@@ -1,0 +1,56 @@
+# The stack is not decided yet. This file covers the plausible candidates
+# without committing to one. Trim it when the stack decision is recorded.
+
+# --- Workflow: local, never in history (AGENTS.md, "The sequence files") ---
+# The in-flight sequence of the one milestone being built. Root-anchored, so
+# TASK_TEMPLATE.md and AUDIT_TEMPLATE.md are not matched, and so the same
+# rule applies at the root of every worktree.
+/TASK-*.md
+/AUDIT-*.md
+/REVIEW-*.md
+/.worktrees/
+
+# --- Rust / Cargo / Tauri ---
+target/
+**/*.rs.bk
+*.pdb
+src-tauri/gen/
+
+# --- Node / TypeScript / Electron ---
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+.eslintcache
+
+# --- Build output and reports ---
+dist/
+dist-ssr/
+build/
+out/
+release/
+coverage/
+
+# --- Local environment ---
+.env
+.env.*
+!.env.example
+*.local
+
+# --- Local agent tooling state ---
+.omc/
+.claude/settings.local.json
+
+# --- Editors ---
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
