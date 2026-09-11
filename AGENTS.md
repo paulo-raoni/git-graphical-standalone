@@ -19,8 +19,10 @@ Git Graph (`mhutchie/vscode-git-graph`) is not under an open-source licence. Fro
 of the Software."* This repository is public, so nothing in it may be a derivative work of Git Graph.
 
 - **Behaviour is the only input.** It comes from running the extension and observing it, and from its
-  user-facing documentation: the marketplace listing, its `README` and its `LICENSE`. It is recorded in this
-  repository in our own words.
+  user-facing documentation **as published on its Marketplace page**: the listing, its `README`, its
+  `LICENSE`, its Changelog, its settings list and its command list. It is recorded in this repository in our
+  own words. Its repository stays off-limits, including the `package.json` and the `CHANGELOG.md` inside it:
+  the same text is read only where the Marketplace publishes it.
 - **NEVER open, read, copy, adapt or translate** any other part of Git Graph: its source code, stylesheets,
   icons, images, localisation strings or any other file of its repository or of its packaged extension. This
   covers **every version**, including the MIT-licensed releases before v1.5.0, and **every fork**.
@@ -47,7 +49,9 @@ Three roles. **A context holds exactly one role for its whole life.**
 **Nobody approves what they wrote.** The reviewer and the executor are never the same context. The
 orchestrator never reviews. An executor never reviews, not even its own work "as a check".
 
-**The owner approves every EPIC and every MILESTONE before its first task file is written.**
+**The owner approves `docs/PLAN.md`, `docs/ADR-0001-stack.md` and the MVP cut once.** Inside the MVP, epics
+and milestones need no separate approval. Outside the MVP, the owner approves every EPIC and every MILESTONE
+before its first task file is written.
 
 ### What each role MAY do. Everything not listed is forbidden.
 
@@ -264,8 +268,9 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
 
 ### When
 
-After **every slice task** of the milestone has been merged into `dev`. Then again, in full, after every fix
-task of a round has been merged.
+At the **end of every wave**, once every lane of the wave has been merged into `dev`. Then again, in full,
+after every fix task of a round has been merged. And once more over the **whole sequence** before promotion,
+even when the last wave's review already passed.
 
 ### How
 
