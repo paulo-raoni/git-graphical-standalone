@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { entryAt } from './column-read';
+import { entryAt } from '../../contracts/column-read';
+
+/**
+ * `column-read.ts` moved to `src/contracts/` in S08 and this test did not follow
+ * it, for the reason recorded at the top of `commit-columns.test.ts`: a test file
+ * under `src/contracts/` names `vitest` and `contracts-depends-on-nothing` has no
+ * carve-out for one.
+ */
 
 describe('entryAt', () => {
   it('reads the entry that is there', () => {

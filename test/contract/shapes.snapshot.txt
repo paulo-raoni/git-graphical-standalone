@@ -91,6 +91,11 @@ interface OpenRepositoryRequest {
 
 type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
 
+interface Person {
+    readonly email: string
+    readonly name: string
+}
+
 interface PersonTable {
     readonly emails: readonly string[]
     readonly names: readonly string[]
@@ -135,3 +140,15 @@ interface WorkingTree {
     readonly isDetached: boolean
     readonly untrackedFileCount: number
 }
+
+value authorOf: (columns: CommitColumns, row: number) => Person
+
+value commitCount: (columns: CommitColumns) => number
+
+value committerOf: (columns: CommitColumns, row: number) => Person
+
+value hexHashOf: (columns: CommitColumns, row: number) => string
+
+value parentsOf: (columns: CommitColumns, row: number) => Uint32Array
+
+value subjectOf: (columns: CommitColumns, row: number) => string

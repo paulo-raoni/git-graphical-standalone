@@ -13,6 +13,33 @@ export type { GitGraphicalBridge } from './bridge';
 export { HASH_BYTE_LENGTH } from './commits';
 export type { CommitColumns } from './commits';
 
+/**
+ * Reading a {@link CommitColumns}.
+ *
+ * These belong to this ring and not to `src/core/`, because the page is a
+ * **compressed encoding** — binary object names, offset tables, one string blob
+ * — and no consumer can read a single field of it without them. A data contract
+ * whose consumers cannot read it is not a complete contract. None of them has an
+ * alternative implementation either: changing what `hexHashOf` returns is
+ * changing what the contract means, not choosing a different policy, which is
+ * the test that keeps the **builder** in `src/core/store/`
+ * (`docs/ADR-0002-architecture-and-performance.md` decision 3, amended
+ * 2026-09-12, and `docs/plan/E01-commit-graph/M01-first-graph/S08-contract-decode-api.md`).
+ *
+ * This is what lets `src/ui/` draw a commit at all: the renderer may import this
+ * ring and nothing else (`ui-only-contracts`), so with the decoders in `core/`
+ * it could not read the page it is given.
+ */
+export {
+  authorOf,
+  commitCount,
+  committerOf,
+  hexHashOf,
+  parentsOf,
+  subjectOf,
+} from './commit-columns';
+export type { Person } from './commit-columns';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';

@@ -1,6 +1,6 @@
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH } from '../../contracts/index';
 
-import { entryAt } from './column-read';
 import { copiedUint32, copiedUint8 } from './growth';
 import { bucketOfHash, hashesMatch } from './hash-index';
 

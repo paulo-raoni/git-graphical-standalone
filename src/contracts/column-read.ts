@@ -3,15 +3,22 @@
  * insists on.
  *
  * `noUncheckedIndexedAccess` types every indexed read as possibly `undefined`,
- * which is the truth: an index past the end of a typed array reads nothing. The
- * store's own callers have already bounded their index, so `undefined` here is a
- * defect in this ring rather than a case a caller should handle, and it fails
- * loudly instead of propagating a `NaN` through arithmetic that would then be
- * wrong somewhere else entirely.
+ * which is the truth: an index past the end of a typed array reads nothing. Its
+ * callers have already bounded their index, so `undefined` here is a defect in
+ * the caller rather than a case it should handle, and it fails loudly instead of
+ * propagating a `NaN` through arithmetic that would then be wrong somewhere else
+ * entirely.
  *
  * It is one function rather than a non-null assertion at each call site because
  * an assertion silences the check without performing it, and because a single
  * function is one place to test.
+ *
+ * It lives in `src/contracts/` because `./commit-columns` needs it and this ring
+ * may import nothing outside itself. It is deliberately **not** re-exported from
+ * `./index`: it is a helper the decoders and the store's own tables share, not a
+ * term of the contract, and the ring's exported surface is snapshotted by
+ * `gates:contract`. `src/core/store/` names it by module path, which
+ * `core-only-inward` allows.
  */
 
 /**
