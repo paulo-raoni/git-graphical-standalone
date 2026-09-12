@@ -1,8 +1,8 @@
 {
   "structuralBytesPerCommitWorst": {
-    "baseline": 85.197,
+    "baseline": 85.519,
     "ceiling": 96,
-    "unit": "bytes per commit, message text excluded, at 24577 commits: the worst size on the growth curve, 24.2 per cent column slack with the hash index newly doubled"
+    "unit": "bytes per commit, message text excluded, at 12502 commits: the worst size found by a sweep of every count from 4097 to 200000, re-measured under this gate's synthetic workload of one parent per commit and one author and committer; 25.0 per cent column slack"
   },
   "structuralBytesPerCommit": {
     "baseline": 79.828,
@@ -26,6 +26,6 @@
   "buildMilliseconds": {
     "baseline": 300,
     "tolerance": 10,
-    "unit": "milliseconds to append 10000 commits, the slowest of the 24577, 20000 and 80000 builds normalised to ten thousand"
+    "unit": "milliseconds to append 10000 commits, the slowest of the 12502, 20000 and 80000 builds normalised to ten thousand"
   }
 }

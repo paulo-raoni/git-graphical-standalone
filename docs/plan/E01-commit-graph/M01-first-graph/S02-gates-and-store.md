@@ -83,17 +83,49 @@ round, and none of them is a size the growth lands on exactly.
 
 | measurement | value | where |
 | --- | --- | --- |
-| structural bytes per commit, 24 577 commits, the worst size on the curve | 85.196 | `perf/baselines.json` |
+| structural bytes per commit, 12 502 commits, the worst size the sweep below found | 85.519 | `perf/baselines.json` |
 | structural bytes per commit, 20 000 commits, 22.1 per cent slack | 79.828 | `perf/baselines.json` |
 | structural bytes per commit, 80 000 commits, 16.4 per cent slack | 76.416 | `perf/baselines.json` |
 | the budget those are held to | 96 | ADR-0002 decision 6 |
 | units of work per commit, at 80 000 | 13.792 | `perf/baselines.json` |
 | work at 80 000 over work at 20 000 | 4.403 | `perf/baselines.json` |
 
-24 577 is the first size past a growth of all three retained structures at once — the per commit columns, the
-parent index column, and the hash index, whose slots are a power of two kept under a three-quarter load — so
-all three carry their slack there together. A sweep of every such size to 200 000 commits found it the worst
-of them, and it is 10.8 bytes under the budget, which is the whole of the headroom the store actually has.
+### Where the worst size comes from, and what it obliges
+
+12 502 is not read off a description of the curve. It is the result of a search, and **the search, not the
+number, is what a later slice inherits.** Describing where the maximum ought to be has been tried twice and
+missed twice — most recently by "the first size past a growth of all three retained structures at once",
+which is a good account of where the peak tends to sit and still named a size 0.32 bytes per commit short of
+the real one. At 12 502 only two of the three have just grown, and it wins on column slack anyway.
+
+**The method, in two phases.** Phase one appends commits one at a time to 200 000, with the same synthetic
+commits `build` uses, reading `retainedByteLength` after every append, and groups the counts by that total:
+each distinct total is one plateau, and there are 24 of them over 4097 to 200 000. Counts below 4097 are
+ignored, because below the initial capacity's first growth the fixed allocation dominates and the ratio says
+nothing about the store. Phase two rebuilds candidates with the gate's own `build` and takes the maximum of
+those. Phase one is a candidate generator and not an answer: because it gives every commit a parent, its
+parent column is never smaller than the gate's, so its reading at any count is an **upper bound** on the
+gate's reading at that count — which is what lets a whole plateau be discarded once its bound falls below the
+best count already rebuilt, and what makes the pass exhaustive rather than a sample.
+
+**The parent-column trap, which is why phase two is not optional.** `build` gives the last commit no parents,
+so a store of `n` commits holds `n − 1` parent entries, and `parentIndices` grows on a boundary one commit
+later than the per commit columns do. A one-pass incremental sweep cannot reproduce that — at every
+intermediate `n` it has already given commit `n − 1` a parent — so it models the parent column as holding `n`
+entries. The two agree everywhere except where `n − 1` and `n` fall either side of a parent-capacity boundary,
+which is precisely the plateau starts, which are precisely the candidates for the peak. There the incremental
+pass **overstates by one byte per commit**, the extra capacity being `4 × (new − old)` over `n`. The worked
+pair: 12 501 reads 85.526 incrementally and **84.526** when rebuilt under the gate's workload, while
+**12 502** reads **85.519**. One commit apart, a byte between them, and the peak in the other place.
+
+**What changes when a growth constant does.** `INITIAL_COMMIT_CAPACITY` and the growth factor are the store's
+own tuning knobs, and changing either moves every boundary of the curve. The size is then **re-derived by
+re-running that search**, never adjusted, and the baseline is re-recorded with the new number and the reason
+(`AGENTS.md` §11). The wording is under the same obligation: what is committed about 12 502 says what was
+searched, over what range, and under which workload — this gate's synthetic one, of one parent per commit and
+one author and one committer, message text excluded — and claims nothing past that, because a repository of
+merges or of thousands of distinct people costs differently. At 85.519 the store is **10.48 bytes** under the
+96-byte budget, and that is the whole of the headroom it has.
 
 ## The fifteen gates
 
@@ -206,12 +238,13 @@ carry no slack at all — the cheapest point of the whole curve. That is the dom
 absorbing proportionally more of the smaller build: 12 500 is far from 4096 and still reads 5.611 against
 50 000, because it too is capacity-exact.
 
-So the gate asserts at the worst size of the curve and at two ordinary mid-cycle sizes, and it **refuses a
-capacity-exact one**: for every size it measures it checks that the builder's final capacity is strictly
-greater than the commits appended, prints the observed slack beside each number, and fails naming the size if
-one stops carrying slack. Without that check a later change to either growth constant would move a size onto
-a boundary, drop bytes per commit from 85.2 to about 66.6, and invite the ratchet to be re-anchored to the
-lowest number the store can show — as an improvement, in a green run.
+So the gate asserts at the worst size the sweep above found and at two ordinary mid-cycle sizes, and it
+**refuses a capacity-exact one**: for every size it measures it checks that the builder's final capacity is
+strictly greater than the commits appended, prints the observed slack beside each number, and fails naming the
+size if one stops carrying slack. Without that check a later change to either growth constant would move a
+size onto a boundary and invite the ratchet to be re-anchored to the lowest number the store can show — as an
+improvement, in a green run. The two commits between 12 500 and 12 502 are the whole of the margin here:
+12 500 is capacity-exact and reads 70.532 against 12 502's 85.519.
 
 `perf/baselines.json` is committed, and the comparison is written so that a baseline can only be **beaten**: a
 run worse than the committed number fails, a run better than it prints the number to commit, and a run past a
