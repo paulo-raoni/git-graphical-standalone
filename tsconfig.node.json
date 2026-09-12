@@ -5,5 +5,11 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["src/app/**/*.ts", "src/adapters/**/*.ts", "src/preload/**/*.ts"]
+  "include": [
+    "src/app/**/*.ts",
+    "src/adapters/**/*.ts",
+    "src/preload/**/*.ts",
+    "test/**/*.ts",
+    "perf/**/*.ts"
+  ]
 }

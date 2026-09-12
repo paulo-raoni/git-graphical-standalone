@@ -1,0 +1,16 @@
+{
+  "comment": "Every pattern is stored in fragments and joined at run time. A gate whose own pattern list is written out in full finds itself, and would then have to exempt the file that holds it, which is the same as not checking it.",
+  "extensions": [".ts", ".js", ".cjs", ".mjs", ".json", ".css", ".html", ".yml", ".yaml"],
+  "patterns": [
+    { "what": "a note left for later", "fragments": ["TO", "DO"] },
+    { "what": "a note left for later", "fragments": ["FIX", "ME"] },
+    { "what": "a note left for later", "fragments": ["HA", "CK:"] },
+    { "what": "a note left for later", "fragments": ["XX", "X:"] },
+    { "what": "a skipped test", "fragments": [".sk", "ip("] },
+    { "what": "a focused test, which silently skips its neighbours", "fragments": [".on", "ly("] },
+    { "what": "a test declared and not written", "fragments": [".to", "do("] },
+    { "what": "a branch that was never written", "fragments": ["not imple", "mented"] },
+    { "what": "a branch that was never written", "fragments": ["unimple", "mented"] },
+    { "what": "a branch that was never written", "fragments": ["todo", "!()"] }
+  ]
+}

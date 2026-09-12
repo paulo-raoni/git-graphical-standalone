@@ -1,0 +1,137 @@
+# The shapes src/contracts/ exports, as the type checker resolves them.
+
+interface ApplicationInfo {
+    readonly chromium: string
+    readonly electron: string
+    readonly git: string | null
+    readonly name: string
+    readonly node: string
+    readonly version: string
+}
+
+type ApplicationInfoResponse = import("./result").Failure | import("./result").Success<import("./ipc").ApplicationInfo>
+
+value BRIDGE_GLOBAL_NAME: "gitGraphical"
+
+value CHANNELS: { readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; }
+
+type ChannelName = "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info"
+
+type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
+
+interface ChosenFolder {
+    readonly path: string
+}
+
+interface CommitColumns {
+    readonly authorId: Uint32Array<ArrayBufferLike>
+    readonly authorTime: Float64Array<ArrayBufferLike>
+    readonly authorTzMinutes: Int16Array<ArrayBufferLike>
+    readonly commitTime: Float64Array<ArrayBufferLike>
+    readonly commitTzMinutes: Int16Array<ArrayBufferLike>
+    readonly committerId: Uint32Array<ArrayBufferLike>
+    readonly count: number
+    readonly hashes: Uint8Array<ArrayBufferLike>
+    readonly parentIndices: Uint32Array<ArrayBufferLike>
+    readonly parentOffsets: Uint32Array<ArrayBufferLike>
+    readonly people: PersonTable
+    readonly subjectOffsets: Uint32Array<ArrayBufferLike>
+    readonly subjects: string
+}
+
+interface Failure {
+    readonly exitCode?: number
+    readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
+    readonly message: string
+    readonly ok: false
+}
+
+type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
+value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly Cancelled: "cancelled"; }
+
+interface GitGraphicalBridge {
+    readonly applicationInfo: () => Promise<ApplicationInfoResponse>
+    readonly chooseFolder: () => Promise<ChooseFolderResponse>
+    readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
+    readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
+    readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
+}
+
+interface GraphPage {
+    readonly commits: CommitColumns
+    readonly hasMore: boolean
+    readonly layout: LayoutRows
+    readonly refs: Refs
+    readonly workingTree: WorkingTree
+}
+
+value HASH_BYTE_LENGTH: 20
+
+interface LayoutRows {
+    readonly colourIndex: Uint8Array<ArrayBufferLike>
+    readonly flags: Uint8Array<ArrayBufferLike>
+    readonly laneIndex: Uint16Array<ArrayBufferLike>
+    readonly maxLane: number
+    readonly rowCount: number
+    readonly segmentColour: Uint8Array<ArrayBufferLike>
+    readonly segmentFromLane: Uint16Array<ArrayBufferLike>
+    readonly segmentOffsets: Uint32Array<ArrayBufferLike>
+    readonly segmentToLane: Uint16Array<ArrayBufferLike>
+}
+
+interface LoadMoreCommitsRequest {
+    readonly count: number
+}
+
+type LoadMoreCommitsResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
+
+interface OpenRepositoryRequest {
+    readonly path: string
+}
+
+type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
+
+interface PersonTable {
+    readonly emails: readonly string[]
+    readonly names: readonly string[]
+}
+
+type RefFlag = 1 | 2 | 4
+value RefFlag: { readonly CheckedOut: 1; readonly AnnotatedTag: 2; readonly DetachedHead: 4; }
+
+type RefKind = 0 | 1 | 2 | 4 | 3
+value RefKind: { readonly LocalHead: 0; readonly RemoteBranch: 1; readonly Tag: 2; readonly RemoteSymbolicHead: 3; readonly Stash: 4; }
+
+type RefreshRequest = { [x: string]: never; }
+
+type RefreshResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
+
+interface Refs {
+    readonly commitIndex: Uint32Array<ArrayBufferLike>
+    readonly count: number
+    readonly flags: Uint8Array<ArrayBufferLike>
+    readonly kind: Uint8Array<ArrayBufferLike>
+    readonly nameOffsets: Uint32Array<ArrayBufferLike>
+    readonly names: string
+}
+
+type Result<TValue> = import("./result").Failure | import("./result").Success<TValue>
+
+type RowFlag = 1 | 2 | 4 | 8
+value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; }
+
+interface Success<TValue> {
+    readonly ok: true
+    readonly value: TValue
+}
+
+value UNKNOWN_INDEX: 4294967295
+
+interface WorkingTree {
+    readonly changedFileCount: number
+    readonly hasChanges: boolean
+    readonly headCommitIndex: number
+    readonly headRefName: string | null
+    readonly isDetached: boolean
+    readonly untrackedFileCount: number
+}

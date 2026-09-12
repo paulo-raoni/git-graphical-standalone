@@ -79,8 +79,40 @@ export default tseslint.config(
     rules: sharedRules,
   },
   {
-    // ESLint's own flat configuration is a module whose export is its default.
-    files: ['eslint.config.js'],
+    // The test and measurement harnesses: TypeScript, outside every ring,
+    // belonging to no bundle and run by their own runners. They are held to the
+    // same type-aware rules as the product code, with nothing relaxed; where
+    // they have to report a number they write to the stream rather than reach
+    // for the `console` the rules forbid.
+    files: ['test/**/*.ts', 'perf/**/*.ts'],
+    extends: [js.configs.recommended, tseslint.configs.strictTypeChecked],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      ...sharedRules,
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+      ],
+    },
+  },
+  {
+    // A tool's flat configuration is a module whose export is its default: the
+    // tool reads it by importing the file, so there is no import site for a
+    // named binding to be renamed at, and the rule above has nothing to protect.
+    files: [
+      'eslint.config.js',
+      'vitest.config.js',
+      'vitest.fixtures.config.js',
+      'vitest.perf.config.js',
+      'playwright.config.js',
+      'commitlint.config.js',
+    ],
     rules: { 'no-restricted-syntax': 'off' },
   },
   {
