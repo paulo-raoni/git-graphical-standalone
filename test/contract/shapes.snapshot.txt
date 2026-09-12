@@ -122,8 +122,8 @@ interface Refs {
 
 type Result<TValue> = import("./result").Failure | import("./result").Success<TValue>
 
-type RowFlag = 1 | 2 | 4 | 8
-value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; }
+type RowFlag = 1 | 2 | 4 | 8 | 16 | 32
+value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; }
 
 interface Success<TValue> {
     readonly ok: true
