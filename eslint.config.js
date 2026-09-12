@@ -41,7 +41,33 @@ const sharedRules = {
 
 export default tseslint.config(
   {
-    ignores: ['dist/', 'node_modules/', 'coverage/'],
+    // Nothing generated is linted. `eslint .` walks the working tree, so a
+    // directory that exists only because a gate ran is a directory this gate
+    // reads — and a `files` pattern here is not anchored, so `src/**/*.ts`
+    // matches a copy of `src/` at any depth. Stryker copies the whole project
+    // into `.stryker-tmp/sandbox-<id>/` and prepends `// @ts-nocheck` to every
+    // `src/` and `test/` file it puts there, which is its `disableTypeChecks`
+    // default and which `@typescript-eslint/ban-ts-comment` forbids. Measured in
+    // this lane, with the three entries this list used to hold and one sandbox on
+    // disk: `eslint .` reported **1674 errors, every one of them inside
+    // `.stryker-tmp/`**. That is S03's report — a lint run that had been green
+    // coming back red because a mutation run was in flight in another shell —
+    // reproduced. It cannot happen inside `npm run gates`, where lint is gate 2
+    // and mutation is gate 7; it happens to whoever runs the two at once, which
+    // at 62 minutes for the mutation gate is what people do. Every entry below
+    // is a `.gitignore` entry as well, and with them `eslint .` reads 91 files,
+    // which is exactly the tracked files its patterns cover, so none of them can
+    // hide a committed file.
+    ignores: [
+      'dist/',
+      'node_modules/',
+      'coverage/',
+      '.stryker-tmp/',
+      'reports/',
+      'playwright-report/',
+      'test-results/',
+      'test/fixtures/repositories/',
+    ],
   },
   {
     // The product code: type-aware linting, one project per ring group.
