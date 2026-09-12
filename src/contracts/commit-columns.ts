@@ -1,7 +1,7 @@
-import { HASH_BYTE_LENGTH } from '../../contracts/index';
-import type { CommitColumns, PersonTable } from '../../contracts/index';
-
 import { entryAt } from './column-read';
+import { HASH_BYTE_LENGTH } from './commits';
+import type { CommitColumns } from './commits';
+import type { PersonTable } from './people';
 
 /**
  * Reading a built page.
@@ -15,6 +15,15 @@ import { entryAt } from './column-read';
  * Nothing here is eager. A page of fifty thousand commits is read by the renderer
  * a viewport at a time, so hex and subjects are produced for the rows on screen
  * and the rest of the page stays as bytes.
+ *
+ * This module is in `contracts/` rather than in `core/` because {@link CommitColumns}
+ * is a compressed encoding: no consumer can read one field of it without these
+ * functions, and none of them has an alternative implementation — changing one
+ * would be changing the contract
+ * (`docs/ADR-0002-architecture-and-performance.md` decision 3, amended
+ * 2026-09-12). The sibling modules of this ring name each other directly rather
+ * than through `./index`, because the index re-exports this module and a module
+ * that imported its own index would be a cycle.
  */
 
 /** One entry of the interned people table, materialised for a caller. */

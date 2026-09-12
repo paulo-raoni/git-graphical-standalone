@@ -1,6 +1,5 @@
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH, UNKNOWN_INDEX } from '../../contracts/index';
-
-import { entryAt } from './column-read';
 
 /**
  * Binary object name to row index, without a string anywhere.
