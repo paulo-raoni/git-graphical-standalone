@@ -122,10 +122,21 @@ if (Test-Path $vswhere) {
 
 ## Traps met while building
 
-- **`npm ci` does not download the Electron binary, and the first `npm start` does.** After a clean install,
-  `node_modules/electron/` has no `dist/` and no `path.txt`. That is normal and not a broken install: this
-  version of the package has no post-install step, and its entry point fetches the binary the first time it
-  is required. What it means in practice is that **the first run in a fresh worktree pulls about 100 MB and
-  needs network**, so it is slow, and it is the step that fails offline or behind a proxy that blocks the
-  download. Every run after it starts immediately. Verified on 2026-09-11 by running `npm start` in a clean
-  worktree with no manual step: it reported the download, installed, and opened the window.
+- **`npm ci` does not fetch the Electron binary. The first `npm start` does, from a cache shared by the whole
+  machine.** After a clean install, `node_modules/electron/` has no `dist/` and no `path.txt`. That is normal
+  and not a broken install: this version of the package has no post-install step at all, and its entry point
+  fetches the binary the first time it is required, without any manual step.
+
+  The cache is **one directory per machine and user account**, `%LOCALAPPDATA%\electron\Cache` on Windows,
+  holding one zip per Electron version. It is **not** per worktree. So only the **first** worktree on a
+  machine with a cold cache downloads anything. Every worktree after it extracts from that cache, which on
+  this machine took **3.4 seconds** and worked without network.
+
+  **`Downloading Electron binary...` is printed before the cache is consulted**, so seeing it proves nothing
+  either way. Tell a download from an extraction by the cached zip's last-write time: an extraction leaves it
+  untouched and only moves its last-access time.
+
+  Measured on 2026-09-11 across three fresh worktrees, each a clean `npm ci` then `npm start`: three cache
+  hits, zero downloads. The zip is **150.8 MB** (158,149,320 bytes) and expands to **367 MB of `dist/` per
+  worktree**, because each worktree has its own `node_modules`. Budget for that when cutting a wave: three
+  lanes at once cost over a gigabyte of disk in `.worktrees/` on top of the rest of the install.
