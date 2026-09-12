@@ -28,6 +28,16 @@ does it.>
 
 Include every failure met on the way and how it was fixed.
 
+**A gate that reports a score reports how it arrived at it.** Give the denominator and the breakdown, not
+the headline: for the mutation gate, how many mutants were killed by a failing assertion and how many merely
+timed out; for coverage, the number of files below the threshold, not the total.
+
+The reason is a defect this project met for real. Four consecutive lanes reported a mutation score of 100.00
+while the share of mutants that only timed out went from ten per cent to ninety-nine point six. Each number
+was true in isolation, none was wrong on its own terms, and the gate had stopped measuring the tests
+entirely. **Nobody put the four side by side, because no audit was asked for the second number.** A trend
+across audits is invisible unless every audit carries the same quantity.
+
 ## Boundary check
 
 <The output of `git diff --name-only <Base>..HEAD` — a list of paths, not a diff — and a note for every path
