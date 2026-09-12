@@ -76,13 +76,24 @@ not change when the store is appended to again.
 
 ### What it measures
 
+The store retains a **step function** of the commit count — the columns grow by five quarters, the hash index
+doubles — so bytes per commit is that step divided by the count, and it has a maximum just after a growth and
+a minimum just before the next one. The sizes below are chosen against those two cycles rather than for being
+round, and none of them is a size the growth lands on exactly.
+
 | measurement | value | where |
 | --- | --- | --- |
-| structural bytes per commit, 10 000 commits | 66.612 | `perf/baselines.json` |
-| structural bytes per commit, 40 000 commits | 78.099 | `perf/baselines.json` |
+| structural bytes per commit, 24 577 commits, the worst size on the curve | 85.196 | `perf/baselines.json` |
+| structural bytes per commit, 20 000 commits, 22.1 per cent slack | 79.828 | `perf/baselines.json` |
+| structural bytes per commit, 80 000 commits, 16.4 per cent slack | 76.416 | `perf/baselines.json` |
 | the budget those are held to | 96 | ADR-0002 decision 6 |
-| units of work per commit | 13.368 | `perf/baselines.json` |
-| work at 40 000 over work at 10 000 | 6.019 | `perf/baselines.json` |
+| units of work per commit, at 80 000 | 13.792 | `perf/baselines.json` |
+| work at 80 000 over work at 20 000 | 4.403 | `perf/baselines.json` |
+
+24 577 is the first size past a growth of all three retained structures at once — the per commit columns, the
+parent index column, and the hash index, whose slots are a power of two kept under a three-quarter load — so
+all three carry their slack there together. A sweep of every such size to 200 000 commits found it the worst
+of them, and it is 10.8 bytes under the budget, which is the whole of the headroom the store actually has.
 
 ## The fifteen gates
 
@@ -180,12 +191,27 @@ leaked process is a failure whatever the assertions said.
 
 `docs/ADR-0003-quality-gates-and-ci.md` decision 4: wall-clock time on a shared runner is noisy enough to
 flap, and a gate that flaps is a gate people learn to ignore. So the gate asserts **counters** — bytes
-retained per commit, units of work per commit, and the ratio of work at forty thousand commits to work at ten
-thousand — and records the wall clock beside them with an order-of-magnitude tolerance.
+retained per commit, units of work per commit, and the ratio of work at eighty thousand commits to work at
+twenty thousand — and records the wall clock beside them with an order-of-magnitude tolerance.
 
-The scaling ratio is what catches an accidentally quadratic append regardless of machine speed. It is 6.019
-rather than exactly 4, because the initial capacity of 4096 absorbs proportionally more of the smaller build
-than of the larger one; a quadratic append would be 16 or more, and the ceiling is 8.
+The scaling ratio is what catches an accidentally quadratic append regardless of machine speed. It is 4.403
+rather than exactly 4, and the store does **about four times the work for four times the commits**: a
+quadratic append would be 16 or more, and the ceiling is 8.
+
+**Where the gate measures is part of what it measures.** The two growth cycles put a best and a worst point
+on the curve, and a size picked for being round can land on either. `INITIAL_COMMIT_CAPACITY × (5/4)ⁿ` is
+8000, 10 000 and 12 500, so at those three sizes the last growth lands exactly on the data and the columns
+carry no slack at all — the cheapest point of the whole curve. That is the dominant reason the pair 10 000 and
+40 000 read 6.019 rather than about 4.3, and it is a much larger effect than the initial capacity of 4096
+absorbing proportionally more of the smaller build: 12 500 is far from 4096 and still reads 5.611 against
+50 000, because it too is capacity-exact.
+
+So the gate asserts at the worst size of the curve and at two ordinary mid-cycle sizes, and it **refuses a
+capacity-exact one**: for every size it measures it checks that the builder's final capacity is strictly
+greater than the commits appended, prints the observed slack beside each number, and fails naming the size if
+one stops carrying slack. Without that check a later change to either growth constant would move a size onto
+a boundary, drop bytes per commit from 85.2 to about 66.6, and invite the ratchet to be re-anchored to the
+lowest number the store can show — as an improvement, in a green run.
 
 `perf/baselines.json` is committed, and the comparison is written so that a baseline can only be **beaten**: a
 run worse than the committed number fails, a run better than it prints the number to commit, and a run past a
