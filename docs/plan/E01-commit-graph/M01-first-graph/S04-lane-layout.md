@@ -195,19 +195,19 @@ under *a page boundary, which is not a root*: the two pages are identical in `ro
 ### The gap this replaced, and what it cost
 
 The vocabulary did not always have these two bits, and while it did not, every `flags` entry of a tip-and-root
-page was `0`. The stub it produced was found by rendering the layout to text and reading it, not by a test: rows 3
-and 20 of the braided sample showed the stub above a tip, and the root of the seven-row fixture in
-`lane-layout-pages.test.ts` the one below a root. Emitting nothing instead of the stub replaces it with a
-half-row **gap** between the dot and the line, which is worse, and emitting the arrival and the departure as two
-segments does not help, because both are spelled `(V, V)`.
+page was `0`. **This lane found that** by rendering the layout to text and reading it, not by a test: it
+reported rows 3 and 20 of its braided sample showing the stub above a tip, and the root of the seven-row
+fixture in `lane-layout-pages.test.ts` showing the one below a root. Emitting nothing instead of the stub
+replaces it with a half-row **gap** between the dot and the line, which is worse, and emitting the arrival and
+the departure as two segments does not help, because both are spelled `(V, V)`.
 
-This lane raised it in `AUDIT-S04-lane-layout.md` and emitted the stub rather than inventing a channel for it,
+It raised the gap in `AUDIT-S04-lane-layout.md` and emitted the stub rather than inventing a channel for it,
 because `src/contracts/` was outside its boundary and was being edited by another lane of the same wave. The
-gap cost a review round and a repair before the renderer could be specified at all, and the review that read
-the layout a second time added the half of it this note had missed: that a true root and a page boundary were
-**byte-identical** in the output. The lesson for the next person choosing a vocabulary is that
-*"a segment spans a band"* was one case short of complete, and that the missing case was not visible from any
-single page of output — which is why a renderer would have been written against it before anyone noticed.
+gap then cost a review finding and a repair lane before the renderer could be specified at all, and that
+review added the half of it this note had missed: that a true root and a page whose last commit has an
+unloaded parent are **byte-identical** in the output. The lesson for the next person choosing a vocabulary is
+that *"a segment spans a band"* was one case short of complete, and that the missing case was invisible from
+any single page of output — which is why a renderer would have been written against it before anyone noticed.
 
 ## What this lane does not set
 
