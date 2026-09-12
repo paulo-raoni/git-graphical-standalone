@@ -17,12 +17,15 @@
     "low": 95,
     "break": 85
   },
-  "reporters": ["progress", "clear-text", "html"],
+  "reporters": ["progress", "clear-text", "html", "json"],
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
   },
-  "timeoutMS": 10000,
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "timeoutMS": 60000,
   "commandRunner": {
-    "command": "node node_modules/vitest/vitest.mjs run --reporter=dot"
+    "command": "node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache"
   }
 }

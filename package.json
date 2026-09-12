@@ -25,7 +25,7 @@
     "gates:unit": "run-s gates:unit:*",
     "gates:unit:modules": "vitest run --coverage",
     "gates:unit:fixtures": "vitest run --config vitest.fixtures.config.js",
-    "gates:mutation": "stryker run",
+    "gates:mutation": "node scripts/gates/mutation.js",
     "gates:build": "run-s build",
     "gates:e2e": "playwright test",
     "gates:perf": "vitest run --config vitest.perf.config.js",
