@@ -49,7 +49,8 @@ Three roles. **A context holds exactly one role for its whole life.**
 **Nobody approves what they wrote.** The reviewer and the executor are never the same context. The
 orchestrator never reviews. An executor never reviews, not even its own work "as a check".
 
-**The owner approves `docs/PLAN.md`, `docs/ADR-0001-stack.md` and the MVP cut once.** Inside the MVP, epics
+**The owner approves `docs/PLAN.md`, the architecture decision records under `docs/` that it rests on, and
+the MVP cut, once.** Inside the MVP, epics
 and milestones need no separate approval. Outside the MVP, the owner approves every EPIC and every MILESTONE
 before its first task file is written.
 
@@ -308,6 +309,17 @@ one that works. For every gate an executor adds or relies on: **plant a probe** 
 **watch it go red**, **remove the probe**, **watch it go green**, and record all four steps in the audit. A
 gate that has never been seen red is reported as unproven.
 
+### The mutation gate, and the reviewer's own mutation
+
+A mutation-testing gate runs over the rings that hold the product's decisions, with a score threshold that
+fails the build (`docs/ADR-0003-quality-gates-and-ci.md`). It is mechanical, it runs on every slice, and it
+raises the floor: a test suite that asserts nothing cannot pass it.
+
+**It does not replace the pass below.** The gate proves the suite kills the mutants a tool can generate; the
+reviewer proves the suite exercises *this slice's guarantee*, which is a judgement no tool makes. The two
+compose: **every mutant the gate reports as surviving is a candidate line for the reviewer**, and the
+reviewer says in its review file whether it used one and why it chose the line it chose.
+
 ### The reviewer mutates a different line
 
 Breaking the same line the executor already broke only re-confirms a claim that was never in doubt.
@@ -400,3 +412,43 @@ asks for it in the current session**.
   - Each agent shell invocation is fresh, so a job table is always empty and proves nothing.
   - Some agent Bash tools **strip `TZ`** from child processes. A timezone-dependent gate run through one
     passes while testing only the host clock. Run those from PowerShell.
+
+---
+
+## 11 · Gates, continuous integration and the ratchet
+
+### One gate script
+
+Every gate of the project is reachable through **one entry point**, named in `MILESTONE.md`, and continuous
+integration calls **the same scripts** rather than its own inlined commands. A gate that exists only in a
+workflow file cannot be run inside a worktree, and a gate an executor cannot run is a gate that fails at the
+wrong moment, against work already merged.
+
+### Where evidence comes from
+
+**Executors never push (§2), so continuous integration never sees a lane branch.** The primary evidence for
+a slice is produced locally, in its worktree, and recorded in its audit with the probe that proved each gate
+can fail (§7). Continuous integration is the **ratchet on `dev` and `main`**: it runs when the orchestrator
+pushes, which happens only when the owner asks, and on the promotion pull request. A green pipeline is never
+accepted in place of an audit, and a red one is a finding regardless of what any audit claims.
+
+### One workflow, one line
+
+There is **exactly one workflow file**. Every trigger lives in it, and a job that should not run for a given
+event is skipped by condition, never moved to a second file. The reason is how the platform renders: one row
+per workflow run, with jobs nested inside it, so a second file is a second row for the same commit and an
+orphan. One job depends on all the others and is the single required check.
+
+### Pull requests
+
+Lane branches are never pushed and never get a pull request. **A pull request exists only for a promotion**,
+`dev` into `main` at the end of a milestone (§8), opened only when the owner asks for the push. One
+milestone, one pull request, one tag.
+
+### The ratchet
+
+A committed baseline — coverage thresholds, mutation thresholds, performance counters and budgets, size
+budgets — **moves in the improving direction only**. Loosening one is a commit that says why, inside the
+diff the reviewer reads. An executor that cannot meet a baseline raises it as a blocker in its audit; it
+never edits the target to match its result. A gate that flaps is a defect of the gate, fixed as one, and
+never a reason to relax a threshold.
