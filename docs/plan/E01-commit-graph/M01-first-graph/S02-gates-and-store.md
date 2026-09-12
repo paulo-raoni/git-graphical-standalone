@@ -295,20 +295,22 @@ before-and-after of the same code.
 | --- | --- | --- |
 | files in the report | 17 | 20 |
 | mutants | 1131 | **1195** |
-| killed by the suite | 1081 (1080 to 1081) | 1141 |
+| killed by the suite | 1081 (1080 to 1081) | 1141 (1141 to 1142) |
 | timed out | 43 (43 to 44) | 46 |
-| survived | 7 (6 to 7) | 8 |
+| survived | 7 (6 to 7) | 8 (7 to 8) |
 | no coverage, errors, ignored, pending | 0 | 0 |
-| score, against `break` 85 | **99.38** (99.38 to 99.47) | **99.33** |
+| score, against `break` 85 | **99.38** (99.38 to 99.47) | **99.33** (99.33 to 99.41) |
 | timeout share of detections | 3.8 per cent | 3.9 per cent of 1187 |
 | the line Stryker prints | `Ran 0.96 tests per mutant on average.` | the same, 0.96 |
-| `gates:mutation`, wall clock | 53 minutes | 62 minutes 50 seconds |
+| `gates:mutation`, wall clock | 53 minutes | 62 to 63 minutes |
+| `npm run gates`, wall clock | 55 minutes | 65 minutes |
 
 S02's column is one run, the last of three; where the three disagreed the range is given, because two mutants
-sit either side of the timeout budget and move between runs. FIX-06's column is one run and carries no range.
-The two wall clocks are **not** a cost for the widening: they are different commits with different amounts of
-source, and 57 more mutants at about eleven seconds each over seven workers accounts for about a minute and a
-half of the nine minutes between them.
+sit either side of the timeout budget and move between runs. FIX-06's column is two runs of **identical
+source**, the first `gates:mutation` alone and the second inside `npm run gates`, and they disagree about one
+mutant — see below. The two wall clocks are **not** a cost for the widening: they are different commits with
+different amounts of source, and 57 more mutants at about eleven seconds each over seven workers accounts for
+about a minute and a half of the nine minutes between them.
 
 **What the widening added is exactly three files and 57 mutants.** At FIX-06's commit the `src/core/` part of
 the report holds 1138 mutants across 17 files, which is what `stryker run --dryRunOnly` counts before the
@@ -320,11 +322,30 @@ to the mutant population rather than a proportion of its file count.
 Eight survivors. Seven are in `src/core/parse/`: `bytes.ts` at 60:26, 70:7 and 166:20, `commit-lookup.ts` at
 28:62, `object-names.ts` at 51:78, and `working-tree-status.ts` at 141:7 and 141:20. The eighth is the one the
 widening found: **`src/contracts/bridge.ts` at 13:35, `StringLiteral`**, which replaces
-`BRIDGE_GLOBAL_NAME`'s `'gitGraphical'` with the empty string. No unit test names that constant — the gate
-that does is `gates:e2e`, which asserts the bridge from inside the renderer, and Stryker runs the unit suite
-only. **Both decoder modules score 100.00 with no survivor.** Every other file under `src/core/` scores
-100.00; those four score 97.32, 97.92, 98.75 and 97.53. **Closing any of them is test work in the folders
-their own lanes own, and it is not what moved the instrument.**
+`BRIDGE_GLOBAL_NAME`'s `'gitGraphical'` with the empty string. No unit test names that constant — grepped,
+not assumed; the gate that does is `gates:e2e`, which asserts the bridge from inside the renderer, and
+Stryker runs the unit suite only. **Both decoder modules score 100.00 with no survivor**, in both runs.
+Every other file under `src/core/` scores 100.00; those four score 97.32, 97.92, 98.75 and 97.53. **Closing
+any of them is test work in the folders their own lanes own, and it is not what moved the instrument.**
+
+### A kill under the command runner is "the suite exited non-zero"
+
+That eighth mutant is the one the two runs disagree about, and the disagreement is worth more than the
+mutant. Run one reported it **survived**; run two, over identical source, reported it **killed**, which is the
+whole of the difference between 99.33 and 99.41. Re-run on its own — `stryker run --mutate
+src/contracts/bridge.ts`, one mutant, the suite completing at `Ran 1.00 tests per mutant` — it **survives**.
+Nothing in the unit suite reads the constant, so there is nothing that could have detected it, and the honest
+verdict is the isolated one.
+
+What run two saw was the suite exiting non-zero for a reason that was not the mutant. The command runner has
+no way to tell those apart: it runs `vitest run` and reads an exit status, so **any** failure under seven
+concurrent workers — and not only a failing assertion — is scored as a detection. That is the same family as
+the timeout counted as a kill, and it moves the score in the same direction, but it is smaller and it is not
+what `scripts/gates/mutation.js` refuses: a falsely killed mutant carries a completed test run, so the first
+clause passes it, and one of 1195 is nowhere near the timeout cap. **Two consequences for a lane reading its
+own numbers:** a survivor that appears in one run and not the next is a survivor, not a flake, until an
+isolated run says otherwise; and a score is reproducible to about a tenth of a point on this machine, not
+exactly.
 
 `bytes.ts:166:20` is the one to read twice. It is a **slow** mutant rather than a non-terminating one, so it
 is reported as survived on two runs of three and as timed out on the third, where the machine was busier — and
