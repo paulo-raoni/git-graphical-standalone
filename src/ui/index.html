@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Nothing loads that this application did not ship: no remote origin, no
+      inline script, no `eval`, and no network of any kind. `frame-ancestors` is
+      deliberately absent because a policy delivered in a meta element may not
+      carry it; framing is refused in the main process instead, which turns off
+      the webview tag and denies every navigation and window open.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Git Graphical Standalone</title>
+    <link rel="stylesheet" href="renderer.css" />
+  </head>
+  <body>
+    <main id="app"></main>
+    <script src="renderer.js" defer></script>
+  </body>
+</html>
