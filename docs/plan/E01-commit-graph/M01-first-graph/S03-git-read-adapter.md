@@ -10,9 +10,13 @@ the layer under it. `src/ports/repository-reader.ts` says what the application n
 `src/adapters/` finds git, runs it, and streams its output; `src/core/parse/` turns that output into
 `CommitColumns`, `Refs` and `WorkingTree` without holding any of it whole.
 
-Read against this repository — 34 commits, five local branches, two remote-tracking branches, one annotated
-tag, five merges and one root — the adapter's answers are identical to what `git log`, `git for-each-ref` and
-`git status` print directly. What was compared, and how, is in `AUDIT-S03-git-read-adapter.md`.
+Read against this repository — which at the time of writing had five local branches, two remote-tracking
+branches, one annotated tag, five merges and two histories joined at a root — the adapter's answers were
+identical to what `git log`, `git for-each-ref` and `git status` printed directly: the same object names in the
+same order, the same reference names, the same counts of merges and roots, and the same working tree. It was
+compared twice, before the work was committed and again at the commit that landed it. What was compared, and
+the figures, are in `AUDIT-S03-git-read-adapter.md`; they are not repeated here because a count of this
+repository's own commits is a number that is wrong by the next merge.
 
 ## The rings, and what is in each
 
@@ -206,10 +210,13 @@ The parser's two per-commit buffers — the object name and the parent list — 
 which is safe for exactly the reason `AppendedCommit` exists: the store copies each field into a column and
 lets the object die in the nursery.
 
-Measured, reading the 10 000-commit fixture's log: 2 108 854 bytes arrived in 6 851 chunks, and the largest
-single chunk was 9 495 bytes. `git-process.spec.ts` asserts that more than one chunk arrives and that the
-largest is smaller than the total, which is the mechanical form of the claim. The audit carries the numbers and
-how they were taken.
+Measured over four runs, reading the 10 000-commit fixture's log: the same 2 108 854 bytes every time, arriving
+in 6 742 to 7 486 chunks, the largest single chunk between 9 495 and 32 494 bytes. **The largest single
+allocation on the path is one chunk**, which at its worst was one part in 65 of the output; the count and the
+size are the pipe's scheduling rather than anything this code chooses, which is why they are a range and the
+total is not. `git-process.spec.ts` asserts that more than one chunk arrives and that the largest is strictly
+smaller than the total, which is the mechanical form of the claim and the assertion that fails if anybody
+replaces the stream with a buffer. The audit carries the four readings and how they were taken.
 
 ## Where the failure types come from
 
