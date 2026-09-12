@@ -8,8 +8,9 @@ of `src/core/`.
 Nothing a user sees has changed: the application still opens one window and says `No repository is open.`
 What has changed is everything around it. `npm run gates` now runs **fifteen** gates rather than five, in the
 order `docs/ADR-0003-quality-gates-and-ci.md` §2 puts them, and `.github/workflows/ci.yml` calls the same
-scripts. Under `src/core/store/` there is the columnar commit store the whole of wave 3 consumes, held to a
-hundred per cent mutation score and a ninety-six byte per commit budget that a benchmark measures on every run.
+scripts. Under `src/core/store/` there is the columnar commit store the whole of wave 3 consumes, at a
+mutation score of 100.00 over its 269 mutants with no survivor, and under a ninety-six byte per commit budget
+that a benchmark measures on every run.
 
 ## The commit store
 
@@ -137,7 +138,7 @@ merges or of thousands of distinct people costs differently. At 85.519 the store
 | 4 | `gates:types` | the three TypeScript projects, separately |
 | 5 | `gates:contract` | a committed snapshot of what `src/contracts/` exports |
 | 6 | `gates:unit` | Vitest with per-directory coverage, and the fixture generator's determinism |
-| 7 | `gates:mutation` | StrykerJS over `src/core/`, breaking below 85 |
+| 7 | `gates:mutation` | StrykerJS over `src/core/`, breaking below 85, refusing a run that measured nothing |
 | 8 | `gates:build` | the three bundles |
 | 9 | `gates:e2e` | Playwright over the built application |
 | 10 | `gates:perf` | counters and budgets against committed baselines |
@@ -164,21 +165,117 @@ assistant and an emoji, over the range from the previous promotion's tag to `HEA
 records what the type checker resolves each export to, so a comment or a reordering does not move the
 snapshot and a renamed field does. `npm run contract:record` rewrites it, which is the only way it changes.
 
-### Coverage, and the mutation threshold
+### Coverage
 
 Coverage thresholds are **per directory**. `src/core/**` is held at 100 per cent of statements, branches,
-functions and lines, which is what the store's own tests reach; `app/`, `preload/` and `ui/` are wiring, their
+functions and lines, which is what its own tests reach; `app/`, `preload/` and `ui/` are wiring, their
 guarantee comes from the end-to-end gate, and holding them to a number would buy a test that asserts the
-wiring is wired. The mutation threshold breaks at **85** for `src/core/` and the store scores **100** over 325
-mutants, 296 killed outright and 29 by timeout.
+wiring is wired.
 
-Stryker runs through its **command runner**, not through `@stryker-mutator/vitest-runner`. With `vitest@5.0.0`
-the vitest runner's per-test name filter does not survive the round trip into the worker: no test matches, no
-test runs, and every mutant is reported as having survived with a score of zero — a red gate whose number
-means nothing. The command runner runs the whole unit suite per mutant, which is slower and correct. The
-consequence is that the unit suite is split in two: `vitest.config.js` covers `src/` only, because the
-mutation gate runs it hundreds of times, and `vitest.fixtures.config.js` covers the fixture generator's proof,
+## The mutation gate
+
+Stryker runs through its **command runner**, not through `@stryker-mutator/vitest-runner`. At the pinned
+versions the vitest runner's per-test name filter does not survive the round trip into its worker: no test
+matches, no test runs, and every mutant is reported as having survived. Measured again over
+`src/core/parse/raw-date.ts` after the gate was repaired: **score 0.00, 71 of 71 survived**, `Ran 0.00 tests
+per mutant on average`, and **no error raised** — the number is wrong and the run looks healthy.
+`docs/ADR-0003-quality-gates-and-ci.md` decision 3 carries the amendment. The command runner runs the whole
+unit suite once per mutant, which is slower and correct, and selects the live mutant through
+`__STRYKER_ACTIVE_MUTANT__` in the child's environment rather than through the file on disk.
+
+One consequence is that the unit suite is split in two: `vitest.config.js` covers `src/` only, because the
+mutation gate runs it once per mutant, and `vitest.fixtures.config.js` covers the fixture generator's proof,
 which spawns git some seventy times and belongs nowhere near that loop.
+
+### A timeout is scored as a kill, and that made this gate green for nothing
+
+**Stryker counts a mutant that ran out of time as detected.** That default is right — a mutant that makes the
+code loop forever has been caught — and it is how this gate came to report **100.00 with nine of 1131 mutants
+killed by a test**, through four lanes and four audits, while the share of its detections that were timeouts
+climbed from ten per cent to ninety-nine.
+
+The cause is a calibration, not a bug in any test. Stryker's per-mutant budget is the **dry run's** net time
+times `timeoutFactor` plus `timeoutMS`, and the dry run has the machine to itself while the per-mutant runs
+share it with six others: `concurrency` defaults to one less than the processor count, which is seven here.
+Measured on the development machine (`docs/ADR-0001-stack.md`), one `vitest run` over `src/` costs **2.0 to
+2.4 seconds** alone and **12.0 to 13.3 seconds** when seven run at once — against a budget of
+`2.5 s × 1.5 + 10 s`, or **13.8 seconds**. Almost every per-mutant run therefore exceeded it, and every one
+that did was scored as a kill.
+
+So `timeoutMS` is **60 000**, which puts the budget at about 64 seconds against a run that costs eleven, and
+the per-mutant command passes `--fsModuleCache`. The cache is a speed choice and not the correctness one:
+enabling it takes the concurrent cost from 13.2 to 11.0 seconds, and **on its own it left 58 of one module's
+71 mutants still timing out**. Sharing a transform cache between sandboxes is sound because the instrumenter
+writes **one** instrumented source carrying every mutant, so the file keyed on is identical for every mutant
+of a run; Vitest's cache key is the module id plus the file's whole content, and Stryker symlinks
+`node_modules` into each sandbox, so the default cache path already resolves to one directory outside them.
+
+### What the gate refuses beyond the score
+
+A score composed of timeouts is not a measurement, and the score alone cannot say so. **`gates:mutation` is
+therefore `scripts/gates/mutation.js`**, which runs Stryker, reads back the shape of the run from its json
+report, and refuses two shapes whatever the score says:
+
+- **a mutant reported as killed or survived with no completed test run behind it.** Both verdicts are claims
+  about what the tests did, and this runner reports exactly one completed test per mutant whose suite reached
+  an exit status. This is the clause that catches a runner returning verdicts without running anything, which
+  is what the vitest runner above does.
+- **a run more than a quarter of whose detections are timeouts.** This is the clause that catches the failure
+  described above. A quarter is a validity bound rather than a baseline: the honest run measures **3.8 per
+  cent**, and the four runs that reported 100.00 while the gate measured nothing sat at 10, 62, 82 and 99.6.
+
+Neither clause is the tests-per-mutant figure itself, because a genuinely non-terminating mutant is a
+legitimate detection with no test result — 43 of the 1131 mutants are loop-control mutations in the growth and
+probing loops of the store and of the layout engine, and in the UTF-8 decoder, which is why the honest run
+prints `Ran 0.96 tests per mutant on average` rather than 1.00. Both numbers are **printed on every run**,
+beside the breakdown, because
+what made the failure survive four reviews was that the line Stryker already printed was read by nobody.
+
+**Every later slice's mutation run has to satisfy this**, so: a lane whose run is refused has not failed on
+its tests. It is being told that the run cannot support a claim about them, and the two numbers in the
+refusal say which of the two shapes it hit.
+
+### The numbers it produces
+
+Over the configured scope — `src/core/**/*.ts` without the tests — with a cleared incremental file, on the
+development machine and otherwise idle. The column is one run, the last of three; where the three disagree the
+range is given, because two mutants sit either side of the timeout budget and move between runs.
+
+| measurement | value |
+| --- | --- |
+| mutants | 1131 |
+| killed by the suite | 1081 (1080 to 1081) |
+| timed out | 43 (43 to 44) |
+| survived | 7 (6 to 7) |
+| no coverage, errors, ignored | 0 |
+| score, against `break` 85 | **99.38** (99.38 to 99.47) |
+| timeout share of detections | 3.8 per cent |
+| the line Stryker prints | `Ran 0.96 tests per mutant on average.` |
+| `gates:mutation`, wall clock | 53 minutes |
+| `npm run gates`, wall clock | 55 minutes |
+
+The seven survivors are in `src/core/parse/`: `bytes.ts` at 60:26, 70:7 and 166:20, `commit-lookup.ts` at
+28:62, `object-names.ts` at 51:78, and `working-tree-status.ts` at 141:7 and 141:20. Every other file under
+`src/core/` scores 100.00; those four score 97.32, 97.92, 98.75 and 97.53. **Closing them is test work in the
+folders their own lanes own, and it is not what moved the instrument.**
+
+`bytes.ts:166:20` is the one to read twice. It is a **slow** mutant rather than a non-terminating one, so it
+is reported as survived on two runs of three and as timed out on the third, where the machine was busier — and
+a timeout is a detection. The honest verdict is the one the longer budget reveals, which is that it survives,
+so the score above is a ceiling and not a point. The remedy is a longer budget, and it is deliberately not
+applied on top of the one this fix already set: a budget is a committed number and moving it twice, once on a
+measurement and once on a hunch, is how a baseline gets walked.
+
+**The score is no longer a per-file guarantee, and the survivor list is.** `break` compares one global number,
+so at 1131 mutants the gate needs 170 survivors to fail, and the largest single file in scope has 133 mutants.
+Measured: reducing `raw-date.test.ts` to a single test that asserts nothing takes that file to **66.20 with 24
+survivors** and the whole run to 97.35, which passes. So a lane reads its own per-file line and its own
+survivors, not the headline, and the headline's job is to stop a collapse rather than to notice a module.
+
+The repair did not make the gate faster and was not expected to either way: the same scope at the same commit
+took 52 minutes before it, spending almost all of that on 1122 timeouts of about 14 seconds. Replacing them
+with 1081 runs that complete in about 11 left the wall clock where it was, within a minute and a half, and the
+whole of `npm run gates` went from 54 minutes to 55.
 
 ## The fixture repositories
 

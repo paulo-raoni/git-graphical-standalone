@@ -9,13 +9,14 @@ import { repositoryRoot, report } from './tree.js';
  * cannot have measured the tests.
  *
  * Stryker scores a **timeout as a detection**. That is the right default — a
- * mutant that makes the code loop forever has been detected — and it is what
- * made this gate's failure invisible: with a per-mutant timeout budget measured
- * on a warm transform cache and spent on cold ones, every per-mutant run ran out
- * of time, every timeout was counted as a kill, and the score was 100.00 with not
- * one mutant killed by an assertion. The gate was green for a reason unrelated to
- * what it measures, which `AGENTS.md` §7 says is the one failure a green run
- * cannot distinguish from working.
+ * mutant that makes the code loop forever has been detected — and it is what made
+ * this gate's failure invisible: the per-mutant timeout budget is derived from the
+ * dry run, which has the machine to itself, and spent on per-mutant runs that
+ * share it with six others, so almost every one of them ran out of time, every
+ * timeout was counted as a kill, and the score read 100.00 with nine of 1131
+ * mutants killed by a test. The gate was green for a reason unrelated to what it
+ * measures, which `AGENTS.md` §7 says is the one failure a green run cannot be
+ * distinguished from working by.
  *
  * So the score is not the only thing read back. Stryker's own JSON report carries
  * `testsCompleted` per mutant — one completed test per mutant whose suite reached
@@ -34,14 +35,15 @@ import { repositoryRoot, report } from './tree.js';
  *    a 99.2 per cent timeout share at a score of 100.00. A quarter is a validity
  *    bound and not a quality target: the honest full run measured for
  *    `docs/plan/E01-commit-graph/M01-first-graph/S02-gates-and-store.md` sits at
- *    3.9 per cent, and the four runs that were green while this gate measured
+ *    3.8 per cent, and the four runs that were green while this gate measured
  *    nothing sat at 10, 62, 82 and 99.6.
  *
  * Neither clause subsumes the other, and neither is the tests-per-mutant figure
  * itself, because a genuinely non-terminating mutant is a legitimate detection
- * with no test result: 44 of the 1131 mutants of the honest run are loop-control
- * mutations in the store's probing and growth loops, which is why that run prints
- * `Ran 0.96 tests per mutant on average` rather than 1.00. The figure is printed
+ * with no test result: 43 of the 1131 mutants of the honest run are loop-control
+ * mutations in the store's probing and growth loops and in the UTF-8 decoder,
+ * which is why that run prints `Ran 0.96 tests per mutant on average` rather than
+ * 1.00 and why a floor on that figure is not one of the clauses. It is printed
  * on every run beside the timeout share, because what caught both failures late
  * was that nobody had those two numbers in one place.
  *
@@ -70,7 +72,7 @@ const DEFAULT_REPORT = join('reports', 'mutation', 'mutation.json');
 /**
  * The cap on the timeout share of detections. A validity bound rather than a
  * baseline: the four runs that reported 100.00 while this gate measured nothing
- * sat at 10, 62, 82 and 99.6 per cent, and the honest run measures 3.9.
+ * sat at 10, 62, 82 and 99.6 per cent, and the honest run measures 3.8.
  */
 const TIMEOUT_SHARE_CAP = 0.25;
 
@@ -126,9 +128,15 @@ function tally(files) {
 
 /**
  * The same arithmetic `mutation-testing-metrics` does, spelled out here so that
- * the number this gate refuses is the number Stryker printed and not a second
- * one: detected is killed plus timeout, valid excludes the errors, and the
+ * the numbers this gate prints are the numbers Stryker printed and not a second
+ * set: detected is killed plus timeout, valid excludes the errors, and the
  * denominator of tests per mutant is every mutant in the report.
+ *
+ * A report with mutants but no **valid** one — every mutant an error — would
+ * score `NaN` and pass both clauses below. It is left unguarded because it
+ * cannot be reached: mutation testing does not start unless the dry run
+ * succeeded, and the only way this runner reports an error is a failure to start
+ * a process, which would have failed the dry run first.
  */
 function metricsOf({ counts, testsCompleted }) {
   const detected = counts.Killed + counts.Timeout;
