@@ -21,9 +21,9 @@ It also lays the ground every later milestone stands on: the four rings and the 
 | ID | title | wave | outcome |
 | --- | --- | --- | --- |
 | S01 | scaffold, rings and the frozen contract | 1 | The project with its rings, the dependency rule enforced mechanically, every development dependency of the milestone pinned, the frozen contracts, the static gates, and a window that opens. |
-| S02 | gate pipeline and CI | 2 | Unit and coverage thresholds, StrykerJS, the Playwright harness, the benchmark harness and its baselines, deterministic fixture repositories, `npm run gates`, and the single grouped workflow. |
-| S03 | git read adapter | 3 | Git discovery; log, refs, status and stash list streamed and parsed incrementally into the contract types; the git version floor measured. |
-| S04 | commit store and lane layout | 3 | The columnar store and the single-pass incremental lane assignment, with its memory budget proved by benchmark. |
+| S02 | gate pipeline, the commit store and CI | 2 | The columnar commit store with its builder and accessors, its 96-byte budget proved by benchmark; unit and coverage thresholds, StrykerJS, the Playwright harness, the benchmark harness and its baselines, deterministic fixture repositories, `npm run gates`, and the single grouped workflow. |
+| S03 | git read adapter and the log parser | 3 | Git discovery; log, refs, status and stash list streamed and parsed incrementally into the store; the git version floor measured. |
+| S04 | lane layout engine | 3 | The single-pass, incremental lane assignment from the store to layout rows, with unit tests over fixture shapes. |
 | S05 | graph table renderer | 3 | Recycled virtualised rows and the coalesced graph canvas, drawing layout buffers supplied as fixtures. |
 | S06 | open a repository | 4 | The composition root: open by argument or folder dialog, initial load, Load More, refresh, and the error page when git is missing. |
 | S07 | budgets, baselines and render stability | 5 | The assembled application measured against every budget of ADR-0002, the baselines committed, and the golden-image question settled. |
