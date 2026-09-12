@@ -309,6 +309,28 @@ one that works. For every gate an executor adds or relies on: **plant a probe** 
 **watch it go red**, **remove the probe**, **watch it go green**, and record all four steps in the audit. A
 gate that has never been seen red is reported as unproven.
 
+### A claim carries its measurement
+
+The first milestone's second wave found the same defect four times, in four artefacts, by four authors, two
+of them the reviewer and two the orchestrator: **a sentence asserting how this project behaves, written
+without measuring it.** Each sounded true, each was wrong, each cost a review round, and not one would have
+survived a minute of its own author's attention.
+
+**Every committed sentence stating how this project behaves must say what was measured and how, or name who
+measured it.** This binds task files, audits, review files, slice documents and the documents under `docs/`
+exactly as §7 binds gates.
+
+- **A number carries its method and its range.** "The worst case" is a claim about every case. "The worst
+  size found by an exhaustive pass over every append to 200 000 commits" is a claim a search establishes.
+  Where the two differ, write the second.
+- **A fact you could falsify in a minute, falsify before you write it**, not after someone else commits it.
+- **Repeating another's measurement makes it yours.** Reproduce it, or say whose it is and that you did not.
+- **An inference is labelled as one.** "It could not have launched" is not an observation, and reads as one.
+- **A message a gate prints is a committed sentence too.** A guard whose failure text repeats a discredited
+  claim teaches the next author the error at the moment they are deciding.
+
+The reviewer checks prose against this section the way it checks gates against the rest of §7.
+
 ### The mutation gate, and the reviewer's own mutation
 
 A mutation-testing gate runs over the rings that hold the product's decisions, with a score threshold that

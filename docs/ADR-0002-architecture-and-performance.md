@@ -94,6 +94,26 @@ The store is a `core/` data structure with a small API, which makes it fully uni
 target for mutation testing. **Every buffer grows geometrically and is reused on "Load More"**; the prefix
 is never recomputed and never reallocated per page.
 
+> **Amended 2026-09-12, before wave 3.** The store has two halves and they belong in different rings.
+>
+> **Building is `core/`.** Interning, growth factor, hash resolution and pending parents are policy: each has
+> alternatives, each can be wrong, and each is where the budget is won or lost.
+>
+> **Decoding is `contracts/`.** Producing the hex of a hash, slicing a subject out of the blob, listing a
+> commit's parents: none of these has an alternative implementation, and changing one would be changing the
+> contract. The encoding is compressed, so **a consumer cannot read `CommitColumns` at all without them** —
+> a data contract whose consumers cannot read it is not a complete contract.
+>
+> This was found by checking, before cutting wave 3, whether its three lanes could actually be written
+> against the rings as they stood. They could not: the renderer may import `contracts/` only (decision 1),
+> and with the decoders in `core/` it could not read a single field of the page it draws. The alternatives
+> were to widen the renderer's rule, or to send it a per-row view model, which costs an IPC round trip per
+> scroll frame and breaks the 8 ms budget of decision 6. Neither is right. The decoders were simply in the
+> wrong ring, and `ui → contracts only` was the rule that revealed it.
+>
+> E01-M01-S08 moves them. Nothing else about decision 1 changes, and the renderer still holds no rule: it
+> decodes what it is given and asks no question that layout answers.
+
 ## Decision 4 · Everything is streamed and incremental
 
 - The git adapter reads standard output as a stream and the parser consumes it **incrementally**, with a
