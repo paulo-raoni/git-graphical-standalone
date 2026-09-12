@@ -54,7 +54,9 @@ import type { SegmentBuffer } from './segment-buffer';
  * `RowFlag.ClipBelowVertex` when the commit has **no parent entry at all**.
  * Neither costs a second pass: the first falls out of the lane table the
  * crossing walk already read, the second out of the parent offsets the
- * departures already read.
+ * departures already read. That is why {@link layoutPage} does the crossing
+ * itself and hands the answer down — the lane table has forgotten it by the time
+ * the row is finished.
  *
  * A parent is **drawable** when it is `UNKNOWN_INDEX` — not loaded, so its line
  * leaves the bottom of the page and is resolved when the page below arrives — or
@@ -305,41 +307,44 @@ function closeArrivedLanes(state: LayoutState, row: number): void {
 }
 
 /**
- * The two answers laying out one row produces, written in place.
+ * Place one commit's vertex and open its departures, and answer its lane.
  *
- * A record rather than a returned object because both come out of the same walk
- * of the lane table and a page allocates one of these, not one per row. The
- * alternative — a second pass over the rows to work out which of them nothing
- * points at — is what
- * `docs/ADR-0002-architecture-and-performance.md` decision 4 forbids.
+ * `arrival` is what {@link crossOpenLanes} answered for this row. The caller
+ * walks the lanes and passes it in, rather than this function doing both, for
+ * one reason: the arrival decides a **flag** as well as the lane, and once the
+ * departures and the closing have run, the lane table no longer holds it. The
+ * only other way to recover it is a second pass over the rows, which
+ * `docs/ADR-0002-architecture-and-performance.md` decision 4 does not allow.
  */
-interface RowOutcome {
-  /** The lane the row's vertex sits in. */
-  lane: number;
-  /** The {@link RowFlag} bits the lane table decides, and only those. */
-  flags: number;
-}
-
-/** Lay out one commit, writing its lane and its own flags into `outcome`. */
 function layoutRow(
   state: LayoutState,
   columns: CommitColumns,
   row: number,
+  arrival: number,
   segments: SegmentBuffer,
-  outcome: RowOutcome,
-): void {
-  const arrival = crossOpenLanes(state, row, segments);
+): number {
   const vertex = arrival === NO_LANE ? claimLane(state) : arrival;
   openDepartures(state, columns, row, vertex, arrival !== NO_LANE, segments);
   closeArrivedLanes(state, row);
-  outcome.lane = vertex;
-  // The vertex went into a lane that was **free**, so no line was descending
-  // towards this commit: nothing above it, on this page or on any page laid out
-  // before it, names it as a parent. That is `RowFlag.ClipAboveVertex`, and it
-  // is final rather than provisional — git emits children before parents, so a
-  // commit whose children are all absent from the rows loaded so far cannot
-  // acquire one from a page that arrives later.
-  outcome.flags = arrival === NO_LANE ? RowFlag.ClipAboveVertex : 0;
+  return vertex;
+}
+
+/**
+ * `RowFlag.ClipAboveVertex`, from what arrived at the row.
+ *
+ * No line was descending towards this commit, so nothing above it — on this page
+ * or on any page laid out before it — names it as a parent: every drawable
+ * parent occupies a lane, a lane is only ever claimed while free, and a lane
+ * aimed at a row is freed only once that row is reached, so an arrival exists
+ * exactly when some earlier row named this one.
+ *
+ * The bit is **final** rather than provisional. Git emits children before
+ * parents, so a commit whose children are all absent from the rows loaded so far
+ * cannot acquire one from a page that arrives later, and no row's flags are ever
+ * rewritten.
+ */
+function clipAboveFlag(arrival: number): number {
+  return arrival === NO_LANE ? RowFlag.ClipAboveVertex : 0;
 }
 
 /**
@@ -391,19 +396,19 @@ export function layoutPage(
   const flags = new Uint8Array(rowCount);
   const segmentOffsets = new Uint32Array(rowCount + 1);
   const segments = createSegmentBuffer(rowCount);
-  const outcome: RowOutcome = { lane: 0, flags: 0 };
   let maxLane = 0;
   for (let row = rowsAlreadyLaidOut; row < columns.count; row += 1) {
     const at = row - rowsAlreadyLaidOut;
-    layoutRow(state, columns, row, segments, outcome);
-    laneIndex[at] = outcome.lane;
-    colourIndex[at] = colourOfLane(outcome.lane);
-    flags[at] = rowFlags(columns, row) | outcome.flags;
+    const arrival = crossOpenLanes(state, row, segments);
+    const lane = layoutRow(state, columns, row, arrival, segments);
+    laneIndex[at] = lane;
+    colourIndex[at] = colourOfLane(lane);
+    flags[at] = rowFlags(columns, row) | clipAboveFlag(arrival);
     segmentOffsets[at + 1] = segments.count;
     // A vertex is not always on a segment: a commit with no child above it and
     // no parent below it is a lone dot, and it can still be the widest lane the
     // page reached.
-    maxLane = Math.max(maxLane, outcome.lane);
+    maxLane = Math.max(maxLane, lane);
   }
   state.rowsLaidOut = columns.count;
   state.counters.rows += rowCount;
