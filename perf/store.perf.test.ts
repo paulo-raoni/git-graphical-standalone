@@ -34,22 +34,39 @@ import type { Comparison } from './baselines';
  */
 
 /**
- * The size that retains the most per commit of any the store reaches.
+ * The worst size found by the search this comment records.
  *
  * Three structures have to grow for the store to hold `n` commits: the per
  * commit columns, the parent index column, and the hash index, whose slots are a
- * power of two kept under a three-quarter load. The first size past the last of
- * those three growths carries all three slacks at once, and since bytes per
- * commit falls across the plateau that follows, the plateau's first size is its
- * worst. A sweep of every such size to 200 000 commits found this one the worst
- * of all of them: 24.2 per cent column slack with the hash index newly doubled.
+ * power of two kept under a three-quarter load. Retained bytes per commit is
+ * their sum over `n`, so it jumps at a growth and falls across the plateau that
+ * follows.
+ *
+ * That describes the shape of the curve. It does not locate the maximum, and two
+ * earlier attempts to locate it by description put it somewhere else. So this
+ * size was **searched for**, over every commit count from 4097 to 200 000, in
+ * two phases. First an incremental pass reading the retained total after every
+ * append: it gives every commit a parent, so its parent column is never smaller
+ * than this gate's and its reading at any count is an upper bound on this gate's
+ * reading at that count. Then a rebuild, with this file's `build`, of every count
+ * that bound could not rule out. 12 502 was the worst of them, at 85.519 bytes
+ * per commit and 25.0 per cent column slack.
+ *
+ * **That is the whole claim.** The workload is this gate's own synthetic one —
+ * one parent per commit, one author and one committer, message text excluded —
+ * and a repository of merges or of thousands of distinct people costs
+ * differently. Nor is the size durable: changing `INITIAL_COMMIT_CAPACITY` or the
+ * growth factor moves every boundary of the curve, and the size must then be
+ * found again by **re-running that search**, never adjusted.
+ * `docs/plan/E01-commit-graph/M01-first-graph/S02-gates-and-store.md` records the
+ * method, and the parent-column trap that makes the second phase necessary.
  *
  * This is the only point at which the 96-byte budget of
- * `docs/ADR-0002-architecture-and-performance.md` decision 6 means anything, and
- * it is the state a repeatedly pressed "Load More" leaves the store in for most
- * of its life.
+ * `docs/ADR-0002-architecture-and-performance.md` decision 6 means anything: a
+ * page-by-page load walks the whole curve, so the store passes through here, and
+ * the budget has to hold where the curve is highest.
  */
-const WORST_CASE = 24577;
+const WORST_CASE = 12502;
 
 /**
  * An ordinary mid-cycle size, and the denominator of the scaling ratio.
@@ -170,9 +187,10 @@ function capacityExactComplaint(measurements: readonly Measurement[]): string {
     `the store's growth now lands exactly on ${sizes}, so the columns there carry no slack at ` +
     `all. That is the cheapest point of the whole curve, not a representative one: measuring ` +
     `there understates both retained bytes and work per commit, and asserts the 96-byte budget ` +
-    `of ADR-0002 decision 6 where it cannot bind. Re-choose the size — the worst point is the ` +
-    `first size past a growth of the columns, the parent column and the hash index together — ` +
-    `and do not re-record a baseline against a capacity-exact size (AGENTS.md section 11).`
+    `of ADR-0002 decision 6 where it cannot bind. Re-choose the size by re-running the sweep the ` +
+    `slice document records — every count over the range, then a rebuild of the survivors — and ` +
+    `not from a description of the curve, which has twice put the worst point in the wrong place. ` +
+    `Do not re-record a baseline against a capacity-exact size (AGENTS.md section 11).`
   );
 }
 
@@ -191,10 +209,10 @@ describe('the commit store, measured', () => {
     expect(complaint).toBe('');
   });
 
-  it('retains no more per commit at its worst size than the budget allows', () => {
+  it('retains no more per commit than the budget allows, at the worst size the sweep found', () => {
     const perCommit = retainedByteLength(worst.builder) / WORST_CASE;
     const comparison = compareWithBaseline(
-      'structural bytes per commit, at the worst size of the growth curve',
+      'structural bytes per commit, at the worst size the recorded sweep found',
       perCommit,
       baselines['structuralBytesPerCommitWorst'] ?? { baseline: 96, unit: 'bytes' },
     );
