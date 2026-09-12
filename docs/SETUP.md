@@ -119,3 +119,12 @@ if (Test-Path $vswhere) {
     ForEach-Object { "$($_.id) $($_.version)" } | Sort-Object -Unique
 } else { 'vswhere: MISSING' }
 ```
+
+## Traps met while building
+
+- **`npm ci` in a fresh worktree can leave Electron unusable.** It has been observed completing while
+  `node_modules/electron/` has no `dist/` and no `path.txt`, so `npm start` fails even though the install
+  reported success: the package's post-install step did not run. The project's `.npmrc` does not disable
+  scripts, so this comes from the environment rather than the configuration. The repair is to run the
+  package's own `install.js` from inside `node_modules/electron/`; nothing tracked changes. Observed on
+  2026-09-11 in a lane worktree.
