@@ -81,7 +81,7 @@ describe('a single root commit', () => {
     const rows = laidOut([[]]);
     expect([...rows.laneIndex]).toEqual([0]);
     expect([...rows.colourIndex]).toEqual([0]);
-    expect([...rows.flags]).toEqual([0]);
+    expect([...rows.flags]).toEqual([RowFlag.ClipAboveVertex | RowFlag.ClipBelowVertex]);
     expect([...rows.segmentOffsets]).toEqual([0, 0]);
     expect(rows.maxLane).toBe(0);
   });
@@ -103,8 +103,8 @@ describe('a straight line of commits', () => {
     expect(segmentsOf(rows, 2)).toEqual([[0, 0, 0]]);
   });
 
-  it('sets no flag, because nothing here is a merge', () => {
-    expect([...rows.flags]).toEqual([0, 0, 0]);
+  it('flags no merge, and clips only the tip above and the root below', () => {
+    expect([...rows.flags]).toEqual([RowFlag.ClipAboveVertex, 0, RowFlag.ClipBelowVertex]);
   });
 });
 
@@ -133,7 +133,12 @@ describe('a merge', () => {
   const rows = laidOut([[1, 2], [3], [3], []]);
 
   it('flags the row and opens a lane for the second parent', () => {
-    expect([...rows.flags]).toEqual([RowFlag.Merge, 0, 0, 0]);
+    expect([...rows.flags]).toEqual([
+      RowFlag.Merge | RowFlag.ClipAboveVertex,
+      0,
+      0,
+      RowFlag.ClipBelowVertex,
+    ]);
     expect([...rows.laneIndex]).toEqual([0, 0, 1, 0]);
     expect(rows.maxLane).toBe(1);
   });
@@ -157,7 +162,13 @@ describe('a merge of more than two parents', () => {
   const rows = laidOut([[1, 2, 3], [4], [4], [4], []]);
 
   it('opens one lane a parent, all leaning out of the one vertex', () => {
-    expect([...rows.flags]).toEqual([RowFlag.Merge, 0, 0, 0, 0]);
+    expect([...rows.flags]).toEqual([
+      RowFlag.Merge | RowFlag.ClipAboveVertex,
+      0,
+      0,
+      0,
+      RowFlag.ClipBelowVertex,
+    ]);
     expect([...rows.laneIndex]).toEqual([0, 0, 1, 2, 0]);
     expect(rows.maxLane).toBe(2);
     expect(segmentsOf(rows, 0)).toEqual([
@@ -249,7 +260,7 @@ describe('a parent that has not been loaded', () => {
 
   it('opens a lane a piece for two unloaded parents of one commit', () => {
     const merge = layoutPage(createLayoutState(), pageTo([[1, 2]], 1), 0);
-    expect([...merge.flags]).toEqual([RowFlag.Merge]);
+    expect([...merge.flags]).toEqual([RowFlag.Merge | RowFlag.ClipAboveVertex]);
     expect(segmentsOf(merge, 0)).toEqual([
       [0, 0, 0],
       [0, 1, 1],
@@ -265,7 +276,13 @@ describe('a parent above the commit that names it', () => {
   const rows = laidOut([[], [0, 2], []]);
 
   it('counts it for the flag and draws nothing for it', () => {
-    expect([...rows.flags]).toEqual([0, RowFlag.Merge, 0]);
+    // Row 0 is named as a parent by row 1, which is *below* it, so nothing
+    // above it points at it and it is still clipped on both halves of its band.
+    expect([...rows.flags]).toEqual([
+      RowFlag.ClipAboveVertex | RowFlag.ClipBelowVertex,
+      RowFlag.Merge | RowFlag.ClipAboveVertex,
+      RowFlag.ClipBelowVertex,
+    ]);
     expect([...rows.laneIndex]).toEqual([0, 0, 0]);
     expect(segmentsOf(rows, 1)).toEqual([[0, 0, 0]]);
     expect(rows.maxLane).toBe(0);
@@ -275,6 +292,84 @@ describe('a parent above the commit that names it', () => {
     const own = laidOut([[0], []]);
     expect([...own.segmentOffsets]).toEqual([0, 0, 0]);
     expect([...own.laneIndex]).toEqual([0, 0]);
+  });
+});
+
+/** The two clip bits of one row, so a row's other flags cannot mask a defect. */
+function clipOf(rows: LayoutRows, row: number): number {
+  return entryAt(rows.flags, row) & (RowFlag.ClipAboveVertex | RowFlag.ClipBelowVertex);
+}
+
+describe('the half of a band a painter must clip', () => {
+  // The page of the task's first drawing: a mainline tip in lane zero, a branch
+  // tip in lane one, the commit both share, and the root they run down to.
+  const rows = laidOut([[2], [2], [3], []]);
+
+  it('clips above a branch tip, which nothing above the page points at', () => {
+    expect([...rows.laneIndex]).toEqual([0, 1, 0, 0]);
+    expect(clipOf(rows, 1)).toBe(RowFlag.ClipAboveVertex);
+  });
+
+  it('clips below a root, whose line ends at the dot', () => {
+    expect(clipOf(rows, 3)).toBe(RowFlag.ClipBelowVertex);
+  });
+
+  it('clips neither half of a row a line crosses whole', () => {
+    expect(clipOf(rows, 2)).toBe(0);
+  });
+
+  it('clips both halves of a lone dot, with neither child nor parent', () => {
+    // Rows 2 and 3 are lone dots in lane two; the page's own single commit is
+    // one as well, with no other lane to cross it.
+    const both = RowFlag.ClipAboveVertex | RowFlag.ClipBelowVertex;
+    const lone = laidOut([[4], [4], [], [], []]);
+    expect([...lone.laneIndex]).toEqual([0, 1, 2, 2, 0]);
+    expect(clipOf(lone, 2)).toBe(both);
+    expect(clipOf(lone, 3)).toBe(both);
+    expect(clipOf(laidOut([[]]), 0)).toBe(both);
+  });
+});
+
+describe('a page boundary, which is not a root', () => {
+  // This is the case the two bits exist for. A page that ends in a commit with
+  // no parents and a page that ends in a commit whose parent is not loaded
+  // produce byte-identical rows, lanes, segments and colours; only
+  // `RowFlag.ClipBelowVertex` tells them apart, and a painter that clips both
+  // puts a gap at the foot of every page of every repository larger than one.
+  const trueRoot = laidOut([[1], []]);
+  const unloadedParent = layoutPage(createLayoutState(), pageTo([[1], [2]], 2), 0);
+
+  it('is identical to a true root in every column but the flags', () => {
+    expect(unloadedParent.rowCount).toBe(trueRoot.rowCount);
+    expect([...unloadedParent.laneIndex]).toEqual([...trueRoot.laneIndex]);
+    expect([...unloadedParent.colourIndex]).toEqual([...trueRoot.colourIndex]);
+    expect([...unloadedParent.segmentOffsets]).toEqual([...trueRoot.segmentOffsets]);
+    expect(segmentsOf(unloadedParent, 1)).toEqual(segmentsOf(trueRoot, 1));
+  });
+
+  it('clips below the true root and not below the unloaded parent', () => {
+    expect(clipOf(trueRoot, 1)).toBe(RowFlag.ClipBelowVertex);
+    expect(clipOf(unloadedParent, 1)).toBe(0);
+  });
+
+  it('still does not clip below it once that parent arrives in the page below', () => {
+    const state = createLayoutState();
+    const first = layoutPage(state, pageTo([[1], [2], []], 2), 0);
+    expect(clipOf(first, 1)).toBe(0);
+    const second = layoutPage(state, page([[1], [2], []]), 2);
+    expect(clipOf(second, 0)).toBe(RowFlag.ClipBelowVertex);
+    // The row the first page emitted is never rewritten, so the bit it carried
+    // has to have been right when it was written and not merely right later.
+    expect(clipOf(first, 1)).toBe(0);
+  });
+
+  it('clips above a first row nothing points at, and not one a page above does', () => {
+    const orphan = createLayoutState();
+    layoutPage(orphan, page([[]]), 0);
+    expect(clipOf(layoutPage(orphan, page([[], [2], []]), 1), 0)).toBe(RowFlag.ClipAboveVertex);
+    const continued = createLayoutState();
+    layoutPage(continued, pageTo([[1], []], 1), 0);
+    expect(clipOf(layoutPage(continued, page([[1], []]), 1), 0)).toBe(RowFlag.ClipBelowVertex);
   });
 });
 

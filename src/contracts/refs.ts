@@ -28,7 +28,18 @@ export const RefFlag = Object.freeze({
   CheckedOut: 1,
   /** This tag is an annotated tag object, not a lightweight ref. */
   AnnotatedTag: 2,
-  /** HEAD is detached, and this is the reference it was detached from. */
+  /**
+   * `HEAD` is detached, and this reference stands at the commit it is detached
+   * at.
+   *
+   * **Position, not history.** Git records which reference a detached `HEAD`
+   * was detached *from* nowhere except the reflog, which this milestone does
+   * not read, so the only thing that can be produced from the commands it runs
+   * is which references happen to point at the same commit as the detached
+   * `HEAD`. Several references may, and then every one of them carries this
+   * flag; none may, and then no reference carries it even though `HEAD` is
+   * detached.
+   */
   DetachedHead: 4,
 } as const);
 
