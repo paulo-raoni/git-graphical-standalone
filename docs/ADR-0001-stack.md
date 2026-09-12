@@ -1,6 +1,6 @@
 # ADR-0001 · The stack
 
-**Status:** proposed, awaiting the owner's approval (`AGENTS.md` §2). Once approved, this file is the
+**Status:** **approved** by the owner on 2026-09-11. Once approved, this file is the
 decision; a later change is a new ADR that supersedes this one, never an edit that rewrites history.
 
 **Date:** 2026-09-11
@@ -163,10 +163,26 @@ if the owner judges the idle footprint unacceptable once he has seen it, the hos
 IPC contract is what makes that a contained change: `core/`, `ports/` and `contracts/` move unchanged, and
 only `app/` and `adapters/` are host-specific.
 
-**This is the one point of this plan where the owner may reasonably decide otherwise**, and now is the
-cheapest moment: no code exists. Choosing Tauri costs two installs on the development machine (the Rust
-toolchain, and the Microsoft C++ build tools with a Windows SDK) before the first gate can run, and adds
-`cargo` gates, `cargo-mutants` for the Rust half and per-platform golden images to ADR-0003.
+**The owner's ruling, 2026-09-11.** Asked to choose, he delegated it on a condition: switch to Tauri **if**
+it makes CPU and memory cheaper, with no attachment to any tool, and he asked for speed. The condition is
+applied here rather than assumed:
+
+- **CPU: no.** Both hosts render and script in Chromium, so every cost our own code creates is identical.
+  Rust would parse a load one or two hundred milliseconds faster, once per load, which no user distinguishes
+  from zero.
+- **Memory: partly.** About 60 to 100 MB less at rest. It is a constant, not a slope: at 50 000 commits the
+  two differ by the same amount as at zero, because what scales is the store and the row count, which ADR-0002
+  governs identically in both.
+- **Speed of delivery: Tauri costs it outright.** It needs the Rust toolchain and the Microsoft C++ build
+  tools with a Windows SDK, neither of which is on this machine. Those are the owner's own installs, several
+  gigabytes, from an interactive terminal, and no lane can be cut until they are done. Choosing Tauri would
+  stop the project on the owner at the exact moment he asked it not to stop.
+
+**Electron therefore stands**, and the footprint is met by ADR-0002's budgets rather than by the host. The
+reversal trigger above is unchanged and is what re-opens this: measured at E07-M01, over 400 MB resident with
+50 000 commits loaded or over 250 MB installed, and the host is reconsidered with real numbers instead of
+estimates. Reversing then costs `app/` and `adapters/`, roughly a tenth of the code, because the contract is
+what was frozen and not the framework.
 
 ## Consequences
 

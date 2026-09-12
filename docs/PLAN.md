@@ -5,8 +5,8 @@ This file is the **map**: the behaviour to reproduce, organised as EPIC > MILEST
 of a slice live **only** in its task file; `docs/plan/E<ee>-<slug>/M<mm>-<slug>/` holds only the item in
 flight. Nothing in this file is a specification.
 
-**Status:** proposed, awaiting the owner's approval of this plan, the MVP cut, and the three architecture
-decision records it rests on: `docs/ADR-0001-stack.md` (the stack),
+**Status:** **approved** by the owner on 2026-09-11: this plan, the MVP cut, and the three architecture
+decision records it rests on, `docs/ADR-0001-stack.md` (the stack),
 `docs/ADR-0002-architecture-and-performance.md` (the rings, the data representation and the budgets) and
 `docs/ADR-0003-quality-gates-and-ci.md` (the gates, the regression ratchet and the workflow).
 `AGENTS.md` §2 applies: inside the MVP, epics and milestones then need no further approval.

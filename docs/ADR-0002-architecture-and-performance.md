@@ -1,7 +1,7 @@
 # ADR-0002 · Architecture, and the performance budgets
 
-**Status:** proposed, awaiting the owner's approval together with `docs/PLAN.md` and
-`docs/ADR-0001-stack.md` (`AGENTS.md` §2).
+**Status:** **approved** by the owner on 2026-09-11, together with `docs/PLAN.md` and the other decision
+records (`AGENTS.md` §2).
 
 **Date:** 2026-09-11
 

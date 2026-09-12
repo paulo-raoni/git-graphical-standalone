@@ -1,7 +1,7 @@
 # ADR-0003 · Quality gates, the regression ratchet, and one grouped CI workflow
 
-**Status:** proposed, awaiting the owner's approval together with `docs/PLAN.md`, `docs/ADR-0001-stack.md`
-and `docs/ADR-0002-architecture-and-performance.md` (`AGENTS.md` §2).
+**Status:** **approved** by the owner on 2026-09-11, together with `docs/PLAN.md` and the other decision
+records (`AGENTS.md` §2).
 
 **Date:** 2026-09-11
 
