@@ -42,7 +42,7 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 | 4 | Types | `gates:types` | `tsc --noEmit`, strict, across every process. |
 | 5 | Contract | `gates:contract` | The IPC and data contracts in `contracts/` are checked for accidental change: a committed shape snapshot must match. Changing it is allowed, silently changing it is not. |
 | 6 | Unit | `gates:unit` | Vitest, with per-directory coverage thresholds. `core/` is held high; `app/` is wiring and is held low on purpose. |
-| 7 | **Mutation** | `gates:mutation` | StrykerJS with the Vitest runner. See decision 3. |
+| 7 | **Mutation** | `gates:mutation` | StrykerJS, through its command runner. See decision 3 and its amendment. |
 | 8 | Build | `gates:build` | esbuild produces main, preload and renderer bundles. |
 | 9 | End to end | `gates:e2e` | Playwright drives the built Electron application on fixture repositories. This is `AGENTS.md` §7's "open the actual thing", made repeatable. |
 | 10 | **Performance** | `gates:perf` | Counters and budgets against committed baselines. See decision 4. |
@@ -56,6 +56,15 @@ Gates 1 to 8 and 11 to 15 run on any platform. Gate 9 and 10 run on Windows, the
 (ADR-0001).
 
 ## Decision 3 · Mutation testing with StrykerJS
+
+> **Amended 2026-09-12, after E01-M01-S02.** The tool is still StrykerJS, but **not through its Vitest
+> runner**. At the versions this project pins, `@stryker-mutator/vitest-runner` 10.0.0 against `vitest` 5.0.0
+> reports a score of zero with every mutant surviving and no test run per mutant, and it does so **without
+> erroring** — the exact shape of failure this whole document exists to prevent, and one that would have read
+> as "the tests kill nothing" rather than "the runner is broken". S02 diagnosed it to the runner's test-name
+> pattern not surviving the round trip into its worker, and runs Stryker through its **command runner**
+> instead: slower, correct, and no dependency added or changed. Revisit when the two versions line up. The
+> paragraph below is kept as written because the reasoning for choosing StrykerJS is unchanged.
 
 **Tool: StrykerJS**, with `@stryker-mutator/vitest-runner`. It is the fastest to adopt for this stack: it
 reads the existing Vitest configuration, needs one configuration file, and requires no change to a single
