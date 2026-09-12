@@ -61,6 +61,9 @@ One forward pass over the rows in the order they arrive. Per row, in this order:
 Steps 3 and 4 are in that order on purpose: a line born at this row never takes a lane a line died in at this
 row, because the two would be drawn crossing inside one row's band, which reads as neither.
 
+The row's `flags` are written from what steps 1 to 3 already looked at, not from a pass of their own: see
+*Where a row's line begins and ends* below.
+
 ### Appending a page
 
 The state is the open lanes and nothing else. A line whose parent was not loaded keeps its lane open and
@@ -83,6 +86,9 @@ rewritten**, and the cost of continuing is one walk of the open lanes per page, 
   are one segment, not two.
 - Every lane a segment names is either the row's vertex lane or a lane open across that row, so `maxLane` is
   the width of the column.
+- A row carries exactly one vertex, so `RowFlag.ClipAboveVertex` and `RowFlag.ClipBelowVertex` are properties
+  of the row and need no lane of their own. They are about the vertex's lane only; a line crossing the row in
+  another lane spans the whole band whatever they say.
 - After any page, every lane still open holds a target the page did not reach, so it keeps descending and is
   closed by whichever later page contains that commit. The store's ordering makes that target `UNKNOWN_INDEX`
   in practice; a target naming a row already gone past behaves the same way, and the lane descends for the rest
@@ -157,31 +163,56 @@ drawing it, and it is recorded here because it is invisible from the output.
 **Cost to change:** it cannot be changed inside this contract. Drawing an upward line needs a segment
 vocabulary that has one.
 
-## What the segment vocabulary cannot say
+## Where a row's line begins and ends
 
 `LayoutRows` models a segment as spanning a whole row band, from the top edge to the bottom edge. A commit that
-is the **start of its line** — a branch tip, with no child in the page — and a commit that is the **end of it** —
-a root, with no parent — each occupy only half of their band, and there is no way to say so:
+is the **start of its line** — a branch tip, with no child among the loaded rows — and a commit that is the
+**end of it** — a root, with no parent — each occupy only half of their band, and the segment cannot say which
+half: a tip's departure and a root's arrival are both spelled `(V, V)` in the vertex's own lane.
 
-- a tip's departing line is emitted as a segment in the vertex's own lane, so a renderer drawing the whole band
-  puts a half-row stub **above** the tip, where nothing should be;
-- a root's arriving line does the same **below** the root.
+So the row says it instead, in two bits of `LayoutRows.flags` this pass sets:
 
-This was found by rendering the layout to text and reading it, not by a test: rows 3 and 20 of the braided
-sample show the stub above a tip, and the root of the seven-row fixture in `lane-layout-pages.test.ts` shows the
-one below a root. Emitting nothing instead of the stub replaces it with a half-row **gap** between the dot and
-the line, which is worse; emitting the arrival and the departure as two segments does not help, because both
-are spelled `(V, V)` and a renderer still cannot tell which half it is holding.
+| bit | set when | what the painter does |
+| --- | --- | --- |
+| `RowFlag.ClipAboveVertex` | the vertex took a **free** lane, so no loaded row above names this commit as a parent | paints nothing in the upper half of the band, in the vertex's lane only |
+| `RowFlag.ClipBelowVertex` | the commit has **no parent entry at all**, `parentOffsets[row + 1] === parentOffsets[row]` | paints nothing in the lower half of the same lane |
 
-The smallest fix is additive and belongs to whoever owns `src/contracts/`: two more bits of
-`LayoutRows.flags`, which is a `Uint8Array` with four of its eight bits still free, saying that a row has no
-child above it or no parent below it. **This lane did not make that change**: `src/contracts/` is outside its
-boundary, and is being edited by another lane of the same wave. It is raised in `AUDIT-S04-lane-layout.md` as
-an open question for the orchestrator, to settle before S05 draws anything.
+Neither costs a second pass over the rows, which
+`docs/ADR-0002-architecture-and-performance.md` decision 4 does not allow. The upper bit falls out of the walk
+of the lane table the crossing already does — a vertex placed in a free lane is a vertex nothing was descending
+towards — and the lower one out of the parent offsets the departures already read. It is also **final on any
+page**: git emits children before parents, so a commit whose children are all absent from the rows loaded so
+far cannot acquire one from a page that arrives later, and a row's flags are never rewritten once emitted.
+
+**The lower bit reads the parent count and never a parent value, and that is the guarantee.** A commit with a
+parent still spelled `UNKNOWN_INDEX` has a parent that exists and is not loaded, so its line leaves the bottom
+of the page and continues into the page below: it must **not** be clipped. Reading "no *loaded* parent" instead
+is one comparison away, is invisible on any single page, and is wrong on every page but the last — it would clip
+the foot of every page of every repository with more commits than a page. `lane-layout.test.ts` asserts the pair
+under *a page boundary, which is not a root*: the two pages are identical in `rowCount`, `laneIndex`,
+`colourIndex`, `segmentOffsets` and every segment column, and differ in `flags` alone.
+
+### The gap this replaced, and what it cost
+
+The vocabulary did not always have these two bits, and while it did not, every `flags` entry of a tip-and-root
+page was `0`. The stub it produced was found by rendering the layout to text and reading it, not by a test: rows 3
+and 20 of the braided sample showed the stub above a tip, and the root of the seven-row fixture in
+`lane-layout-pages.test.ts` the one below a root. Emitting nothing instead of the stub replaces it with a
+half-row **gap** between the dot and the line, which is worse, and emitting the arrival and the departure as two
+segments does not help, because both are spelled `(V, V)`.
+
+This lane raised it in `AUDIT-S04-lane-layout.md` and emitted the stub rather than inventing a channel for it,
+because `src/contracts/` was outside its boundary and was being edited by another lane of the same wave. The
+gap cost a review round and a repair before the renderer could be specified at all, and the review that read
+the layout a second time added the half of it this note had missed: that a true root and a page boundary were
+**byte-identical** in the output. The lesson for the next person choosing a vocabulary is that
+*"a segment spans a band"* was one case short of complete, and that the missing case was not visible from any
+single page of output — which is why a renderer would have been written against it before anyone noticed.
 
 ## What this lane does not set
 
-`RowFlag.Merge` is set here, from the parent count. `RowFlag.Stash`, `RowFlag.Head` and `RowFlag.Uncommitted`
+`RowFlag.Merge` is set here, from the parent count, and so are `RowFlag.ClipAboveVertex` and
+`RowFlag.ClipBelowVertex`. `RowFlag.Stash`, `RowFlag.Head` and `RowFlag.Uncommitted`
 are not, because this ring is not told which commit `HEAD` resolves to, which rows are stash entries, or
 whether the working tree is dirty. They belong to the caller that reads `Refs` and `WorkingTree` — S06 — which
 sets `Head` on the row whose hash matches, `Stash` on the rows it appended from the stash list, and

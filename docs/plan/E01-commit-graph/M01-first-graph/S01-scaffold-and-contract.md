@@ -112,6 +112,29 @@ edges, no scene graph — so painting a viewport is a walk over a slice of these
 Colours are palette **indices**, never colour values, so a theme change repaints without recomputing the
 layout.
 
+**Two bits of `RowFlag` say where a row's own line begins and ends**, because a segment cannot. A segment
+spans a whole band, so a branch tip's departing line and a root's arriving line are both spelled `(V, V)` in
+the vertex's lane and a painter holding one cannot tell which half of the band it covers:
+
+- `RowFlag.ClipAboveVertex` — paint nothing in the half band above the dot, in the vertex's own lane. Set
+  when **no loaded row above names this commit as a parent**. Git emits children before parents, so a commit
+  whose children are all absent from the rows loaded so far can never acquire one from a later page, and the
+  bit is final on any page rather than provisional.
+- `RowFlag.ClipBelowVertex` — paint nothing in the half band below the dot, same lane. Set when the commit
+  has **no parent entry at all**, `parentOffsets[row + 1] === parentOffsets[row]`.
+
+`ClipBelowVertex` reads the parent **count** and never a parent value, and that is the whole of what
+separates a root from a page that ran out of commits: a parent entry of `UNKNOWN_INDEX` is a parent that
+exists and is not loaded, so its line continues into the page below and the row is **not** clipped. The two
+pages are otherwise byte-identical in every column of `LayoutRows`, which is why the distinction has to be a
+bit in the contract rather than a convention a renderer could rediscover. Both bits are properties of the
+**row**, which carries exactly one vertex, and neither says anything about lines crossing the row in other
+lanes: those span the whole band as they always did. The painter is **required** to clip on them, because
+`core/` cannot draw and the renderer answers no question of its own:
+`docs/ADR-0002-architecture-and-performance.md` decision 1 says `ui/` holds no rule and that a question like
+"which lane is this commit in" is never answered in the renderer, and decision 5 has the graph canvas redrawn
+from the layout buffers. Where to stop a line is such a question, so the answer is a bit and not a heuristic.
+
 Commit bodies are deliberately not in `CommitColumns`. The first milestone shows subjects only, and adding
 bodies is a visible change to this contract rather than a quiet addition.
 
