@@ -103,10 +103,12 @@ jobs:
           retention-days: 3
 
   # Mutation depends on unit: a suite that does not pass cannot be asked which
-  # mutants it kills. Stryker's incremental report is cached and restored, keyed
-  # by the lockfile, which is ADR-0003 decision 3's speed compromise; the flag
-  # that turns incremental mode on lives in stryker.config.json, not here, so
-  # that a run in a worktree and a run here are the same run.
+  # mutants it kills. Nothing is restored from a cache here. Stryker's
+  # incremental report used to be, keyed on the lockfile, which is a key that
+  # does not change when the source does — so a pull request could be scored
+  # from a report the current source never earned. Incremental mode is off in
+  # stryker.config.json for the same reason, and the flag lives there and not
+  # here, so that a run in a worktree and a run here are the same run.
   mutation:
     name: mutation
     needs: unit
@@ -118,13 +120,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Restore the incremental mutation report
-        uses: actions/cache@v4
-        with:
-          path: .stryker-tmp/incremental.json
-          key: stryker-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            stryker-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
       - run: npm run gates:mutation
       - if: failure()
         uses: actions/upload-artifact@v4
