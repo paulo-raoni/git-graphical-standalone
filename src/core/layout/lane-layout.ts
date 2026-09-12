@@ -43,6 +43,19 @@ import type { SegmentBuffer } from './segment-buffer';
  *    never takes a lane a line died in at this row: that would draw the two
  *    crossing inside one row's band, which reads as neither.
  *
+ * ### Where a row's line begins and ends
+ *
+ * A segment spans a whole row band, so a tip's departing line and a root's
+ * arriving line are both spelled `(V, V)` in the vertex's lane and a painter
+ * cannot tell which half of the band it is holding. Two bits of
+ * `LayoutRows.flags` say it instead, and this pass is where both are decided:
+ * `RowFlag.ClipAboveVertex` when the vertex took a **free** lane, which means no
+ * loaded row above names this commit as a parent, and
+ * `RowFlag.ClipBelowVertex` when the commit has **no parent entry at all**.
+ * Neither costs a second pass: the first falls out of the lane table the
+ * crossing walk already read, the second out of the parent offsets the
+ * departures already read.
+ *
  * A parent is **drawable** when it is `UNKNOWN_INDEX` — not loaded, so its line
  * leaves the bottom of the page and is resolved when the page below arrives — or
  * when its index is below this commit's, meaning further down the view. A parent
@@ -291,24 +304,63 @@ function closeArrivedLanes(state: LayoutState, row: number): void {
   lanes.limit = limit;
 }
 
-/** Lay out one commit, and answer the lane its vertex sits in. */
+/**
+ * The two answers laying out one row produces, written in place.
+ *
+ * A record rather than a returned object because both come out of the same walk
+ * of the lane table and a page allocates one of these, not one per row. The
+ * alternative — a second pass over the rows to work out which of them nothing
+ * points at — is what
+ * `docs/ADR-0002-architecture-and-performance.md` decision 4 forbids.
+ */
+interface RowOutcome {
+  /** The lane the row's vertex sits in. */
+  lane: number;
+  /** The {@link RowFlag} bits the lane table decides, and only those. */
+  flags: number;
+}
+
+/** Lay out one commit, writing its lane and its own flags into `outcome`. */
 function layoutRow(
   state: LayoutState,
   columns: CommitColumns,
   row: number,
   segments: SegmentBuffer,
-): number {
+  outcome: RowOutcome,
+): void {
   const arrival = crossOpenLanes(state, row, segments);
   const vertex = arrival === NO_LANE ? claimLane(state) : arrival;
   openDepartures(state, columns, row, vertex, arrival !== NO_LANE, segments);
   closeArrivedLanes(state, row);
-  return vertex;
+  outcome.lane = vertex;
+  // The vertex went into a lane that was **free**, so no line was descending
+  // towards this commit: nothing above it, on this page or on any page laid out
+  // before it, names it as a parent. That is `RowFlag.ClipAboveVertex`, and it
+  // is final rather than provisional — git emits children before parents, so a
+  // commit whose children are all absent from the rows loaded so far cannot
+  // acquire one from a page that arrives later.
+  outcome.flags = arrival === NO_LANE ? RowFlag.ClipAboveVertex : 0;
 }
 
-/** `RowFlag.Merge` when the commit has more than one parent, drawn or not. */
+/**
+ * The bits the parent columns decide: `RowFlag.Merge` and
+ * `RowFlag.ClipBelowVertex`.
+ *
+ * Both read the parent **count** and neither reads a parent value. For the merge
+ * flag that is deliberate, so a parent this vocabulary cannot draw is still
+ * counted. For `ClipBelowVertex` **it is the guarantee**: a commit with no
+ * parent entry is a root and its line ends at the dot, while a commit whose
+ * parent entry is `UNKNOWN_INDEX` has a parent that exists and is not loaded, so
+ * its line leaves the bottom of the page and continues into the page below.
+ * Reading "no *loaded* parent" instead would clip the last row of every page of
+ * every repository too large to fit in one, which is invisible on a single page
+ * and wrong on every page but the last.
+ */
 function rowFlags(columns: CommitColumns, row: number): number {
   const parents = entryAt(columns.parentOffsets, row + 1) - entryAt(columns.parentOffsets, row);
-  return parents > 1 ? RowFlag.Merge : 0;
+  const merge = parents > 1 ? RowFlag.Merge : 0;
+  const clipBelow = parents === 0 ? RowFlag.ClipBelowVertex : 0;
+  return merge | clipBelow;
 }
 
 /**
@@ -339,18 +391,19 @@ export function layoutPage(
   const flags = new Uint8Array(rowCount);
   const segmentOffsets = new Uint32Array(rowCount + 1);
   const segments = createSegmentBuffer(rowCount);
+  const outcome: RowOutcome = { lane: 0, flags: 0 };
   let maxLane = 0;
   for (let row = rowsAlreadyLaidOut; row < columns.count; row += 1) {
     const at = row - rowsAlreadyLaidOut;
-    const lane = layoutRow(state, columns, row, segments);
-    laneIndex[at] = lane;
-    colourIndex[at] = colourOfLane(lane);
-    flags[at] = rowFlags(columns, row);
+    layoutRow(state, columns, row, segments, outcome);
+    laneIndex[at] = outcome.lane;
+    colourIndex[at] = colourOfLane(outcome.lane);
+    flags[at] = rowFlags(columns, row) | outcome.flags;
     segmentOffsets[at + 1] = segments.count;
     // A vertex is not always on a segment: a commit with no child above it and
     // no parent below it is a lone dot, and it can still be the widest lane the
     // page reached.
-    maxLane = Math.max(maxLane, lane);
+    maxLane = Math.max(maxLane, outcome.lane);
   }
   state.rowsLaidOut = columns.count;
   state.counters.rows += rowCount;
