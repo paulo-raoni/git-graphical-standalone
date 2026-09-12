@@ -90,11 +90,12 @@ git … log -z --format=<COMMIT_LOG_FORMAT> --date=raw --no-use-mailmap
 ```
 
 - **`--branches --tags --remotes … HEAD`** is this slice's reading of "the branches being shown": every local
-  branch, every remote-tracking branch, every tag, and HEAD. It is spelled out rather than written `--all` for
-  two reasons a repository shows immediately. `--all` also walks `refs/stash`, which puts a stash's two
-  internal commits into the graph as ordinary commits — observed on the `stash` fixture, where `--all` returns
-  four commits and this invocation returns two. And in a clone of a hosted repository `--all` also walks
-  `refs/pull/*` and `refs/notes/*`, which is history nobody asked to see.
+  branch, every remote-tracking branch, every tag, and HEAD. It is spelled out rather than written `--all`, and
+  the difference was measured: on the `stash` fixture `--all` returns four commits and this invocation returns
+  two, because `--all` walks `refs/stash` as well and a stash is two commits of git's own making. Git documents
+  `--all` as every reference under `refs/`, so whatever else a host or a tool has put there — notes,
+  replacements, a `refs/pull/*` namespace — is walked too; that part follows from the documentation and was not
+  measured here.
 - **`--ignore-missing`** is what lets `HEAD` be named unconditionally. In a repository with no commits HEAD
   resolves to nothing, and without it `git log … HEAD` exits 128 with `ambiguous argument 'HEAD'` — measured on
   a freshly initialised repository. With it, the same repository produces an empty page and exit 0.

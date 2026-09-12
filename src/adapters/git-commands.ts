@@ -60,11 +60,15 @@ export function repositoryProbeArgs(repositoryPath: string): string[] {
  *
  * "The branches being shown" is read here as **every local branch, every
  * remote-tracking branch, every tag, and HEAD** — the same set a user sees
- * without having chosen anything. It is spelled out rather than written `--all`
- * for two reasons that a repository shows immediately: `--all` also walks
- * `refs/stash`, which would put a stash's two internal commits into the graph as
- * ordinary commits, and in a clone of a hosted repository it also walks
- * `refs/pull/*`, which is thousands of commits nobody asked for.
+ * without having chosen anything.
+ *
+ * It is spelled out rather than written `--all`, and the reason is measurable:
+ * on the `stash` fixture, `--all` returns four commits and this list returns
+ * two, because `--all` walks `refs/stash` as well and a stash is two commits of
+ * git's own making. Git documents `--all` as every reference under `refs/`, so
+ * whatever else a host or a tool has put there — notes, replacements, a
+ * `refs/pull/*` namespace — is walked too. Only the stash was measured here;
+ * the rest follows from what `--all` is documented to mean.
  *
  * `--ignore-missing` is what lets `HEAD` be named unconditionally: in a
  * repository with no commits yet, HEAD resolves to nothing and naming it would
