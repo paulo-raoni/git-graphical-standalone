@@ -1,0 +1,216 @@
+# E01-M01-S01 · Scaffold, rings and the frozen contract
+
+What a reader of the code needs to know about how this repository is laid out, why it is laid out that way,
+and which parts of it later work is not free to change.
+
+## What exists now
+
+A single private npm package at the root, no runtime dependency, five gates reachable through
+`npm run gates`, and an application that opens one window showing its name and the line
+`No repository is open.` Nothing reads a repository, nothing draws a graph and no menu action does anything;
+those arrive in S03 to S06.
+
+## The rings
+
+`docs/ADR-0002-architecture-and-performance.md` decision 1 fixes four rings and one rule: **dependencies
+point inward only**. Under `src/`:
+
+| directory | holds | may import |
+| --- | --- | --- |
+| `contracts/` | the shared vocabulary: data types and the IPC contract | nothing at all |
+| `core/` | the domain and the use cases; pure, no I/O, no timers, no randomness | `contracts/`, `ports/` |
+| `ports/` | the interfaces `core/` needs from the world | `contracts/` |
+| `adapters/` | implementations of the ports | `contracts/`, `ports/`, `core/` |
+| `app/` | the composition root: the Electron main process | anything inward |
+| `preload/` | the bridge between the shell and the renderer | `contracts/` |
+| `ui/` | the renderer | `contracts/` only |
+
+Only `contracts/`, `app/`, `preload/` and `ui/` exist as directories today. `core/`, `ports/` and
+`adapters/` are named in the rules and in the TypeScript projects but hold no file yet, because a directory
+whose only content is a placeholder is a placeholder. S03 and S04 create them by putting real code in them.
+
+Unit tests are **colocated** with the file they test, as `<name>.test.ts`. End-to-end tests live in
+`test/e2e/`, which S02 creates. Colocation is what lets a later lane own a folder including its tests
+without touching another lane's files.
+
+### The rule is enforced twice, because the two halves catch different mistakes
+
+**`dependency-cruiser`** (`.dependency-cruiser.cjs`, the `gates:boundaries` script) forbids each edge by
+name, so a failure says which rule was broken rather than that something is wrong. Every rule is an error,
+not a warning. Besides the ring edges it forbids any cycle, any orphan module — the three build entry points
+excepted, since by definition nothing imports them — and any import that does not resolve, because an
+unresolvable edge silently exempts itself from every other rule.
+
+**The TypeScript projects** decide what each ring can even see, which is the half that actually keeps the
+DOM and Node out of `core/`:
+
+| project | library | types | covers |
+| --- | --- | --- | --- |
+| `tsconfig.inner.json` | `ES2023` | none | `contracts/`, `core/`, `ports/` |
+| `tsconfig.ui.json` | `ES2023`, `DOM`, `DOM.Iterable` | none | `ui/` |
+| `tsconfig.node.json` | `ES2023` | `node` | `app/`, `adapters/`, `preload/` |
+
+`tsconfig.base.json` holds the flags all three share: `strict`, `noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `isolatedModules` and
+`verbatimModuleSyntax`, plus `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters`,
+`noPropertyAccessFromIndexSignature` and `erasableSyntaxOnly`. `tsconfig.json` at the root is a
+solution file: it names the three so an editor opens all of them, and it is not itself a gate.
+
+`gates:types` runs the three separately. Running them together would defeat the point: a single program
+that has both `DOM` and `node` in it cannot tell you that `contracts/` reached for `document`.
+
+## The frozen contracts
+
+`src/contracts/` is the one thing three lanes of wave 3 share, so it is frozen before any of them starts.
+Everything in it is plain `readonly` data. **Nothing in it is a class**, because all of it crosses a process
+boundary and a class does not survive a structured clone with its prototype. There is no validator, builder
+or factory: nothing constructs these types yet, and a helper written before its first caller is a helper
+shaped by a guess.
+
+| file | holds |
+| --- | --- |
+| `indices.ts` | `UNKNOWN_INDEX`, the sentinel for "not loaded" |
+| `people.ts` | `PersonTable`, authors and committers interned once per page |
+| `commits.ts` | `CommitColumns`, the columnar commit store, and `HASH_BYTE_LENGTH` |
+| `refs.ts` | `Refs`, with `RefKind` and `RefFlag` |
+| `working-tree.ts` | `WorkingTree` |
+| `layout.ts` | `LayoutRows`, with `RowFlag` |
+| `graph-page.ts` | `GraphPage`, the unit that crosses the boundary |
+| `result.ts` | `Result`, `Success`, `Failure` and `FailureKind` |
+| `ipc.ts` | `CHANNELS` and the request and reply types |
+| `bridge.ts` | `GitGraphicalBridge` and the renderer's global declaration |
+| `index.ts` | the single import surface for the other rings |
+
+Four properties are load-bearing, and each is a decision rather than a style:
+
+**The store is columnar.** A JavaScript object per commit costs 300 to 500 bytes once the engine has added
+its header and shape, and every one of them is traced on each major collection. `CommitColumns` is a struct
+of typed arrays: hashes stay binary and 20 bytes wide, parents are a compressed sparse row
+(`parentOffsets` plus `parentIndices`, never a nested array), authors and committers are indices into an
+interned `PersonTable`, timestamps are epoch seconds with the offset stored beside them and no `Date`
+objects, and every subject lives in one string blob addressed by `subjectOffsets`. `Refs` and `LayoutRows`
+follow the same shape for the same reason.
+
+**An absent index is `UNKNOWN_INDEX`, not `null` or `-1`.** Every index lives in a `Uint32Array`, so
+"absent" has to be a value inside the type's range. `0xFFFFFFFF` is the largest `Uint32` and cannot collide
+with a real row.
+
+**Kinds and flags are named constants.** `RefKind`, `RefFlag`, `RowFlag` and `FailureKind` are each a frozen
+object plus a type of the same name, so no bare number or bare string appears at a call site, and the plan,
+the code and the tests say the same words.
+
+**Failures are values, not thrown errors.** Every reply is a `Result`: either `{ ok: true, value }` or a
+`Failure` with a `kind`, a `message` and an optional `exitCode`. The discriminant means a consumer that
+forgets the failure branch does not type-check. The `message` is **git's own message** wherever git produced
+one and is never replaced by a friendlier sentence, because the user has to be able to read what git
+actually said in order to act on it; a friendlier sentence may be shown as well, chosen from the `kind`.
+
+`LayoutRows` deserves its own note, because it is the seam between two lanes of wave 3. A **segment** is one
+line crossing the vertical band of a single row; a line passing straight through an untouched lane is a
+segment whose two lanes are equal. That is the whole drawing instruction set — no curves, no multi-row
+edges, no scene graph — so painting a viewport is a walk over a slice of these arrays and nothing else.
+Colours are palette **indices**, never colour values, so a theme change repaints without recomputing the
+layout.
+
+Commit bodies are deliberately not in `CommitColumns`. The first milestone shows subjects only, and adding
+bodies is a visible change to this contract rather than a quiet addition.
+
+## The IPC contract and the bridge
+
+`CHANNELS` is a frozen object and the only place a channel name is spelled; no string literal channel name
+appears anywhere else. Five channels: open a repository by path, choose a folder, load more commits,
+refresh, and application information.
+
+The bridge the preload exposes is a **fixed set of five methods**, one per channel, and deliberately not a
+generic `invoke(channel, payload)`. A generic one would let anything running in the page reach a channel the
+renderer was never meant to use, which is the whole reason a bridge exists at all. The function that does
+the sending is module-private and is never exposed. Adding a capability is therefore a change to
+`contracts/bridge.ts` and to `preload/bridge.ts`, and is visible in review.
+
+`contracts/bridge.ts` also declares the renderer's global, so `window.gitGraphical` is typed wherever the
+renderer can see it.
+
+## The window, and the line the guarantee hangs on
+
+`src/app/window.ts` creates one `BrowserWindow` with `contextIsolation: true`, `sandbox: true`,
+`nodeIntegration: false`, no Node integration in workers or subframes, and `webviewTag: false`. The remote
+module no longer exists in this Electron, so there is nothing to disable. Navigation and window opening are
+refused, and an external link is handed to the user's browser instead.
+
+**That `webPreferences` block is the one thing in this slice that silently degrades.** A window configured
+wrongly compiles, builds and opens exactly like a correct one; the only thing that tells them apart is
+asking the running renderer whether `window.require` exists. So it is checked by hand and the values are
+recorded, not inferred from a green build. The renderer also asserts at startup that the bridge is present,
+which turns a silent misconfiguration into an error in the console of the very window that has it.
+
+Background throttling is **left on**. A hidden window that keeps running is what makes a desktop application
+expensive on a laptop (`docs/ADR-0002-architecture-and-performance.md` decision 5).
+
+The document carries a content security policy allowing only the application's own resources, with no inline
+script and no network of any kind. It has no `frame-ancestors`: a policy delivered in a `meta` element may
+not carry that directive, and Chromium logs it as ignored on every load. Framing is refused in the main
+process instead, where it holds.
+
+## The build
+
+`scripts/build.js` produces three bundles into `dist/`:
+
+| bundle | format | why |
+| --- | --- | --- |
+| `main.cjs` | CommonJS, Node target, `electron` external | The shell's entry point. |
+| `preload.cjs` | CommonJS, Node target, `electron` external | A **sandboxed preload script cannot be an ES module**: Electron loads it through its own module system. |
+| `renderer.js` | immediately invoked function, Chromium target | A `type="module"` script is fetched under cross-origin rules that a document loaded from the file system cannot satisfy, so a module build would simply not run. |
+
+`index.html` and `renderer.css` are copied beside them. Source maps are on by default and off under
+`--production`, which is what `npm start` and a later packaging step respectively want. The targets name
+what this Electron actually bundles; downlevelling further would only hide a syntax error behind a transform
+the shell never needed. When esbuild fails, the script lets esbuild's own diagnostic stand and sets a
+failing exit status rather than burying the line under its own stack trace.
+
+## The scripts, which CI will call
+
+`docs/ADR-0003-quality-gates-and-ci.md` §2 names them, and CI calls these and never its own inlined
+commands, so the two cannot drift.
+
+| script | runs |
+| --- | --- |
+| `gates` | the five below, in order, cheapest first |
+| `gates:format` | `prettier --check .` |
+| `gates:lint` | `eslint .` |
+| `gates:boundaries` | `depcruise src` against the ring rules |
+| `gates:types` | the three TypeScript projects, separately |
+| `gates:build` | the three bundles |
+| `build`, `start` | build, and build then run |
+
+`gates` is a flat list, so S02 extends it by adding entries rather than by restructuring it.
+
+## Lint and format
+
+ESLint runs `typescript-eslint`'s **strict type-checked** preset over `src/`, plus: no default exports, no
+explicit `any`, a complexity limit of 10, a module limit of 300 lines and a function limit of 50 —
+`docs/ADR-0002-architecture-and-performance.md` decision 7 made mechanical. Build and configuration
+JavaScript is linted without type information, because it belongs to no TypeScript project.
+
+**Prettier and ESLint do not overlap.** No formatting rule is enabled anywhere in the ESLint configuration —
+`typescript-eslint` moved its formatting rules out of these presets — so the two tools have nothing to
+disagree about and no `eslint-config-prettier` is needed to separate them.
+
+Prettier does not format Markdown. Every Markdown file here is prose written to a deliberate line width, and
+the plan, the contract and the decision records belong to the orchestrator (`AGENTS.md` §2); reflowing their
+tables would put an executor's formatting choice inside documents it may not edit, and would make every
+later prose change a formatting argument.
+
+## Dependencies
+
+There is **no runtime dependency**. Every dependency is a development dependency, every one is pinned to an
+exact version (`save-exact=true` in `.npmrc`), and the lockfile is committed. The whole milestone's
+toolchain is installed here, including the parts only S02 uses, because two lanes of one wave may not both
+touch the manifest or the lockfile (`AGENTS.md` §5).
+
+**TypeScript is pinned to 6.0.3, not to the current 7.0.2.** TypeScript 7 is the native port of the
+compiler; `typescript-eslint` 8.70.0 — the current stable line, and the only one — declares
+`typescript >=4.8.4 <6.1.0`. Pinning 7 would mean the type-aware lint gate either refuses to run or runs
+outside its supported range, and that gate is where `docs/ADR-0002-architecture-and-performance.md`
+decision 7 actually lives. 6.0.3 is the newest stable release the lint toolchain supports. This is a pin to
+revisit when `typescript-eslint` supports TypeScript 7, and moving it is a one-line change here plus a gate
+run.
