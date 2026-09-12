@@ -122,9 +122,10 @@ if (Test-Path $vswhere) {
 
 ## Traps met while building
 
-- **`npm ci` in a fresh worktree can leave Electron unusable.** It has been observed completing while
-  `node_modules/electron/` has no `dist/` and no `path.txt`, so `npm start` fails even though the install
-  reported success: the package's post-install step did not run. The project's `.npmrc` does not disable
-  scripts, so this comes from the environment rather than the configuration. The repair is to run the
-  package's own `install.js` from inside `node_modules/electron/`; nothing tracked changes. Observed on
-  2026-09-11 in a lane worktree.
+- **`npm ci` does not download the Electron binary, and the first `npm start` does.** After a clean install,
+  `node_modules/electron/` has no `dist/` and no `path.txt`. That is normal and not a broken install: this
+  version of the package has no post-install step, and its entry point fetches the binary the first time it
+  is required. What it means in practice is that **the first run in a fresh worktree pulls about 100 MB and
+  needs network**, so it is slow, and it is the step that fails offline or behind a proxy that blocks the
+  download. Every run after it starts immediately. Verified on 2026-09-11 by running `npm start` in a clean
+  worktree with no manual step: it reported the download, installed, and opened the window.

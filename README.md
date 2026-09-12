@@ -55,8 +55,8 @@ Read [`AGENTS.md`](AGENTS.md) before planning, writing or reviewing anything. It
 and it is authoritative: how work is planned (epic, milestone, slice), how it moves through worktrees and
 branches, how it is reviewed, and what counts as a complete delivery.
 
-Setup notes for building locally are in [`docs/SETUP.md`](docs/SETUP.md). They describe requirements, not a
-build, because there is nothing to build yet.
+Setup notes for building locally are in [`docs/SETUP.md`](docs/SETUP.md): what has to be installed, what was
+verified on the development machine, and the traps met while building.
 
 ## Layout
 
@@ -65,9 +65,6 @@ AGENTS.md            the workflow contract (authoritative)
 TASK_TEMPLATE.md     the shape of every task file
 AUDIT_TEMPLATE.md    the shape of every audit file
 src/contracts/       the shared data types and the IPC contract; depends on nothing
-src/core/            pure domain and use cases; no I/O, no Electron, no DOM
-src/ports/           the interfaces core needs from the world
-src/adapters/        implementations of those interfaces
 src/app/             the composition root: the Electron main process
 src/preload/         the typed bridge between the main process and the renderer
 src/ui/              the renderer
@@ -80,7 +77,11 @@ docs/KICKOFF.md      the opening brief for the first working session
 LICENSE              MIT
 ```
 
-Dependencies point inward only, and a gate enforces it rather than a convention.
+Those are the directories that exist today. The architecture has three more rings, and each one is created
+by the slice that puts a real file in it rather than standing empty: `src/core/` for pure domain and use
+cases, `src/ports/` for the interfaces it needs from the world, and `src/adapters/` for their
+implementations. **Dependencies point inward only, and a gate enforces it rather than a convention**, so the
+rules for all seven exist already even where the directory does not.
 [`docs/ADR-0002-architecture-and-performance.md`](docs/ADR-0002-architecture-and-performance.md) explains the
 rings and carries the CPU and memory budgets every change is measured against.
 
