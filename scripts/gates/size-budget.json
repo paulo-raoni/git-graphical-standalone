@@ -1,0 +1,11 @@
+{
+  "comment": "Bytes, measured over the development build in dist/ — unminified, which is the stricter of the two and the one `npm run gates` has already produced. Source maps are excluded: they are absent from a production build and are not distributed. A budget here moves DOWN only (AGENTS.md section 11, ADR-0003 decision 5); raising one is a commit that says why, inside the diff the reviewer reads.",
+  "files": {
+    "main.cjs": 6144,
+    "preload.cjs": 6144,
+    "renderer.js": 8192,
+    "index.html": 2048,
+    "renderer.css": 4096
+  },
+  "total": 24576
+}

@@ -1,0 +1,72 @@
+{
+  "linear": {
+    "refs": [
+      "04d326588463a7865d302e0fa40c5ef8645f28ba HEAD",
+      "04d326588463a7865d302e0fa40c5ef8645f28ba refs/heads/main"
+    ],
+    "commitCount": 5,
+    "commitDigest": "400631fdca29ecad668e789a393228214b731db4d9406ff5e67826e42fe06cdf"
+  },
+  "branch-and-merge": {
+    "refs": [
+      "040ed33db58db343200680a69a4d75fcf2ae18f3 HEAD",
+      "486885563520b26dd455e9948bf38f0acc5cc0f6 refs/heads/feature",
+      "040ed33db58db343200680a69a4d75fcf2ae18f3 refs/heads/main"
+    ],
+    "commitCount": 6,
+    "commitDigest": "0fa012c625b9e5116ef85425247211f17e0cb8829d1007f89c7badc5713d7229"
+  },
+  "two-roots": {
+    "refs": [
+      "869f21c22f956a3dc221834b9649bc5835ce0159 HEAD",
+      "869f21c22f956a3dc221834b9649bc5835ce0159 refs/heads/main",
+      "e4b7bdd5f535adcc3dd5f929174b138e7da6fb49 refs/heads/second-root"
+    ],
+    "commitCount": 4,
+    "commitDigest": "8e35bb4c299ee22d40713e04b1b64087319bde3992888b2b062d282c759869f3"
+  },
+  "tags": {
+    "refs": [
+      "44ff76757bb9d94624446ace92a1c08d76f73b2a HEAD",
+      "44ff76757bb9d94624446ace92a1c08d76f73b2a refs/heads/main",
+      "5550b88aa2e632e97ae1d5701e52bbdbf6bb0c40 refs/tags/annotated",
+      "44ff76757bb9d94624446ace92a1c08d76f73b2a refs/tags/annotated^{}",
+      "1c6708775d3ad04e4dc3a11bc63c699bcb665381 refs/tags/lightweight"
+    ],
+    "commitCount": 3,
+    "commitDigest": "1e720321c95fb6422fa859f28824e1c4855d0303a787cb314eb14fd3e5fc1caa"
+  },
+  "stash": {
+    "refs": [
+      "1c6708775d3ad04e4dc3a11bc63c699bcb665381 HEAD",
+      "1c6708775d3ad04e4dc3a11bc63c699bcb665381 refs/heads/main",
+      "a47c9304c83a3c37b8bd24cd6ad5474e4faff663 refs/stash"
+    ],
+    "commitCount": 4,
+    "commitDigest": "eeecb4059422e1015008af1876cb9b9801fb0437ef8e23e9da025f86c60b0f64"
+  },
+  "detached-head": {
+    "refs": [
+      "1c6708775d3ad04e4dc3a11bc63c699bcb665381 HEAD",
+      "44ff76757bb9d94624446ace92a1c08d76f73b2a refs/heads/main"
+    ],
+    "commitCount": 3,
+    "commitDigest": "1e720321c95fb6422fa859f28824e1c4855d0303a787cb314eb14fd3e5fc1caa"
+  },
+  "dirty-working-tree": {
+    "refs": [
+      "1c6708775d3ad04e4dc3a11bc63c699bcb665381 HEAD",
+      "1c6708775d3ad04e4dc3a11bc63c699bcb665381 refs/heads/main"
+    ],
+    "commitCount": 2,
+    "commitDigest": "00fa077c5ea7550f58674306a95527719f84597c3dc3339db9b7d201f248d493"
+  },
+  "large": {
+    "refs": [
+      "c8bddb87b89ffb16fbf1b3f7f6acc4a6fa154b4e HEAD",
+      "c8bddb87b89ffb16fbf1b3f7f6acc4a6fa154b4e refs/heads/main"
+    ],
+    "commitCount": 10000,
+    "commitDigest": "9f6a8849ebbf6653079a2c33f97c388954168d55074ce8a9a1ed0bf4b233f9ce"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "identity": {
+    "authorName": "Fixture Author",
+    "authorEmail": "author@fixture.invalid",
+    "committerName": "Fixture Committer",
+    "committerEmail": "committer@fixture.invalid"
+  },
+  "firstSecond": 1700000000,
+  "stepSeconds": 60,
+  "zone": "+0000",
+  "repositories": [
+    { "name": "linear", "shape": "linear", "commits": 5 },
+    { "name": "branch-and-merge", "shape": "branch-and-merge", "commits": 3 },
+    { "name": "two-roots", "shape": "two-roots", "commits": 2 },
+    { "name": "tags", "shape": "tags", "commits": 3 },
+    { "name": "stash", "shape": "stash", "commits": 2 },
+    { "name": "detached-head", "shape": "detached-head", "commits": 3 },
+    { "name": "dirty-working-tree", "shape": "dirty-working-tree", "commits": 2 },
+    { "name": "large", "shape": "large", "commits": 10000 }
+  ]
+}

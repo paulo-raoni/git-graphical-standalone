@@ -1,0 +1,29 @@
+{
+  "comment": "This repository is public and MIT. Every installed dependency's licence must be on this list, and a licence the checker cannot determine is reported as UNKNOWN, which is not on it — so it fails, as an undetermined licence should.",
+  "allowed": [
+    "0BSD",
+    "Apache-2.0",
+    "BlueOak-1.0.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC-BY-3.0",
+    "CC-BY-4.0",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "Python-2.0",
+    "Unlicense",
+    "(MIT AND CC-BY-3.0)",
+    "(MIT OR CC0-1.0)"
+  ],
+  "exceptions": {
+    "lightningcss": {
+      "licence": "MPL-2.0",
+      "why": "Weak, file-level copyleft rather than a permissive licence, so it is named here rather than allowed for everything. It arrives transitively under the bundler, is a development dependency, and no part of it is distributed with this application."
+    },
+    "lightningcss-win32-x64-msvc": {
+      "licence": "MPL-2.0",
+      "why": "The prebuilt binary of the entry above, on this platform, and the same reasoning applies to it."
+    }
+  }
+}

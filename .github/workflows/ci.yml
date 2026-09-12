@@ -1,0 +1,216 @@
+# The one workflow file.
+#
+# `docs/ADR-0003-quality-gates-and-ci.md` decision 6 and `AGENTS.md` §11: there
+# is exactly one workflow file, every trigger lives in it, and a job that should
+# not run for a given event is skipped by a condition rather than moved to a
+# second file. The reason is how Actions renders — one row per workflow run, with
+# jobs nested inside it — so a second file is a second row for the same commit
+# and an orphan.
+#
+# Every job calls a `gates:*` script from package.json and never its own inlined
+# command, so that what runs here is what an executor ran in its worktree
+# (ADR-0003 decision 1). A gate that exists only here could not be run before the
+# work was merged, which is the wrong moment to find out.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+
+# One row per commit that still matters: a push that supersedes a running build
+# cancels it rather than queueing behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  # Installs once against the cached store, builds, and publishes the bundles
+  # every other job consumes. `node_modules` itself is not published: with the
+  # Electron runtime in it, it is over half a gigabyte, and restoring the same
+  # cached store in each job is both smaller and what `actions/setup-node`
+  # already does well.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run gates:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 3
+
+  # Everything that reads the source and nothing else: format, lint, boundaries,
+  # types, the contract snapshot, licences, provenance, commits, placeholders.
+  # `fetch-depth: 0` because `gates:commits` reads the range from the base tag,
+  # and a shallow clone has neither the tag nor the commits.
+  static:
+    name: static
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run gates:format
+      - run: npm run gates:lint
+      - run: npm run gates:boundaries
+      - run: npm run gates:types
+      - run: npm run gates:contract
+      - run: npm run gates:licences
+      - run: npm run gates:provenance
+      - run: npm run gates:commits
+      - run: npm run gates:placeholders
+
+  unit:
+    name: unit
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run gates:unit
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 3
+
+  # Mutation depends on unit: a suite that does not pass cannot be asked which
+  # mutants it kills. Stryker's incremental report is cached and restored, keyed
+  # by the lockfile, which is ADR-0003 decision 3's speed compromise; the flag
+  # that turns incremental mode on lives in stryker.config.json, not here, so
+  # that a run in a worktree and a run here are the same run.
+  mutation:
+    name: mutation
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Restore the incremental mutation report
+        uses: actions/cache@v4
+        with:
+          path: .stryker-tmp/incremental.json
+          key: stryker-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            stryker-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      - run: npm run gates:mutation
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 3
+
+  # Windows is the verified platform (ADR-0001), and this gate drives the built
+  # application, so it runs there and nowhere else.
+  e2e:
+    name: end to end
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - run: npm run gates:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+
+  perf:
+    name: performance
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run gates:perf
+
+  size:
+    name: size
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - run: npm run gates:size
+
+  # The single required check. It needs every other job, so branch protection has
+  # one entry and a pull request shows one line that expands into everything that
+  # produced it (ADR-0003 decision 6). `always()` is what lets it observe a
+  # failure rather than being skipped by it.
+  gate:
+    name: gate
+    if: always()
+    needs:
+      - build
+      - static
+      - unit
+      - mutation
+      - e2e
+      - perf
+      - size
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report what every job did
+        run: echo '${{ toJSON(needs) }}'
+      - name: Fail unless every job succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "At least one gate did not succeed."
+          exit 1

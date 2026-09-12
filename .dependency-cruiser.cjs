@@ -21,6 +21,12 @@ const PURE_RINGS = '^src/(core|ports)/';
 /** The rings that only the composition root may know about. */
 const OUTER_RINGS = '^src/(adapters|app|preload|ui)/';
 
+/**
+ * Colocated unit tests. They live inside their ring and are bound by its rules,
+ * with one addition that product code does not get: they name the test runner.
+ */
+const TEST_FILES = '\\.test\\.ts$';
+
 module.exports = {
   forbidden: [
     {
@@ -60,8 +66,19 @@ module.exports = {
       name: 'core-only-inward',
       severity: 'error',
       comment: 'src/core/ may import src/contracts/ and src/ports/, and nothing else.',
-      from: { path: '^src/core/' },
+      from: { path: '^src/core/', pathNot: TEST_FILES },
       to: { pathNot: '^src/(contracts|core|ports)/' },
+    },
+    {
+      name: 'core-tests-only-inward-and-the-runner',
+      severity: 'error',
+      comment:
+        'A colocated test of src/core/ obeys its ring and names one thing besides: the test ' +
+        'runner. The rule above excludes test files rather than widening itself, because ' +
+        'widening it would let the product code reach vitest as well — and the rule against ' +
+        'Node builtins still covers these files, so a core test that opens a file still fails.',
+      from: { path: '^src/core/.*\\.test\\.ts$' },
+      to: { pathNot: '^src/(contracts|core|ports)/|^node_modules/vitest/' },
     },
     {
       name: 'ports-only-contracts',

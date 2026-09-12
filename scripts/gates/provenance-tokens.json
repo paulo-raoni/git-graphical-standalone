@@ -1,0 +1,22 @@
+{
+  "comment": "Each token is stored in fragments and joined at run time, so this file does not contain the strings it forbids and does not have to exempt itself.",
+  "tokens": [
+    { "what": "the extension's publisher", "fragments": ["mhut", "chie"] },
+    { "what": "the extension's package", "fragments": ["vscode-git", "-graph"] },
+    { "what": "the extension's marketplace item", "fragments": ["itemName=mhut", "chie"] }
+  ],
+  "exempt": [
+    "AGENTS.md",
+    "README.md",
+    "docs/KICKOFF.md",
+    "scripts/gates/provenance.js",
+    "package-lock.json"
+  ],
+  "exemptReasons": {
+    "AGENTS.md": "Section 1 is the clean-room rule itself, and a rule has to name what it forbids.",
+    "README.md": "States plainly what this project is and is not a derivative of.",
+    "docs/KICKOFF.md": "Records where the observable behaviour is read from.",
+    "scripts/gates/provenance.js": "Explains in prose what it looks for.",
+    "package-lock.json": "Checked separately, by dependency name rather than by substring, because a lockfile carries integrity hashes that collide with any short token."
+  }
+}
