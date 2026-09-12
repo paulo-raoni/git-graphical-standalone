@@ -82,6 +82,19 @@ module.exports = {
       to: { path: '^src/(app|preload|ui)/' },
     },
     {
+      name: 'preload-only-contracts',
+      severity: 'error',
+      comment:
+        'src/preload/ is the one surface the renderer has on the rest of the application. It ' +
+        'carries contract types across a process boundary and nothing else, so it names ' +
+        'src/contracts/ and electron and no other ring; a bridge that reached into core/ would ' +
+        'widen that surface without anything saying so. Until this rule existed the ring table ' +
+        'in the slice document was the only place it was written, and a rule that is only ' +
+        'written down erodes.',
+      from: { path: '^src/preload/' },
+      to: { path: '^src/(adapters|app|core|ports|ui)/' },
+    },
+    {
       name: 'ui-no-electron',
       severity: 'error',
       comment:
