@@ -133,12 +133,12 @@ merges or of thousands of distinct people costs differently. At 85.519 the store
 | # | script | what it protects |
 | --- | --- | --- |
 | 1 | `gates:format` | Prettier in check mode |
-| 2 | `gates:lint` | ESLint, type-aware, with the complexity and module-size limits |
+| 2 | `gates:lint` | ESLint, type-aware, with the complexity and module-size limits, over the source and nothing a gate generated |
 | 3 | `gates:boundaries` | the ring rules of ADR-0002 decision 1 |
 | 4 | `gates:types` | the three TypeScript projects, separately |
 | 5 | `gates:contract` | a committed snapshot of what `src/contracts/` exports |
 | 6 | `gates:unit` | Vitest with per-directory coverage, and the fixture generator's determinism |
-| 7 | `gates:mutation` | StrykerJS over `src/core/`, breaking below 85, refusing a run that measured nothing |
+| 7 | `gates:mutation` | StrykerJS over `src/core/` and `src/contracts/`, breaking below 85, refusing a run that measured nothing |
 | 8 | `gates:build` | the three bundles |
 | 9 | `gates:e2e` | Playwright over the built application |
 | 10 | `gates:perf` | counters and budgets against committed baselines |
@@ -165,12 +165,33 @@ assistant and an emoji, over the range from the previous promotion's tag to `HEA
 records what the type checker resolves each export to, so a comment or a reordering does not move the
 snapshot and a renamed field does. `npm run contract:record` rewrites it, which is the only way it changes.
 
+**`gates:lint` reads the source and nothing a gate wrote.** `eslint .` walks the working tree, and an ESLint
+`files` pattern is not anchored, so `src/**/*.ts` matches a copy of `src/` at any depth — including the copy
+Stryker makes in `.stryker-tmp/sandbox-<id>/`, which carries a `// @ts-nocheck` on every `src/` and `test/`
+file because that is Stryker's `disableTypeChecks` default, and which
+`@typescript-eslint/ban-ts-comment` forbids. Measured in FIX-06 with one sandbox on disk and the ignore list
+as it stood: **1674 errors, every one of them inside `.stryker-tmp/`**. So the ignore list covers every
+directory that exists only because a gate ran — the Stryker temporary directory, `reports/`,
+`playwright-report/`, `test-results/` and the generated fixture repositories — each of which is a
+`.gitignore` entry too, so none of them can hide a committed file. With them the gate reads **91 files**,
+which is exactly the tracked files its patterns cover. It cannot bite inside `npm run gates`, where lint is
+gate 2 and mutation is gate 7; it bites whoever runs the two at once, which is what an hour-long gate invites.
+
 ### Coverage
 
-Coverage thresholds are **per directory**. `src/core/**` is held at 100 per cent of statements, branches,
-functions and lines, which is what its own tests reach; `app/`, `preload/` and `ui/` are wiring, their
-guarantee comes from the end-to-end gate, and holding them to a number would buy a test that asserts the
-wiring is wired.
+Coverage thresholds are **per directory**. `src/core/**` and `src/contracts/**` are both held at 100 per cent
+of statements, branches, functions and lines, which is what their own tests reach; `app/`, `preload/` and
+`ui/` are wiring, their guarantee comes from the end-to-end gate, and holding them to a number would buy a
+test that asserts the wiring is wired.
+
+`src/contracts/**` was thresholded in FIX-06, when the ring stopped being declarations only: S08 moved the
+page decoders into it, and a ring that can be wrong needs a floor. The rest of that ring has no executable
+code, and the v8 provider reports such a file as **100 per cent of a zero denominator**, so it neither raises
+nor lowers the number — measured over the twelve files the provider reports under `src/contracts/`
+(`index.ts` is excluded, as every barrel is), of which three carry no statement at all. The whole group is
+35 statements, 11 branches, 9 functions and 34 lines, and the decoders are 27 of those statements. Deleting
+the two tests that reach `entryAt`'s refusal takes the group to 97.14, 90.9 and 97.05 and fails the gate,
+which is how the floor was proved to bite rather than merely to be recorded.
 
 ## The mutation gate
 
@@ -235,29 +256,96 @@ what made the failure survive four reviews was that the line Stryker already pri
 its tests. It is being told that the run cannot support a claim about them, and the two numbers in the
 refusal say which of the two shapes it hit.
 
+### Every run is a full run
+
+`incremental` is **off**, and `.github/workflows/ci.yml` restores nothing. Incremental mode reuses the
+verdicts of an earlier run for any mutant whose file it believes unchanged, and **S03 measured it** reusing
+them when it should not have — a run reporting 47 survivors at 95.26, then an incremental re-run finishing in
+47 seconds with the same survivor counts although the tests had changed, then a full run reporting 100.00
+with none. That is S03's measurement and FIX-06 did not reproduce it; what FIX-06 did was remove the
+mechanism, so there is nothing left to reproduce it against.
+FIX-04's shape check refuses a restored run made of timeouts, which closes the green-for-nothing path;
+it cannot notice a run that is fast and wrong in the other direction, because the report's shape is the shape
+of whatever was reused.
+
+The cache made that worse rather than contained it: the key was the lockfile, which does not change when the
+source does, and a `restore-keys` prefix beneath it, so a pull request could be scored against a report
+produced from other source. Its benefit was a **second** run of the same source, which is the one case the
+one workflow does not have: `concurrency` cancels a superseded run, `push` fires once per commit, and the
+promotion pull request is opened once. That is read off `.github/workflows/ci.yml` and ADR-0003 decision 6,
+not measured — **the workflow has never run, because nothing has been pushed.** What a cold run costs with
+the cache and without it is therefore an **inference** and not a measurement, and it is the same inference
+either way: an empty cache restores nothing and the run is full.
+
+The alternative considered and rejected was keeping incremental mode and keying the cache on the source tree
+rather than the lockfile. It fixes the key and not the mechanism: the verdicts reused are still verdicts a
+different run produced, and the shape check cannot tell a reused one from a fresh one. A gate that takes an
+hour and is right is cheaper than one that takes a minute and might be a month old. What FIX-06 measured, and
+the only cost it can honestly claim, is the wall clock of a full local run, in the table below.
+
 ### The numbers it produces
 
-Over the configured scope — `src/core/**/*.ts` without the tests — with a cleared incremental file, on the
-development machine and otherwise idle. The column is one run, the last of three; where the three disagree the
-range is given, because two mutants sit either side of the timeout budget and move between runs.
+Two runs, over two scopes, on the development machine and otherwise idle. The first is **S02's**, over
+`src/core/**/*.ts` without the tests, at S02's own commit; it is kept as S02 wrote it and FIX-06 did not
+re-run it. The second is **FIX-06's**, over that scope plus `src/contracts/**/*.ts` without the tests, with
+`incremental` off, at the commit that widened it. The source tree grew between them, so the two are not a
+before-and-after of the same code.
 
-| measurement | value |
-| --- | --- |
-| mutants | 1131 |
-| killed by the suite | 1081 (1080 to 1081) |
-| timed out | 43 (43 to 44) |
-| survived | 7 (6 to 7) |
-| no coverage, errors, ignored | 0 |
-| score, against `break` 85 | **99.38** (99.38 to 99.47) |
-| timeout share of detections | 3.8 per cent |
-| the line Stryker prints | `Ran 0.96 tests per mutant on average.` |
-| `gates:mutation`, wall clock | 53 minutes |
-| `npm run gates`, wall clock | 55 minutes |
+| measurement | S02, `src/core/` | FIX-06, `src/core/` and `src/contracts/` |
+| --- | --- | --- |
+| files in the report | 17 | 20 |
+| mutants | 1131 | **1195** |
+| killed by the suite | 1081 (1080 to 1081) | 1141 (1141 to 1142) |
+| timed out | 43 (43 to 44) | 46 |
+| survived | 7 (6 to 7) | 8 (7 to 8) |
+| no coverage, errors, ignored, pending | 0 | 0 |
+| score, against `break` 85 | **99.38** (99.38 to 99.47) | **99.33** (99.33 to 99.41) |
+| timeout share of detections | 3.8 per cent | 3.9 per cent of 1187 |
+| the line Stryker prints | `Ran 0.96 tests per mutant on average.` | the same, 0.96 |
+| `gates:mutation`, wall clock | 53 minutes | 62 to 63 minutes |
+| `npm run gates`, wall clock | 55 minutes | 65 minutes |
 
-The seven survivors are in `src/core/parse/`: `bytes.ts` at 60:26, 70:7 and 166:20, `commit-lookup.ts` at
-28:62, `object-names.ts` at 51:78, and `working-tree-status.ts` at 141:7 and 141:20. Every other file under
-`src/core/` scores 100.00; those four score 97.32, 97.92, 98.75 and 97.53. **Closing them is test work in the
-folders their own lanes own, and it is not what moved the instrument.**
+S02's column is one run, the last of three; where the three disagreed the range is given, because two mutants
+sit either side of the timeout budget and move between runs. FIX-06's column is two runs of **identical
+source**, the first `gates:mutation` alone and the second inside `npm run gates`, and they disagree about one
+mutant — see below. The two wall clocks are **not** a cost for the widening: they are different commits with
+different amounts of source, and 57 more mutants at about eleven seconds each over seven workers accounts for
+about a minute and a half of the nine minutes between them.
+
+**What the widening added is exactly three files and 57 mutants.** At FIX-06's commit the `src/core/` part of
+the report holds 1138 mutants across 17 files, which is what `stryker run --dryRunOnly` counts before the
+change as well; `src/contracts/` adds `commit-columns.ts` with 50, `column-read.ts` with 6 — the 56 the
+decoders carried in `src/core/store/` before S08 moved them — and `bridge.ts` with 1. Every other file of
+`src/contracts/` is type declarations and produces none, which is why widening a whole ring adds 5.0 per cent
+to the mutant population rather than a proportion of its file count.
+
+Eight survivors. Seven are in `src/core/parse/`: `bytes.ts` at 60:26, 70:7 and 166:20, `commit-lookup.ts` at
+28:62, `object-names.ts` at 51:78, and `working-tree-status.ts` at 141:7 and 141:20. The eighth is the one the
+widening found: **`src/contracts/bridge.ts` at 13:35, `StringLiteral`**, which replaces
+`BRIDGE_GLOBAL_NAME`'s `'gitGraphical'` with the empty string. No unit test names that constant — grepped,
+not assumed; the gate that does is `gates:e2e`, which asserts the bridge from inside the renderer, and
+Stryker runs the unit suite only. **Both decoder modules score 100.00 with no survivor**, in both runs.
+Every other file under `src/core/` scores 100.00; those four score 97.32, 97.92, 98.75 and 97.53. **Closing
+any of them is test work in the folders their own lanes own, and it is not what moved the instrument.**
+
+### A kill under the command runner is "the suite exited non-zero"
+
+That eighth mutant is the one the two runs disagree about, and the disagreement is worth more than the
+mutant. Run one reported it **survived**; run two, over identical source, reported it **killed**, which is the
+whole of the difference between 99.33 and 99.41. Re-run on its own — `stryker run --mutate
+src/contracts/bridge.ts`, one mutant, the suite completing at `Ran 1.00 tests per mutant` — it **survives**.
+Nothing in the unit suite reads the constant, so there is nothing that could have detected it, and the honest
+verdict is the isolated one.
+
+What run two saw was the suite exiting non-zero for a reason that was not the mutant. The command runner has
+no way to tell those apart: it runs `vitest run` and reads an exit status, so **any** failure under seven
+concurrent workers — and not only a failing assertion — is scored as a detection. That is the same family as
+the timeout counted as a kill, and it moves the score in the same direction, but it is smaller and it is not
+what `scripts/gates/mutation.js` refuses: a falsely killed mutant carries a completed test run, so the first
+clause passes it, and one of 1195 is nowhere near the timeout cap. **Two consequences for a lane reading its
+own numbers:** a survivor that appears in one run and not the next is a survivor, not a flake, until an
+isolated run says otherwise; and a score is reproducible to about a tenth of a point on this machine, not
+exactly.
 
 `bytes.ts:166:20` is the one to read twice. It is a **slow** mutant rather than a non-terminating one, so it
 is reported as survived on two runs of three and as timed out on the third, where the machine was busier — and

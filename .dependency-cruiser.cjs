@@ -35,8 +35,21 @@ module.exports = {
       comment:
         'src/contracts/ is the shared vocabulary. It imports nothing at all, which is what lets ' +
         'three lanes of one wave depend on it without depending on each other.',
-      from: { path: '^src/contracts/' },
+      from: { path: '^src/contracts/', pathNot: TEST_FILES },
       to: { pathNot: '^src/contracts/' },
+    },
+    {
+      name: 'contracts-tests-only-the-runner',
+      severity: 'error',
+      comment:
+        'A colocated test of src/contracts/ obeys its ring and names one thing besides: the test ' +
+        'runner. The rule above excludes test files rather than widening itself, because widening ' +
+        'it would let the contract code itself reach vitest — and then the ring that imports ' +
+        'nothing would import whatever a file happens to name. The ring imports nothing; its ' +
+        'tests import the runner and nothing else, so a contracts test that names another ' +
+        'package, another ring or a Node builtin still fails here.',
+      from: { path: '^src/contracts/.*\\.test\\.ts$' },
+      to: { pathNot: '^src/contracts/|^node_modules/vitest/' },
     },
     {
       name: 'core-and-ports-no-electron',

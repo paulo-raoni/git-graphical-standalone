@@ -15,8 +15,12 @@ import { defineConfig } from 'vitest/config';
  *
  * Coverage thresholds are **per directory**, which is the whole point of the
  * gate. `src/core/` holds every decision that can be wrong
- * (`docs/ADR-0002-architecture-and-performance.md` decision 1) and is held high;
- * `src/app/`, `src/preload/` and `src/ui/` are wiring, their guarantee comes
+ * (`docs/ADR-0002-architecture-and-performance.md` decision 1) and is held high.
+ * `src/contracts/` is held to the same number since it acquired the page
+ * decoders (decision 3 as amended, S08): the rest of the ring is type
+ * declarations, which the v8 provider reports as 100 per cent of a zero
+ * denominator, so the number is reached by the decoders and nothing else moves
+ * it. `src/app/`, `src/preload/` and `src/ui/` are wiring, their guarantee comes
  * from the end-to-end gate, and holding them to a number would buy a test that
  * asserts the wiring is wired. They are reported and not thresholded on purpose.
  *
@@ -35,6 +39,12 @@ export default defineConfig({
       reportsDirectory: 'coverage',
       thresholds: {
         'src/core/**': {
+          statements: 100,
+          branches: 100,
+          functions: 100,
+          lines: 100,
+        },
+        'src/contracts/**': {
           statements: 100,
           branches: 100,
           functions: 100,

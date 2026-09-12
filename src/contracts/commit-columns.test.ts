@@ -9,26 +9,8 @@ import {
   parentsOf,
   subjectOf,
   UNKNOWN_INDEX,
-} from '../../contracts/index';
-import type { CommitColumns } from '../../contracts/index';
-
-/**
- * The decoders moved to `src/contracts/` in S08; this test did not follow them.
- *
- * `.dependency-cruiser.cjs`'s `contracts-depends-on-nothing` rule has no
- * carve-out for colocated tests — unlike `core-only-inward`, which excludes them
- * and is paired with `core-tests-only-inward-and-the-runner` — so a test file
- * under `src/contracts/` naming `vitest` fails `gates:boundaries`. That was
- * measured, not assumed: moving both test files there produced exactly two
- * errors, `contracts-depends-on-nothing: src/contracts/<name>.test.ts →
- * node_modules/vitest/dist/index.js`.
- *
- * S08's boundary does not include `.dependency-cruiser.cjs`, so the rule could
- * not be amended in that lane. The test stays here, where
- * `core-tests-only-inward-and-the-runner` permits both `src/contracts/` and the
- * runner, and `AUDIT-S08-contract-decode-api.md` raises the amendment. It is a
- * stopgap, not a statement about which ring owns these functions.
- */
+} from './index';
+import type { CommitColumns } from './index';
 
 const PEOPLE = {
   names: ['Ada', 'Grace'],

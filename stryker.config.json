@@ -2,13 +2,14 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "packageManager": "npm",
   "testRunner": "command",
-  "vitest": {
-    "configFile": "vitest.config.js",
-    "related": false
-  },
-  "mutate": ["src/core/**/*.ts", "!src/core/**/*.test.ts"],
+  "mutate": [
+    "src/core/**/*.ts",
+    "!src/core/**/*.test.ts",
+    "src/contracts/**/*.ts",
+    "!src/contracts/**/*.test.ts"
+  ],
   "coverageAnalysis": "off",
-  "incremental": true,
+  "incremental": false,
   "incrementalFile": ".stryker-tmp/incremental.json",
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
