@@ -19,7 +19,9 @@ are now in two rings:
 
 No function's body, signature or behaviour changed. The unit suite that covers the decoders was not edited
 except for its import path and an explanatory header: the 104 assertions of `npm run gates:unit` pass here and
-passed at the base commit, and none of their expected values moved.
+passed at the base commit, and none of their expected values moved. Those two test files stayed in
+`src/core/store/` in this lane and **came home in FIX-06**, which added the boundary rule that let them; the
+section at the end of this document says where they are now.
 
 ## The test that decides the ring
 
@@ -95,17 +97,30 @@ It is deliberately **not** re-exported from `src/contracts/index.ts`. The export
 snapshotted by `gates:contract`, and `entryAt` is a shared helper rather than a term of the vocabulary. A
 module inside `contracts/` is not automatically part of the contract; what `index.ts` exports is.
 
-### Two consequences a reader should know about
+### What this lane could not finish, and where FIX-06 put it
 
-- **The decoders left the mutation gate's scope.** `stryker.config.json` mutates `src/core/**` only, so the
-  six decoders and `entryAt` — which were held to that gate in S02 — are now mutated by nothing. Their unit
-  tests still run and still fail when a decoder is broken (measured in
-  `AUDIT-S08-contract-decode-api.md`), but the mechanical floor under them is gone until the gate's scope is
-  widened. S08's boundary did not include `stryker.config.json`.
-- **The two test files did not follow the code.** `contracts-depends-on-nothing` has no carve-out for
-  colocated tests, so a `*.test.ts` under `src/contracts/` fails `gates:boundaries` for naming `vitest` —
-  measured in this lane, two errors, one per file. `core-only-inward` has exactly such a carve-out, paired
-  with `core-tests-only-inward-and-the-runner`; `contracts/` never needed one because it had no test until
-  now. `.dependency-cruiser.cjs` was outside S08's boundary, so the two tests stay in `src/core/store/` and
-  import the modules they cover across the ring boundary. That is a stopgap and is recorded as an open
-  finding.
+Moving the sources moved them out from under two gates and out of reach of their own tests, and all three of
+the files that would have fixed that — `stryker.config.json`, `vitest.config.js` and
+`.dependency-cruiser.cjs` — were outside this lane's boundary, because `AGENTS.md` §5 keeps a wave's shared
+registries out of its lanes. So this lane raised them and **FIX-06 closed them**. Both records are kept: the
+asymmetry below is the reason the boundary rule now has the shape it has.
+
+- **The decoders left the mutation gate's scope, and had no coverage floor.** `stryker.config.json` mutated
+  `src/core/**` only, so the six decoders and `entryAt` — held to that gate in S02 — were mutated by nothing,
+  and `vitest.config.js` thresholded `src/core/**` only, so the 100 per cent the two files read was recorded
+  and not enforced. Their unit tests ran and failed when a decoder was broken (measured in
+  `AUDIT-S08-contract-decode-api.md`), and that was the whole of the floor. FIX-06 added
+  `src/contracts/**/*.ts` to `mutate` and a `src/contracts/**` coverage threshold at 100 per cent of
+  statements, branches, functions and lines.
+- **The two test files could not follow the code, and now have.** `contracts-depends-on-nothing` forbade the
+  ring every import, with no carve-out for a colocated test, so a `*.test.ts` under `src/contracts/` failed
+  `gates:boundaries` for naming `vitest` — measured in this lane, two errors, one per file. `core-only-inward`
+  had exactly such a carve-out, paired with `core-tests-only-inward-and-the-runner`, because `core/` had tests
+  from S02 onward; `contracts/` never needed one until it acquired these functions. FIX-06 mirrored that pair:
+  `contracts-depends-on-nothing` now carries `pathNot: TEST_FILES` and **`contracts-tests-only-the-runner`**
+  permits a colocated test `^src/contracts/` and `^node_modules/vitest/` and nothing else. So
+  `column-read.test.ts` and `commit-columns.test.ts` live in `src/contracts/`, beside the modules they test,
+  and no longer import across a ring boundary. The rule's `to` clause is the whole of the guarantee, and it
+  was probed both ways in that lane: a contracts test naming another ring, another package or a Node builtin
+  fails it, and a **non-test** file under `src/contracts/` naming `vitest` still fails
+  `contracts-depends-on-nothing`.
