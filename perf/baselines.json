@@ -1,26 +1,31 @@
 {
-  "structuralBytesPerCommit": {
-    "baseline": 66.612,
+  "structuralBytesPerCommitWorst": {
+    "baseline": 85.197,
     "ceiling": 96,
-    "unit": "bytes per commit, message text excluded, over 10000 commits"
+    "unit": "bytes per commit, message text excluded, at 24577 commits: the worst size on the growth curve, 24.2 per cent column slack with the hash index newly doubled"
+  },
+  "structuralBytesPerCommit": {
+    "baseline": 79.828,
+    "ceiling": 96,
+    "unit": "bytes per commit, message text excluded, at 20000 commits: mid-cycle, 22.1 per cent column slack"
   },
   "structuralBytesPerCommitLarge": {
-    "baseline": 78.099,
+    "baseline": 76.416,
     "ceiling": 96,
-    "unit": "bytes per commit, message text excluded, over 40000 commits"
+    "unit": "bytes per commit, message text excluded, at 80000 commits: mid-cycle, 16.4 per cent column slack"
   },
   "scalingRatio": {
-    "baseline": 6.02,
+    "baseline": 4.403,
     "ceiling": 8,
-    "unit": "times the work of 10000 commits, for 40000 of them"
+    "unit": "times the work of 20000 commits, for 80000 of them: 22.1 and 16.4 per cent slack, neither size capacity-exact"
   },
   "workPerCommit": {
-    "baseline": 13.37,
-    "unit": "counted operations per commit, over 40000 commits"
+    "baseline": 13.792,
+    "unit": "counted operations per commit, over 80000 commits: 16.4 per cent column slack"
   },
   "buildMilliseconds": {
     "baseline": 300,
     "tolerance": 10,
-    "unit": "milliseconds to append 10000 commits"
+    "unit": "milliseconds to append 10000 commits, the slowest of the 24577, 20000 and 80000 builds normalised to ten thousand"
   }
 }
