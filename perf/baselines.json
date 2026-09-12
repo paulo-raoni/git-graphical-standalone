@@ -1,0 +1,26 @@
+{
+  "structuralBytesPerCommit": {
+    "baseline": 66.612,
+    "ceiling": 96,
+    "unit": "bytes per commit, message text excluded, over 10000 commits"
+  },
+  "structuralBytesPerCommitLarge": {
+    "baseline": 78.099,
+    "ceiling": 96,
+    "unit": "bytes per commit, message text excluded, over 40000 commits"
+  },
+  "scalingRatio": {
+    "baseline": 6.02,
+    "ceiling": 8,
+    "unit": "times the work of 10000 commits, for 40000 of them"
+  },
+  "workPerCommit": {
+    "baseline": 13.37,
+    "unit": "counted operations per commit, over 40000 commits"
+  },
+  "buildMilliseconds": {
+    "baseline": 300,
+    "tolerance": 10,
+    "unit": "milliseconds to append 10000 commits"
+  }
+}
