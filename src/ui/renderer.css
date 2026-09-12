@@ -1,0 +1,75 @@
+/*
+ * The renderer's only stylesheet. Plain CSS, no framework and no preprocessor:
+ * the view is a small number of large components, and a build step between the
+ * source and the browser would only hide what is actually painted.
+ *
+ * Colours follow the operating system's light or dark preference rather than a
+ * theme switch, because there is nothing to configure yet.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --surface: #ffffff;
+  --text-primary: #1f1f1f;
+  --text-secondary: #5c5c5c;
+
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1f1f1f;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0a0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+#app {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  user-select: none;
+}
+
+.empty-state__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.empty-state__message {
+  margin: 0;
+  color: var(--text-secondary);
+}
