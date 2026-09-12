@@ -10,12 +10,6 @@
 /REVIEW-*.md
 /.worktrees/
 
-# --- Rust / Cargo / Tauri ---
-target/
-**/*.rs.bk
-*.pdb
-src-tauri/gen/
-
 # --- Node / TypeScript / Electron ---
 node_modules/
 .pnpm-store/
