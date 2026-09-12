@@ -36,7 +36,8 @@ This ADR takes each of its five choices in turn.
 3. **Clean room** (`AGENTS.md` §1): nothing here may make provenance arguable.
 4. **One lane, one context**: an executor should be able to hold the whole slice in one language.
 5. **Cost to start**: what has to be installed before the first gate can run.
-6. **Distributable size and memory**, which users of a standalone tool do notice.
+6. **Footprint: CPU and memory.** Raised by the owner to the top of the list after this ADR was first
+   drafted; answered in Axis 6 and turned into numbers by `docs/ADR-0002-architecture-and-performance.md`.
 7. **Cross-platform reach**, at the cost the owner accepts (`docs/PLAN.md`, owner decisions).
 
 ## Axis 1 · Git access
@@ -125,6 +126,48 @@ this machine. Linux and macOS packaging and verification are a later milestone t
 then the README says so. This is owner decision 2 in `docs/PLAN.md`; the default recorded here is
 "cross-platform code, Windows-verified", and it costs nothing extra now.
 
+## Axis 6 · The lightweight requirement, re-examined
+
+The owner has since put **CPU efficiency and memory allocation above feature count**: as light as possible,
+with the whole repository still explorable. That is a direct challenge to this ADR's accepted cost, so it is
+answered here rather than left in the Consequences.
+
+**What the shell actually costs, on Windows.** Both candidates render in Chromium: Electron bundles it,
+Tauri drives the WebView2 runtime, which is Chromium. So the rendering and scripting engine, and therefore
+the cost of our own drawing and scrolling, is **the same in both**. The difference is a roughly fixed
+baseline:
+
+| | Electron | Tauri 2 on Windows |
+| --- | --- | --- |
+| Resident memory, application idle, one window | about 120 to 200 MB across its processes | about 60 to 110 MB, part of it in a WebView2 runtime shared with other applications |
+| Installed size | about 150 to 200 MB | about 5 to 15 MB, plus the already-present runtime |
+| Memory for 50 000 loaded commits, under ADR-0002's store | about 5 to 10 MB | the same |
+| Rendering and scrolling cost | Chromium | Chromium |
+| Parsing 50 000 commits, once per load | roughly 200 to 400 ms in optimised TypeScript | roughly 80 to 150 ms in Rust |
+
+Two things follow, and they matter more than the headline.
+
+1. **The difference is a constant, not a slope.** Electron costs on the order of 60 to 100 MB more at rest
+   and around 150 MB more on disk, and that gap does not widen with repository size. What *does* scale is
+   the commit store, the DOM row count and the redraw policy, and those are identical in both candidates
+   and are governed by ADR-0002's budgets. An Electron application that obeys those budgets is lighter under
+   load than a Tauri application that does not.
+2. **Rust's parsing advantage is real and small in a session.** It is one or two hundred milliseconds, once
+   per load, against two machine-level installs, a second language across every lane, and three different
+   webviews to verify once the project leaves Windows.
+
+**Decision: Electron stands, and the lightweight requirement is met by ADR-0002's budgets rather than by the
+shell.** The measurements are taken for real at E07-M01, and the reversal trigger is written down now: if
+the packaged application exceeds **400 MB resident with 50 000 commits loaded** or **250 MB installed**, or
+if the owner judges the idle footprint unacceptable once he has seen it, the host is reconsidered. The typed
+IPC contract is what makes that a contained change: `core/`, `ports/` and `contracts/` move unchanged, and
+only `app/` and `adapters/` are host-specific.
+
+**This is the one point of this plan where the owner may reasonably decide otherwise**, and now is the
+cheapest moment: no code exists. Choosing Tauri costs two installs on the development machine (the Rust
+toolchain, and the Microsoft C++ build tools with a Windows SDK) before the first gate can run, and adds
+`cargo` gates, `cargo-mutants` for the Rust half and per-platform golden images to ADR-0003.
+
 ## Consequences
 
 - **No machine install is needed.** Phase 2 can start the moment this ADR and the plan are approved.
@@ -132,8 +175,13 @@ then the README says so. This is owner decision 2 in `docs/PLAN.md`; the default
   `docs/SETUP.md`, including the measured git version floor.
 - The typed IPC contract and the graph data contract (commits, refs, layout rows) are frozen by the first
   slice, before any parallel lane, as braidline advised.
-- Distributable size is accepted as the price of drivers 4 and 5. It is measured at the packaging epic and
-  recorded there, so the reversal path above can be weighed against a number rather than a feeling.
+- Distributable size is accepted as the price of drivers 4 and 5, within the reversal trigger of Axis 6. It
+  is measured at the packaging epic and recorded there, so the reversal can be weighed against a number
+  rather than a feeling.
+- **Everything that scales with repository size is governed by
+  `docs/ADR-0002-architecture-and-performance.md`**, and every budget in it is enforced by a gate in
+  `docs/ADR-0003-quality-gates-and-ci.md`. This ADR chooses the host; those two are what make the result
+  light.
 - Electron's release cadence means one dependency bump per milestone at most, done by a slice with the
   end-to-end gate as its evidence.
 
