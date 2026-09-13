@@ -331,18 +331,52 @@ decoders carried in `src/core/store/` before S08 moved them — and `bridge.ts` 
 `src/contracts/` is type declarations and produces none, which is why widening a whole ring adds 5.0 per cent
 to the mutant population rather than a proportion of its file count.
 
-Eight survivors. Seven are in `src/core/parse/`: `bytes.ts` at 60:26, 70:7 and 166:20, `commit-lookup.ts` at
-28:62, `object-names.ts` at 51:78, and `working-tree-status.ts` at 141:7 and 141:20. The eighth is the one the
-widening found: **`src/contracts/bridge.ts` at 13:35, `StringLiteral`**, which replaces
-`BRIDGE_GLOBAL_NAME`'s `'gitGraphical'` with the empty string. No unit test names that constant — grepped,
-not assumed; the gate that does is `gates:e2e`, which asserts the bridge from inside the renderer, and
-Stryker runs the unit suite only. **Both decoder modules score 100.00 with no survivor**, in both runs.
-Every other file under `src/core/` scores 100.00; those four score 97.32, 97.92, 98.75 and 97.53. **Closing
-any of them is test work in the folders their own lanes own, and it is not what moved the instrument.**
+S02's run counted seven survivors and FIX-06's eight, and the one the widening found is in
+`src/contracts/bridge.ts`. **Both decoder modules score 100.00 with no survivor**, in both runs.
+
+### The survivors are a list, and a run's count is an observation of it
+
+**The list is `scripts/gates/mutation-survivors.json`** — the ratchet `AGENTS.md` §11 asks for: one entry per
+mutant known to survive, matched on file, line, column, mutator and replacement, each with the reason it
+survives and which of four kinds it is. **The list is the durable fact. A run's survivor tally is one
+observation of it**, so what this document says is what the list holds, named by the file and the construct
+each entry mutates, with the coordinates left to the file itself. A sentence of the form "N survivors, at
+these lines" goes stale twice over — when a lane writes the test that closes one, and when an edit above a
+listed line moves it — and this passage had gone stale both ways before E01-M01-FIX-09 rewrote it.
+
+**The two can differ legitimately, and `scripts/gates/mutation.js` is built for that.** A verdict under the
+command runner is only "the suite exited non-zero", so a listed mutant can come back `Killed` or `Timeout` on
+a busy machine over source nobody changed, which the sections below record happening to two different mutants
+of this repository. So the gate **reports** a listed mutant that comes back detected and does **not** fail on it, and a run's
+survivor count is then smaller than the list without anything being wrong. What it refuses instead are the
+two facts that are deterministic, because they are functions of the source and not of the machine: a survivor
+that no entry names, and an entry that names no mutant of a file the run did mutate.
+
+**Three entries at E01-M01-FIX-09's commit**, where FIX-06's run above found eight. Five were closed by tests
+and dropped in the commits that wrote them, which is the list shrinking on its own: E01-M01-FIX-08 killed two
+mutants of `bytes.ts`, one of `object-names.ts` and both of `working-tree-status.ts`. **Closing any of the
+three that remain is test work in the folder its own lane owns**, and none of them is what moved the
+instrument:
+
+- **`src/contracts/bridge.ts`** — `StringLiteral`, replacing `BRIDGE_GLOBAL_NAME`'s `'gitGraphical'` with the
+  empty string. Kind **another gate**: no unit test names that constant — grepped again for E01-M01-FIX-09,
+  and the only places outside `src/` that name it are `test/e2e/window.spec.ts` and
+  `test/contract/shapes.snapshot.txt`, which records its value. So two gates assert it, `gates:e2e` from
+  inside the renderer and `gates:contract` against the snapshot, and Stryker runs neither: it runs the unit
+  suite only.
+- **`src/core/parse/bytes.ts`** — `EqualityOperator`, the batching loop of `stringOf` with `at < units.length`
+  mutated to `<=`. Kind **not behavioural**: the loop runs one extra time and appends the empty string, so no
+  gate can catch it, because there is nothing to catch. The entry carries the measurement, at eight lengths
+  either side of the 4096 batch, and the paragraphs below are why it is equivalent rather than slow.
+- **`src/core/parse/commit-lookup.ts`** — `BlockStatement`, emptying `prefixAt` so every object name lands in
+  one bucket of the map. Kind **not behavioural**: the bucket only narrows the candidates and the full
+  twenty-byte comparison still decides. What changes is work done, and no gate catches that either, because
+  `src/core/parse/` exposes no work counter to assert it against where `src/core/store/` has `storeWork` and
+  `src/core/layout/` has `layoutWork`.
 
 ### A kill under the command runner is "the suite exited non-zero"
 
-That eighth mutant is the one the two runs disagree about, and the disagreement is worth more than the
+`src/contracts/bridge.ts`'s mutant is the one the two runs disagree about, and the disagreement is worth more than the
 mutant. Run one reported it **survived**; run two, over identical source, reported it **killed**, which is the
 whole of the difference between 99.33 and 99.41. Re-run on its own — `stryker run --mutate
 src/contracts/bridge.ts`, one mutant, the suite completing at `Ran 1.00 tests per mutant` — it **survives**.
@@ -359,7 +393,8 @@ own numbers:** a survivor that appears in one run and not the next is a survivor
 isolated run says otherwise; and a score is reproducible to about a tenth of a point on this machine, not
 exactly.
 
-`bytes.ts:166:20` is the one to read twice, because it was reported as survived on two runs of three and as
+The `bytes.ts` batching mutant — at 166:20 in that tree, and the entry has moved since — is the one to read
+twice, because it was reported as survived on two runs of three and as
 timed out on the third, where the machine was busier — and a timeout is a detection. FIX-06 read that as a
 **slow** mutant. **FIX-07 measured it and it is not slow: it is equivalent.** `at < units.length` mutated to
 `<=` runs the batching loop one extra time and appends `String.fromCharCode()`, the empty string, so the
@@ -393,9 +428,9 @@ report as hundreds of lines. It is the backstop. The ratchet is the list.
 each with the reason it survives and which of four kinds it is: a **test gap** a behavioural assertion would
 close, **diagnostic text** where only a thrown message changes, **not behavioural** where every observable
 answer is identical under the mutant, and **another gate** where the mutant is observable only from a ring the
-unit suite does not cover. **Eight entries** at the commit that introduced it, which are the same eight the
-paragraphs above name — three in `bytes.ts`, two in `working-tree-status.ts`, one each in `commit-lookup.ts`,
-`object-names.ts` and `src/contracts/bridge.ts` — reproduced there rather than carried over. The one reading
+unit suite does not cover. **Eight entries when FIX-07 introduced it** — three in `bytes.ts`, two in
+`working-tree-status.ts`, one each in `commit-lookup.ts`, `object-names.ts` and `src/contracts/bridge.ts` —
+reproduced from that lane's own run rather than carried over, and **three now**, listed above. The one reading
 in this document that the re-measurement changed is `bytes.ts:166:20`, which the paragraph above now records
 as equivalent rather than slow.
 
