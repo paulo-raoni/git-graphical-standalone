@@ -247,17 +247,30 @@ of a run; Vitest's cache key is the module id plus the file's whole content, and
 
 A score composed of timeouts is not a measurement, and the score alone cannot say so. **`gates:mutation` is
 therefore `scripts/gates/mutation.js`**, which runs Stryker, reads back the shape of the run from its json
-report, and refuses two shapes whatever the score says:
+report, and refuses four shapes whatever the score says. The first two are E01-M01-FIX-04's; the third and
+fourth are E01-M01-FIX-10's, and read the `statusReason` Stryker records per mutant, which is the runner's
+whole captured output:
 
 - **a mutant reported as killed or survived with no completed test run behind it.** Both verdicts are claims
   about what the tests did, and this runner reports exactly one completed test per mutant whose suite reached
   an exit status. This is the clause that catches a runner returning verdicts without running anything, which
   is what the vitest runner above does.
-- **a run more than a quarter of whose detections are timeouts.** This is the clause that catches the failure
-  described above. A quarter is a validity bound rather than a baseline: the honest run measures **3.8 per
-  cent**, and the four runs that reported 100.00 while the gate measured nothing sat at 10, 62, 82 and 99.6.
+- **a run more than a quarter of whose detections rest on a clock rather than on an assertion.** This is the
+  clause that catches the failure described above, and what it counts was corrected by FIX-10: see *the two
+  clocks* below. A quarter is a validity bound rather than a baseline: FIX-10's four honest runs measure
+  between **6.2 and 8.5 per cent**, and the four runs that reported 100.00 while the gate measured nothing
+  sat at 10, 62, 82 and 99.6.
+- **a killed mutant whose recorded output says a run ran out of time in a wording the clause above cannot
+  read.** That clause recognises vitest's own `timed out in <n>ms` and nothing else, so a reworded message
+  would otherwise be read as an assertion and make the share **smaller** — a wrong answer in the direction
+  that reads as good news. This refuses instead, names the mutants and says which pattern to widen.
+- **a run more than a quarter of whose kills name no failing test.** A kill under the command runner is only
+  "the suite exited non-zero", and a suite that exits non-zero without failing a test asserted nothing about
+  the mutant. It is a cap rather than a refusal because a mutant that breaks its module on import is a
+  genuine detection of exactly that shape; the argument for the number is in the script's header, and the
+  count is printed on every run whether or not it refuses.
 
-Neither clause is the tests-per-mutant figure itself, because a genuinely non-terminating mutant is a
+No clause is the tests-per-mutant figure itself, because a genuinely non-terminating mutant is a
 legitimate detection with no test result — 43 of the 1131 mutants are loop-control mutations in the growth and
 probing loops of the store and of the layout engine, and in the UTF-8 decoder, which is why the honest run
 prints `Ran 0.96 tests per mutant on average` rather than 1.00. Both numbers are **printed on every run**,
@@ -265,8 +278,63 @@ beside the breakdown, because
 what made the failure survive four reviews was that the line Stryker already printed was read by nobody.
 
 **Every later slice's mutation run has to satisfy this**, so: a lane whose run is refused has not failed on
-its tests. It is being told that the run cannot support a claim about them, and the two numbers in the
-refusal say which of the two shapes it hit.
+its tests. It is being told that the run cannot support a claim about them, and the numbers in the
+refusal say which of the four shapes it hit.
+
+### The two clocks, and what the clock clause counts
+
+**There are two clocks over every mutant run and only one of them is Stryker's.** `stryker.config.json` sets
+`timeoutMS`, which bounds the whole per-mutant command; `vitest.config.js` sets no `testTimeout`, so vitest's
+own default applies to each test *inside* that command. The inner clock is much the shorter, so it fires
+first: the test fails, the suite exits non-zero, and Stryker records **`Killed`**, not `Timeout`. The clause
+as FIX-04 wrote it counted only Stryker's `Timeout`, which is the wrong set.
+
+Measured by E01-M01-FIX-10, on its own full run of the configured scope unnarrowed, at the commit that lane
+was cut from: of **1183** mutants, **44** were reported `Timeout` and a further **38 of the 1136** reported
+`Killed` carried `Test timed out in 5000ms` in their recorded output, those 38 spread over eight files. The
+gate printed a timeout share of **3.7 per cent** where the share of detections resting on a clock was 82 of
+1180, **6.9 per cent**. Both numbers pass the cap and the run is honest; the defect is not the size of the
+error but its **insensitivity**.
+
+**Four full runs of identical source measured that.** `Timeout` was 44, 46, 46, 46 while timeout-shaped kills
+were 38, 42, 54, 27 — so the detections resting on a clock were **82, 88, 100 and 73** of about 1180, or
+**6.9, 7.5, 8.5 and 6.2 per cent**, while the number the old clause counted stayed between **3.7 and 3.9**.
+It was printed as such on the first run, the only one that still ran the old clause, and is computable from
+the other three. **Stryker's own count is very nearly constant while the quantity the clause is about varies
+by a factor of two**, because the inner clock fires on whichever tests the machine was too busy to finish and
+the outer one is reached by almost nothing. The variation is load, not a trend. So a run whose score is
+largely a stopwatch reading barely moves the old number: the same instrument failure as the one at the top of
+this section, an order of magnitude smaller, and printed as good news. That mutants also *migrate* out of
+`Timeout` and into `Killed` as a machine gets busier is the mechanism behind the 99 per cent failure above;
+it is not something these four runs show, because `Timeout` hardly moved in them.
+
+So the clause counts both, and the run prints Stryker's `Timeout` count, the timeout-shaped subset of its
+`Killed` count and the combined share **separately**, so the gap between the two clocks is readable on every
+run instead of having to be rediscovered. The subset is reported as a subset and Stryker's own counts are
+printed as Stryker reports them, for the same reason the survivor clause counts mutants rather than
+identities: the numbers this gate prints have to reconcile with the numbers Stryker printed above them.
+
+**What the clause counts is detections resting on a clock, which is the property the cap is about. It is not
+a count of spurious kills and cannot be one:** the inner clock catches a genuinely non-terminating mutant
+exactly as it catches a loaded machine, the two produce the same message, and nothing in the report tells
+them apart. A run at the cap is being told that too much of its score is a stopwatch reading.
+
+**The two clocks themselves are one decision and it is not taken here.** `vitest.config.js`'s unset
+`testTimeout` and `stryker.config.json`'s `timeoutMS` are scheduled for a later milestone with this lane's
+measurements as their input; moving either would move every verdict in the report this lane's clauses were
+measured against.
+
+### Watching a clause fail without paying for an hour
+
+Every clause above is only observable at the end of a run that costs most of an hour, which is why two of
+them had never been watched failing on anything but the accident that revealed them, and `AGENTS.md` §7 says
+a gate is not evidence until it has been watched failing. So `scripts/gates/mutation.js` takes
+`--check-report=<path>`, which **replays** the clauses over a report that already exists and does not run
+Stryker at all. It is a diagnostic and not a gate, and it is built so that the two transcripts cannot be
+confused: it says on its first line that Stryker did not run and names the report it was handed, and every
+line it prints — the verdict included — carries the label `mutation-replay` rather than `mutation`.
+`npm run gates:mutation` passes no such flag and is unchanged. Each probe is then a doctored copy of a real
+report, and costs seconds.
 
 ### Every run is a full run
 
@@ -312,7 +380,7 @@ before-and-after of the same code.
 | survived | 7 (6 to 7) | 8 (7 to 8) |
 | no coverage, errors, ignored, pending | 0 | 0 |
 | score, against `break` 85 | **99.38** (99.38 to 99.47) | **99.33** (99.33 to 99.41) |
-| timeout share of detections | 3.8 per cent | 3.9 per cent of 1187 |
+| timeout share of detections, as the gate then counted it | 3.8 per cent | 3.9 per cent of 1187 |
 | the line Stryker prints | `Ran 0.96 tests per mutant on average.` | the same, 0.96 |
 | `gates:mutation`, wall clock | 53 minutes | 62 to 63 minutes |
 | `npm run gates`, wall clock | 55 minutes | 65 minutes |
@@ -323,6 +391,12 @@ source**, the first `gates:mutation` alone and the second inside `npm run gates`
 mutant — see below. The two wall clocks are **not** a cost for the widening: they are different commits with
 different amounts of source, and 57 more mutants at about eleven seconds each over seven workers accounts for
 about a minute and a half of the nine minutes between them.
+
+**Both timeout shares in that row are the old count**, Stryker's `Timeout` alone, and neither run was asked
+what its kills rested on — the report carries the answer and nobody had read it. On the run E01-M01-FIX-10
+measured, the same quantity counted correctly is 6.9 per cent rather than 3.7, and the section on *the two
+clocks* above has the breakdown. The rest of the table is unaffected: the correction changes what the gate
+counts, not what Stryker reported.
 
 **What the widening added is exactly three files and 57 mutants.** At FIX-06's commit the `src/core/` part of
 the report holds 1138 mutants across 17 files, which is what `stryker run --dryRunOnly` counts before the
@@ -361,9 +435,16 @@ instrument:
 - **`src/contracts/bridge.ts`** — `StringLiteral`, replacing `BRIDGE_GLOBAL_NAME`'s `'gitGraphical'` with the
   empty string. Kind **another gate**: no unit test names that constant — grepped again for E01-M01-FIX-09,
   and the only places outside `src/` that name it are `test/e2e/window.spec.ts` and
-  `test/contract/shapes.snapshot.txt`, which records its value. So two gates assert it, `gates:e2e` from
-  inside the renderer and `gates:contract` against the snapshot, and Stryker runs neither: it runs the unit
-  suite only.
+  `test/contract/shapes.snapshot.txt`, which records its value. **One gate asserts it, and it is
+  `gates:contract`**: the snapshot records the export as its *literal type*, so any change to the value moves
+  it. Measured by E01-M01-FIX-10 with the mutant planted: `gates:contract` exits 1 and exits 0 again on the
+  restored file. **`gates:e2e` does not assert the value**, although this passage and the entry itself both
+  said it did from the day each was written until FIX-10 measured it: `test/e2e/window.spec.ts` imports
+  the constant and passes it into the page, so it looks the bridge up under whatever the contract currently
+  says, and all three end-to-end tests pass with the mutant planted and the application rebuilt — measured by
+  FIX-10. What `gates:e2e` catches is the preload and the contract *disagreeing* about the name, which is a
+  different fault. Stryker runs neither gate: it runs the unit suite only, which passes with the mutant
+  planted at 20 files and 326 tests.
 - **`src/core/parse/bytes.ts`** — `EqualityOperator`, the batching loop of `stringOf` with `at < units.length`
   mutated to `<=`. Kind **not behavioural**: the loop runs one extra time and appends the empty string, so no
   gate can catch it, because there is nothing to catch. The entry carries the measurement, at eight lengths
@@ -445,7 +526,7 @@ and not refused**: the clause that refused it would have failed this very run, o
 correct list, and `AGENTS.md` §11 calls a gate that flaps a defect of the gate. It is also why a lane should
 read the survivor list rather than the third decimal of the score: 99.33 and 99.41 are the same tree.
 
-`scripts/gates/mutation.js` reads that list beside the two clauses FIX-04 built, and splits what it finds by
+`scripts/gates/mutation.js` reads that list beside the four shape clauses above, and splits what it finds by
 whether the fact is deterministic:
 
 - **A survivor that is not on the list refuses the build.** This is what catches the first new survivor in a
@@ -461,7 +542,14 @@ whether the fact is deterministic:
   deterministic: any non-zero exit of the suite counts as a detection, so a busy machine can turn a survivor
   into a kill, and `AGENTS.md` §11 says a gate that flaps is a defect of the gate. The line says what to do
   instead — an entry whose mutant a test now kills is dropped in the commit that wrote the test, which is the
-  list shrinking, which is the one direction §11 lets a baseline move on its own.
+  list shrinking, which is the one direction §11 lets a baseline move on its own. Since E01-M01-FIX-10 the
+  line carries an **excerpt** of that mutant's recorded output — the last few lines of it that name a
+  verdict, bounded and said to be bounded — so a reader can tell a failed assertion from a suite that fell
+  over, or from the inner clock firing, without paying for a second run. It earned itself on the run that
+  introduced it: `bytes.ts`'s listed mutant came back `Killed`, and the excerpt showed the suite's only
+  failure was `Error: Test timed out in 5000ms.` in `commit-log.test.ts`, a file that mutant cannot touch.
+  That is the paragraph below — a kill that is the machine and not the mutant — observed rather than
+  inferred, and it took no second run to see it.
 - **Entries in a file the run did not mutate are out of consideration**, and counted as such. Narrowing
   `--mutate` for speed therefore removes entries from the question rather than diluting a percentage, so a
   scoped lane's answer stays exact. Measured: `--mutate src/contracts/column-read.ts` passes in 71 seconds
