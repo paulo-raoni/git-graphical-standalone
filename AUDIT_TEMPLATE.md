@@ -32,6 +32,11 @@ Include every failure met on the way and how it was fixed.
 the headline: for the mutation gate, how many mutants were killed by a failing assertion and how many merely
 timed out; for coverage, the number of files below the threshold, not the total.
 
+**Report the survivor list's length beside the run's survivor count, as a pair.** They are usually equal and
+the interesting thing is when they are not. The gate cannot refuse a listed mutant that a run reports as
+killed, because that verdict has been measured drifting between runs over identical source, so the gap
+between the two numbers is the only instrument that turns the drift into a series someone can read.
+
 The reason is a defect this project met for real. Four consecutive lanes reported a mutation score of 100.00
 while the share of mutants that only timed out went from ten per cent to ninety-nine point six. Each number
 was true in isolation, none was wrong on its own terms, and the gate had stopped measuring the tests

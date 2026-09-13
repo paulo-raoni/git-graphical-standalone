@@ -79,9 +79,13 @@ test. The owner named it, and nothing here argues against it.
   mutated never changes which tests run, while an executor choosing its own scope can narrow until the result
   flatters it. The wave-end review runs the configured scope in full.
 - **The ratchet is a committed survivor baseline, not a threshold.** `break` stays at 85 as a collapse
-  backstop and is not raised. It cannot be the ratchet: measured over 1 195 mutants, failing at 85 needs 170
-  survivors while the largest file in scope carries 133, so **no single file's tests can break a global
-  percentage**. Instead every surviving mutant is listed, with its file, line, column, mutator, replacement,
+  backstop and is not raised. It cannot be the ratchet, and the reason is structural rather than numeric:
+  **failing a global percentage takes more survivors than the largest file in scope even carries**, so no
+  single file's tests can break it however bad they get. Deleting every assertion in one module leaves the
+  gate green. The two counts that show this are dated to a scope and a commit, and they move whenever the
+  scope does, so they live where they are measured — `scripts/gates/mutation-survivors.json` and the slice
+  document — and deliberately not here. Instead every surviving mutant is listed, with its file, line,
+  column, mutator, replacement,
   a kind and a measured reason, and **an unlisted survivor refuses the run**. That catches the first survivor
   at any denominator, forces each one to be told apart in writing, and survives a narrowed scope. The list
   moves **down** only (decision 5).
