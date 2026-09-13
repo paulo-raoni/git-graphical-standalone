@@ -17,6 +17,12 @@ const textOf = (values: readonly number[]): string => {
   return decodeUtf8(bytes, 0, bytes.length);
 };
 
+/**
+ * One code point as text, for the boundaries whose character is a control code
+ * or a non-character and would be an invisible or unreadable literal here.
+ */
+const charOf = (code: number): string => String.fromCodePoint(code);
+
 const REPLACEMENT = '�';
 
 describe('entryAt', () => {
@@ -26,6 +32,14 @@ describe('entryAt', () => {
 
   it('refuses an index past the end rather than returning undefined', () => {
     expect(() => entryAt(bytesOf([7]), 1)).toThrow(RangeError);
+  });
+
+  it('names the index it refused and the length of the buffer it looked in', () => {
+    const read = (): void => {
+      entryAt(bytesOf([7, 9, 11]), 5);
+    };
+    expect(read).toThrow(/\b5\b/);
+    expect(read).toThrow(/\b3\b/);
   });
 });
 
@@ -38,8 +52,21 @@ describe('decodeUtf8, on well-formed input', () => {
     expect(textOf([0x67, 0x69, 0x74])).toBe('git');
   });
 
+  it('decodes the last byte that stands for its own code point, which is 7F', () => {
+    expect(textOf([0x7f])).toBe(charOf(0x7f));
+  });
+
   it('decodes a two-byte sequence', () => {
     expect(textOf([0xc3, 0xa9])).toBe('é');
+  });
+
+  it('decodes the lowest two-byte sequence there is, whose lead is C2', () => {
+    expect(textOf([0xc2, 0x80])).toBe(charOf(0x80));
+    expect(textOf([0xc2, 0xa9])).toBe('©');
+  });
+
+  it('decodes the highest two-byte sequence there is, whose lead is DF', () => {
+    expect(textOf([0xdf, 0xbf])).toBe(charOf(0x7ff));
   });
 
   it('decodes a three-byte sequence', () => {
@@ -52,6 +79,14 @@ describe('decodeUtf8, on well-formed input', () => {
 
   it('decodes the code point just below the surrogates, whose lead is ED', () => {
     expect(textOf([0xed, 0x9f, 0xbf])).toBe('퟿');
+  });
+
+  it('decodes the code point just above the surrogates, whose lead is EE', () => {
+    expect(textOf([0xee, 0x80, 0x80])).toBe(charOf(0xe000));
+  });
+
+  it('decodes the highest three-byte sequence there is, whose lead is EF', () => {
+    expect(textOf([0xef, 0xbf, 0xbf])).toBe(charOf(0xffff));
   });
 
   it('decodes a character outside the basic multilingual plane as a pair', () => {
@@ -94,6 +129,10 @@ describe('decodeUtf8, on bytes that are not UTF-8', () => {
 
   it('refuses a surrogate half, which UTF-8 may not carry', () => {
     expect(textOf([0xed, 0xa0, 0x80])).toBe(`${REPLACEMENT}${REPLACEMENT}${REPLACEMENT}`);
+  });
+
+  it('refuses the last surrogate as well as the first', () => {
+    expect(textOf([0xed, 0xbf, 0xbf])).toBe(REPLACEMENT.repeat(3));
   });
 
   it('refuses a code point past the last one', () => {

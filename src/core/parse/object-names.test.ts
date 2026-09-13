@@ -67,6 +67,15 @@ describe('writeObjectName', () => {
   });
 });
 
+describe('writeObjectName, over a span that does not start at the buffer', () => {
+  it('says how many digits the span held, not where in the buffer it began', () => {
+    const bytes = bytesOf('..abc');
+    expect(() => {
+      writeObjectName(bytes, 2, 5, new Uint8Array(20), 0);
+    }).toThrow(/hex digits, not 3/);
+  });
+});
+
 describe('writeObjectName, on characters either side of the three ranges', () => {
   /** A name of forty digits whose last one is `character`. */
   const endingIn = (character: string): Uint8Array =>

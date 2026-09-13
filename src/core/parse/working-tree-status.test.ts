@@ -116,6 +116,12 @@ describe('pushStatus, on the entries', () => {
     expect(facts.untrackedFileCount).toBe(1);
   });
 
+  it('does not let an empty record consume the original path a rename is waiting for', () => {
+    const facts = readStatus(streamOf([RENAMED, '', '?old.txt']));
+    expect(facts.changedFileCount).toBe(1);
+    expect(facts.untrackedFileCount).toBe(0);
+  });
+
   it('reads a path holding a newline, a tab and a quotation mark literally', () => {
     const facts = readStatus(streamOf(['? odd\n\t"name".txt']));
     expect(facts.untrackedFileCount).toBe(1);
