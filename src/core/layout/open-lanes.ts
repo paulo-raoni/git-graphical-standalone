@@ -1,6 +1,5 @@
+import { entryAt } from '../../contracts/column-read';
 import { UNKNOWN_INDEX } from '../../contracts/index';
-
-import { entryAt } from './column-entry';
 
 /**
  * The set of open lanes: the whole of what the layout pass carries from one page

@@ -1,4 +1,4 @@
-import { entryAt } from './bytes';
+import { entryAt } from '../../contracts/column-read';
 
 /**
  * Cutting git's output into records and fields, across chunk boundaries.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodeUtf8, entryAt } from './bytes';
+import { decodeUtf8 } from './bytes';
 
 /**
  * The decoder is held to the WHATWG encoding standard's UTF-8 decoder, which is
@@ -25,23 +25,13 @@ const charOf = (code: number): string => String.fromCodePoint(code);
 
 const REPLACEMENT = '�';
 
-describe('entryAt', () => {
-  it('reads an entry that exists', () => {
-    expect(entryAt(bytesOf([7, 9]), 1)).toBe(9);
-  });
-
-  it('refuses an index past the end rather than returning undefined', () => {
-    expect(() => entryAt(bytesOf([7]), 1)).toThrow(RangeError);
-  });
-
-  it('names the index it refused and the length of the buffer it looked in', () => {
-    const read = (): void => {
-      entryAt(bytesOf([7, 9, 11]), 5);
-    };
-    expect(read).toThrow(/\b5\b/);
-    expect(read).toThrow(/\b3\b/);
-  });
-});
+/**
+ * The bounded read this folder uses is `src/contracts/column-read`, and it is
+ * asserted in `src/contracts/column-read.test.ts` — both the in-range and the
+ * out-of-range path, and the message with the two numbers in it. The three cases
+ * that stood here asserted the same two paths against a local copy of the same
+ * twelve lines, which E01-M01-FIX-09 deleted.
+ */
 
 describe('decodeUtf8, on well-formed input', () => {
   it('decodes nothing as the empty string', () => {

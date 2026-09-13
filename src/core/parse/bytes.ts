@@ -1,5 +1,13 @@
 /**
- * Reading git's bytes: one bounded entry, and UTF-8 as text.
+ * Reading git's bytes: UTF-8 as text.
+ *
+ * The bounded indexed read this module and the rest of this folder use is
+ * `entryAt` of `src/contracts/column-read`, imported by module path, which
+ * `core-only-inward` permits. This module carried its own copy of it, under a
+ * `NumericBuffer` that was `NumericColumn` with another name — measured, not
+ * assumed: the two interfaces were mutually assignable and every call site in
+ * this folder type-checks unchanged against the survivor. E01-M01-FIX-09 deleted
+ * the copy.
  *
  * The decoder is written here rather than borrowed because `src/core/` may not
  * reach the platform (`docs/ADR-0002-architecture-and-performance.md`
@@ -18,6 +26,8 @@
  * decoding the same bytes both ways and comparing.
  */
 
+import { entryAt } from '../../contracts/column-read';
+
 /** What every ill-formed byte sequence becomes: U+FFFD REPLACEMENT CHARACTER. */
 const REPLACEMENT = 0xfffd;
 
@@ -29,38 +39,6 @@ const REPLACEMENT = 0xfffd;
  * — so the batching loop is the rare path and the single call is the usual one.
  */
 const BATCH = 4096;
-
-/**
- * The shape every typed array satisfies: numeric entries addressed by index.
- *
- * Written structurally so that one bounded read serves `Uint8Array` chunks and
- * the `Uint32Array` of field offsets without a generic parameter for each.
- */
-export interface NumericBuffer {
-  readonly [index: number]: number | undefined;
-  readonly length: number;
-}
-
-/**
- * Read entry `index` of `buffer`.
- *
- * `noUncheckedIndexedAccess` types every indexed read as possibly `undefined`,
- * which is the truth. Every caller in this ring has already bounded its index
- * against a record it just cut, so `undefined` here is a defect of this ring,
- * and it fails loudly rather than propagating a `NaN` into arithmetic that would
- * then be wrong somewhere else entirely. It is a function rather than a non-null
- * assertion at each call site because an assertion silences the check without
- * performing it.
- *
- * @throws RangeError when the entry does not exist
- */
-export function entryAt(buffer: NumericBuffer, index: number): number {
-  const value = buffer[index];
-  if (value === undefined) {
-    throw new RangeError(`entry ${String(index)} is outside a buffer of ${String(buffer.length)}`);
-  }
-  return value;
-}
 
 /** Bytes in the sequence this lead byte starts, or 0 when it starts none. */
 function sequenceLength(lead: number): number {

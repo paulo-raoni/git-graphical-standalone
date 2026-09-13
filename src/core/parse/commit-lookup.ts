@@ -1,6 +1,5 @@
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH, UNKNOWN_INDEX } from '../../contracts/index';
-
-import { entryAt } from './bytes';
 
 /**
  * Which row of the page each reference points at.

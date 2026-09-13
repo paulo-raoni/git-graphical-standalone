@@ -1,7 +1,8 @@
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH } from '../../contracts/index';
 import type { WorkingTree } from '../../contracts/index';
 
-import { decodeUtf8, entryAt } from './bytes';
+import { decodeUtf8 } from './bytes';
 import { writeObjectName } from './object-names';
 import { createRecordReader, finishRecords, NUL_TERMINATOR, pushRecords } from './records';
 import type { RecordReader } from './records';
