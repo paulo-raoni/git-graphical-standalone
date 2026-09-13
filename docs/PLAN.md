@@ -332,7 +332,7 @@ remembers. Each is scheduled into the milestone that follows E01-M01 and is not 
 
 | item | why it waits | the measurement it starts from |
 | --- | --- | --- |
-| **Decide the two clocks the mutation gate runs under.** The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | 83 of 1 183 detections rest on a clock rather than an assertion, of which 39 are recorded as kills because the inner clock fired before the outer one. |
+| **Decide the two clocks the mutation gate runs under.** The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | Detections resting on a clock rather than an assertion were **73, 82, 88 and 100 across four runs of the configured scope on identical source**, against a runner timeout count that sat at 44 to 46 in the same four. The quantity moves with machine load and the single figure of 83 that an earlier draft of this row carried was one draw from that range, not the value. |
 
 ### What shapes the plan rather than the code
 

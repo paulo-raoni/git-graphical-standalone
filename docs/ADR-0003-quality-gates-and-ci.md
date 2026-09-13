@@ -120,9 +120,15 @@ test. The owner named it, and nothing here argues against it.
 - **Speed: incremental mode is off, and the gate refuses it.** It was measured returning a stale score over
   rewritten tests, and this document exists because of gates that are green for an unrelated reason. The full
   run costs most of an hour and that cost is paid rather than escaped.
-- **The gate checks the shape of its own run.** A run that reports a killed or surviving mutant with no
-  completed test, or whose detections are more than a quarter timeouts, is refused whatever it scores. The
-  reason is recorded below.
+- **The gate checks the shape of its own run, and refuses a run whose shape says it learned nothing**,
+  whatever it scores. Four clauses, each watched failing: a killed or surviving mutant with no completed
+  test; **detections resting on a clock** above a quarter, counting not only the runner's own timeouts but
+  kills whose recorded output is a test timing out, which is the same event reached by a different path;
+  kills naming no failing test, counted and capped rather than refused outright, because a mutant that
+  crashes the suite on import is a genuine detection; and a surviving mutant absent from the baseline. A
+  **replay mode** runs every clause over a report already produced, so each one is watchable in seconds
+  rather than in an hour, which is what makes `AGENTS.md` §7's "watched failing" affordable for a gate whose
+  failing path a green pipeline never takes.
 - **It does not replace the reviewer's mutation pass** (`AGENTS.md` §7). Stryker raises the floor
   mechanically; the reviewer still breaks a line by hand, predicts the failures per configuration first and
   compares. Where Stryker reports a **surviving mutant**, that is the reviewer's best candidate line, and the
