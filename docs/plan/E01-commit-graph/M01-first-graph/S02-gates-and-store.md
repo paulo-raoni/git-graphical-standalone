@@ -138,7 +138,7 @@ merges or of thousands of distinct people costs differently. At 85.519 the store
 | 4 | `gates:types` | the three TypeScript projects, separately |
 | 5 | `gates:contract` | a committed snapshot of what `src/contracts/` exports |
 | 6 | `gates:unit` | Vitest with per-directory coverage, and the fixture generator's determinism |
-| 7 | `gates:mutation` | StrykerJS over `src/core/` and `src/contracts/`, breaking below 85, refusing a run that measured nothing |
+| 7 | `gates:mutation` | StrykerJS over `src/core/` and `src/contracts/`, refusing a run that measured nothing, refusing a survivor that is not on the committed list, and breaking below 85 as a backstop |
 | 8 | `gates:build` | the three bundles |
 | 9 | `gates:e2e` | Playwright over the built application |
 | 10 | `gates:perf` | counters and budgets against committed baselines |
@@ -347,18 +347,94 @@ own numbers:** a survivor that appears in one run and not the next is a survivor
 isolated run says otherwise; and a score is reproducible to about a tenth of a point on this machine, not
 exactly.
 
-`bytes.ts:166:20` is the one to read twice. It is a **slow** mutant rather than a non-terminating one, so it
-is reported as survived on two runs of three and as timed out on the third, where the machine was busier — and
-a timeout is a detection. The honest verdict is the one the longer budget reveals, which is that it survives,
-so the score above is a ceiling and not a point. The remedy is a longer budget, and it is deliberately not
-applied on top of the one this fix already set: a budget is a committed number and moving it twice, once on a
+`bytes.ts:166:20` is the one to read twice, because it was reported as survived on two runs of three and as
+timed out on the third, where the machine was busier — and a timeout is a detection. FIX-06 read that as a
+**slow** mutant. **FIX-07 measured it and it is not slow: it is equivalent.** `at < units.length` mutated to
+`<=` runs the batching loop one extra time and appends `String.fromCharCode()`, the empty string, so the
+decoded text is unchanged — identical output at lengths 0, 1, 2, 4095, 4096, 4097, 8192 and 8193, either side
+of the 4096 batch. One extra empty iteration cannot exhaust a 64-second budget, so a `Timeout` verdict for it
+is the machine being busy and not the mutant looping, and the honest verdict is that it survives. The score
+above is therefore a ceiling and not a point. The remedy is still a longer budget, and it is still deliberately
+not applied on top of the one FIX-06 set: a budget is a committed number and moving it twice, once on a
 measurement and once on a hunch, is how a baseline gets walked.
 
-**The score is no longer a per-file guarantee, and the survivor list is.** `break` compares one global number,
-so at 1131 mutants the gate needs 170 survivors to fail, and the largest single file in scope has 133 mutants.
-Measured: reducing `raw-date.test.ts` to a single test that asserts nothing takes that file to **66.20 with 24
-survivors** and the whole run to 97.35, which passes. So a lane reads its own per-file line and its own
-survivors, not the headline, and the headline's job is to stop a collapse rather than to notice a module.
+### The survivor baseline, and why `break` stayed at 85
+
+**The score threshold cannot fail at this size, and that is arithmetic rather than an opinion.** `break`
+compares one global number: over the 1195 mutants of the configured scope a score below 85 needs
+`(1195 − S) / 1195 < 0.85`, so **180 survivors** — and the largest single file in scope,
+`src/core/layout/lane-layout.ts`, carries **140 mutants**. Deleting the tests of the largest file in the
+project would therefore read 88.28 and **pass**. Measured on this scope rather than argued: reducing
+`src/core/parse/raw-date.test.ts` to one test that asserts nothing takes that file to **66.20 with 24
+survivors** and the whole run to **97.32**, which is twelve points above `break` and which both of FIX-04's
+shape clauses also pass. FIX-04 measured the same shape one scope earlier — 1131 mutants, 170 survivors
+needed, 133 in the largest file — and the numbers moved with the scope while the conclusion did not.
+
+**Raising the threshold is not the repair.** The honest run sits at 99.33, fourteen points above 85, so any
+new number is a guess at how much honest variation to allow; a number close to 99.33 would flap, because a
+kill under the command runner is only "the suite exited non-zero", and `docs/ADR-0003-quality-gates-and-ci.md`
+decision 5 does not let a threshold be relaxed once set. So `break` is **kept at 85 and not moved**: it is
+Stryker's own message, it costs nothing, and it catches the collapse that the list below would otherwise
+report as hundreds of lines. It is the backstop. The ratchet is the list.
+
+**The ratchet is `scripts/gates/mutation-survivors.json`**, one committed entry per mutant known to survive,
+each with the reason it survives and which of four kinds it is: a **test gap** a behavioural assertion would
+close, **diagnostic text** where only a thrown message changes, **not behavioural** where every observable
+answer is identical under the mutant, and **another gate** where the mutant is observable only from a ring the
+unit suite does not cover. **Eight entries** at the commit that introduced it, which are the same eight the
+paragraphs above name — three in `bytes.ts`, two in `working-tree-status.ts`, one each in `commit-lookup.ts`,
+`object-names.ts` and `src/contracts/bridge.ts` — reproduced there rather than carried over. Two full runs of
+identical source at that commit both report exactly those eight, at 1195 mutants and 99.33: 1143 killed and 44
+timed out in 63 minutes, then 1141 and 46 in 68. **Two verdicts moved between those runs**, both in
+`reference-list.ts` and both from `Killed` to `Timeout`, which is a detection either way; that is this
+project's own measurement of how much a verdict drifts, and it is why a listed mutant coming back detected is
+reported rather than refused. The one reading in this document that the re-measurement changed is
+`bytes.ts:166:20`, which the paragraph above now records as equivalent rather than slow.
+
+`scripts/gates/mutation.js` reads that list beside the two clauses FIX-04 built, and splits what it finds by
+whether the fact is deterministic:
+
+- **A survivor that is not on the list refuses the build.** This is what catches the first new survivor in a
+  file of any size, which is what a per-file percentage floor cannot do: a floor of 95 would let a 140-mutant
+  file accumulate seven survivors in silence. The message names the mutant and says that a new survivor is
+  either a test to write or an entry to add with a reason, and that adding one is a commit a reviewer reads.
+- **An entry that matches no mutant at all, in a file the run did mutate, refuses the build.** The mutant
+  population is a pure function of the source, so this is deterministic and can refuse without flapping. It is
+  the case that turns an allow-list into a blanket — a coordinate protecting nothing that nobody is checking —
+  and when an unlisted survivor of the same file carries the same mutator and replacement, the message says so
+  and names the line it moved to, because that is what an edit above a listed line looks like.
+- **An entry whose mutant the run reports as detected is printed, and does not refuse.** That verdict is not
+  deterministic: any non-zero exit of the suite counts as a detection, so a busy machine can turn a survivor
+  into a kill, and `AGENTS.md` §11 says a gate that flaps is a defect of the gate. The line says what to do
+  instead — an entry whose mutant a test now kills is dropped in the commit that wrote the test, which is the
+  list shrinking, which is the one direction §11 lets a baseline move on its own.
+- **Entries in a file the run did not mutate are out of consideration**, and counted as such. Narrowing
+  `--mutate` for speed therefore removes entries from the question rather than diluting a percentage, so a
+  scoped lane's answer stays exact. Measured: `--mutate src/contracts/column-read.ts` passes in 71 seconds
+  with all eight entries out of scope.
+
+**The comparison is the whole of the guarantee, so it is exact:** an entry matches a mutant on file, line,
+column, mutator **and replacement**, all five. Four are not enough, measured on the recorded run: 187 positions
+carry more than one mutant with the same file, line, column and mutator, and two of them are on the list — at
+`working-tree-status.ts` 141:7 the `ConditionalExpression` replacing the condition with `true` is killed while
+the one replacing it with `false` survives, and at `bytes.ts` 70:7 `lead >= 0xc2` is killed while
+`lead <= 0xc2` survives. An entry naming only the position would excuse the killed twin as well, which is a
+blanket one mutant wide. Nor are five a unique key: 12 of the 1195 mutants share all five with another, all of
+them a `ConditionalExpression` Stryker emits twice where a compound condition is mutated once whole and once in
+part, all killed and none on the list. The gate counts mutants rather than entries so that its survivor count
+is the one Stryker printed three lines above it. Stryker's own mutant `id` would be unique and is not used: it
+is positional, so it would move under any edit anywhere in the file, which is the flapping this identity
+exists to avoid. The cost that remains is that an edit above a listed line moves it and the entry then names
+nothing — the second clause above — and the repair is to re-record that entry, never to add a second one.
+
+**Every later lane's audit reports the list's length and any change to it**, which is the breakdown
+`AUDIT_TEMPLATE.md` asks of a gate that reports a score. The gate prints the length, how many entries matched a
+mutant of the run, how many of those were detected rather than left alive, how many were out of scope and how
+many survivors were unlisted, on every run, pass or fail — because the failure this gate exists to undo
+survived four reviews by being printed and read by nobody.
+
+So a lane reads its own per-file line and its own survivors, not the headline, and the headline's job is to
+stop a collapse rather than to notice a module.
 
 The repair did not make the gate faster and was not expected to either way: the same scope at the same commit
 took 52 minutes before it, spending almost all of that on 1122 timeouts of about 14 seconds. Replacing them
