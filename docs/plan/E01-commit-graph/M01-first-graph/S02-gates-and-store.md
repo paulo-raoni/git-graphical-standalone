@@ -21,6 +21,9 @@ store. It is pure: no I/O, no Electron, no DOM, no timers, no randomness, and no
 
 ### What later lanes call
 
+`src/core/store/index.ts` exports these, and beside them the constant `INITIAL_COMMIT_CAPACITY` and the types
+`AppendedCommit`, `CommitStoreBuilder` and `StoreCounters`. Nothing else leaves the folder.
+
 | function | what it does |
 | --- | --- |
 | `createCommitStoreBuilder(initialCapacity?)` | an empty store, sized for `initialCapacity` commits before it grows |
@@ -28,15 +31,24 @@ store. It is pure: no I/O, no Electron, no DOM, no timers, no randomness, and no
 | `buildCommitColumns(builder)` | the page as `CommitColumns`, with arrays exactly the contract's lengths |
 | `retainedByteLength(builder)` | every structural byte the store holds, message text excluded |
 | `storeWork(builder)` | the deterministic work counter the performance gate reads |
-| `commitCount(columns)` | commits in the page |
-| `hexHashOf(columns, row)` | the object name of a row, in hex, produced on demand |
-| `subjectOf(columns, row)` | the subject, sliced out of the page's one message blob |
-| `parentsOf(columns, row)` | the parents, as a view over the flat parent column |
-| `authorOf(columns, row)`, `committerOf(columns, row)` | a `Person`, from the interned table |
 
-The accessors take the page as a parameter and keep nothing, so the same functions read a page built in this
-process and a page that arrived over the IPC boundary as transferred buffers, with no rehydration step.
-S03 feeds `appendCommit`; S04 and S05 read through the accessors.
+S03 feeds `appendCommit`.
+
+**Reading a built page is no longer in this table.** When this slice was written it also exported
+`commitCount`, `hexHashOf`, `subjectOf`, `parentsOf`, `authorOf` and `committerOf`. **E01-M01-S08 moved all
+six to `src/contracts/`**, under `docs/ADR-0002-architecture-and-performance.md` decision 3 **as amended on
+2026-09-12**, and `src/core/store/index.ts` deliberately does not forward them: a forwarding barrel would
+leave every old import working, which would mean the two rings had been separated in the file tree and
+nowhere else. The reason they went is one question — *could a reasonable person implement this differently
+and still be right?* — and
+it is written out, with the cases either way, in *The test that decides the ring* of
+`docs/plan/E01-commit-graph/M01-first-graph/S08-contract-decode-api.md`. Building a page is policy that can
+be wrong, which is `core/`; reading back an encoding the contract already fixed is not, which is
+`contracts/`, and it is also the only way `src/ui/` can read the page it draws at all.
+
+Those decoders still take the page as a parameter and keep nothing, so the same functions read a page built
+in this process and a page that arrived over the IPC boundary as transferred buffers, with no rehydration
+step. S04 and S05 read through them, imported from `src/contracts/`.
 
 `AppendedCommit` is flat, and it is **not retained**: every field is copied into a column and the object dies
 in the nursery. Parent object names arrive as one buffer of whole twenty-byte names rather than as an array of

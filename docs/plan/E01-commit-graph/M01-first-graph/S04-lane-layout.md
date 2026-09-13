@@ -42,6 +42,31 @@ other. The way this interface is misused is by laying the same page out twice or
 those produce a graph that is quietly wrong rather than one that fails; the check turns them into a
 `RangeError` at the call.
 
+### The bounded read this folder no longer holds
+
+This folder used to hold `column-entry.ts`: `entryAt`, one indexed read of a typed array with the
+bound `noUncheckedIndexedAccess` insists on, throwing a `RangeError` rather than letting an `undefined`
+propagate as a `NaN` into lane arithmetic that would then be wrong several rows from where it started. It was
+**a copy**, and it was written as one deliberately. The same twelve lines already existed in
+`src/core/store/` when this lane ran, and the comment at the head of the file gave the reason: that copy was
+not re-exported from the store's own index, so importing it meant reaching into another lane's internals
+while three lanes of wave 3 were in flight, and E01-M01-S08 — running in that same wave — was about to move
+the file. Copying twelve lines was the cheaper of the two mistakes for the length of the wave, and the note
+named the condition for its own removal: hoisting the copies into one home is a later slice's work, and costs
+one import line here.
+
+**E01-M01-FIX-09 did that hoist**, after the wave landed and `src/contracts/column-read.ts` existed. The
+module and its colocated test are gone; `lane-layout.ts` and `open-lanes.ts` import `entryAt` from
+`src/contracts/column-read` by module path, which `core-only-inward` permits, and it cost the one import
+line the note predicted. What the deleted test asserted is asserted from `src/contracts/column-read.test.ts`,
+including a read of a `Uint16Array` — the width of the lane column, and the one element type that test
+reached and the surviving one did not.
+
+The record is kept here rather than deleted with the file, because the situation recurs. A lane that needs a
+helper an in-flight lane owns faces the same choice, and what made this copy defensible was not that twelve
+lines are cheap: it was that the reason was written down beside the code, with the condition under which it
+should stop being true.
+
 ## The algorithm
 
 One forward pass over the rows in the order they arrive. Per row, in this order:
