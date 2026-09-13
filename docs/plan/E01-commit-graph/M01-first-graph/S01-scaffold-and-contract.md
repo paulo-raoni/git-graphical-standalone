@@ -190,6 +190,65 @@ what this Electron actually bundles; downlevelling further would only hide a syn
 the shell never needed. When esbuild fails, the script lets esbuild's own diagnostic stand and sets a
 failing exit status rather than burying the line under its own stack trace.
 
+### What the bundles cost, and what `gates:size` is a budget of
+
+Measured 2026-09-13, by splitting each bundle on esbuild's own module markers. Two numbers per bundle: the
+development build, which is what `gates:size` weighs, and the same bundle built with `--production`.
+
+| bundle | development | production | what the difference is |
+| --- | --- | --- | --- |
+| `main.cjs` | 2173 | 1078 | comments and whitespace; `main.cjs` reaches no contract module |
+| `preload.cjs` | 1402 | 547 | comments and whitespace |
+| `renderer.js` | 1215 | 649 | comments and whitespace |
+
+Before 2026-09-13 the second and third were 5221 and 5849. **8469 of those bytes were contract constants
+the bundles never read** — 3835 of `preload.cjs`, being `layout.ts`, `refs.ts` and `result.ts`, and 4634 of
+`renderer.js`, those three and `ipc.ts` as well, since the renderer names no channel. `RowFlag`, `RefKind`,
+`RefFlag` and `FailureKind` appear in neither entry point. Both import `src/contracts/index.ts`, and
+`Object.freeze({ ... })` is a call expression esbuild cannot prove free of side effects, so every frozen
+constant reachable through the barrel was retained whether or not anything read it. Comments are the other
+half of the old numbers and not this half: the **production** build at the same commit carried every one of
+those constants too, so minifying never dropped them.
+
+The fix is `/* @__PURE__ */` in front of each of those calls, which is a claim esbuild acts on and which is
+true here: `Object.freeze` returns the object it was given, cannot throw on an ordinary one, and its effect
+is observable only through that object — so dropping the call when the object itself is dropped changes
+nothing that can be seen. The annotation does not stop the freeze where the constant *is* used: `CHANNELS`
+is still frozen in `dist/preload.cjs`, because the preload reads it.
+
+The alternative fix was for the two consumers to import `../contracts/bridge` and `../contracts/ipc`
+instead of the barrel. Measured on its own it gives 1386 and 1215 — sixteen bytes better than the
+annotation, because the annotation's own text survives into the one constant the preload reads — and
+measured *with* the annotation it gives exactly the annotation's numbers, so the two are not complementary.
+
+**The annotation was taken alone, and the reason is about S05 rather than about bytes.** It sits on the
+definition, not on the consumer, so it needs nothing remembered: a consumer that imports the whole barrel
+and uses three of the five constants gets those three, still frozen, and the other two are dropped — which
+is what a throwaway bundle over this ring was built to check. The import rule would have had to be
+remembered by every consumer written after it, and nothing in the gate set can express it.
+
+**The consequence worth writing down: `gates:size` measures the development build, so a doc comment in a
+module a bundle reads spends that bundle's budget.** That is most of the 1.9× to 2.6× between the two
+columns above, and it was 5.7× for `preload.cjs` before the dead constants left. `src/contracts/` is where
+this project puts its most load-bearing prose — `RowFlag`'s two clip-bit doc blocks are 1748 bytes of
+source on their own, the largest single piece of documentation in the project, and they were the bulk of
+the 2251 bytes `layout.ts` cost the renderer while the renderer was pulling it in — so the gate as it
+stands prices documentation of the contract against the renderer's size budget.
+
+That is also why the new budget's margin is what it is. The two bounds are measured and they overlap: the
+smallest thing the budget should catch is one frozen constant returning, and the smallest of the four is
+`FailureKind` at 471 bytes of the renderer; the largest ordinary edit it should absorb is a doc block, and
+the largest of those is the 1748 bytes above. No margin satisfies both, so it is set towards the doc
+block — a gate that fired on good prose would be the worse error in a project whose contract is mostly
+prose — and what it still catches is the whole ring returning, which is the 4634 bytes it was set after.
+
+`size.js` measures the development build on the stated reasoning that it is the stricter of the two and
+needs no second build. Both halves of that are still true. What the numbers add is that "stricter" is
+mostly *stricter about comments*, which is not what a distributable size budget is usually for: nothing
+ships the development build. **Which build the budget is a budget of is a decision of
+`docs/ADR-0003-quality-gates-and-ci.md` §2, gate 11, and is recorded here unresolved on purpose** — the
+measurement that makes it decidable is now on the record, and the decision is the orchestrator's.
+
 ## The scripts, which CI will call
 
 `docs/ADR-0003-quality-gates-and-ci.md` §2 names them, and CI calls these and never its own inlined
