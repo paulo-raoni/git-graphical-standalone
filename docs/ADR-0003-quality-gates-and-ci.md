@@ -46,7 +46,7 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 | 8 | Build | `gates:build` | esbuild produces main, preload and renderer bundles. |
 | 9 | End to end | `gates:e2e` | Playwright drives the built Electron application on fixture repositories. This is `AGENTS.md` §7's "open the actual thing", made repeatable. |
 | 10 | **Performance** | `gates:perf` | Counters and budgets against committed baselines. See decision 4. |
-| 11 | Size | `gates:size` | Bundle and installer size budget, so the distributable does not drift upward unnoticed. |
+| 11 | Size | `gates:size` | Bundle and installer size budget, so the distributable does not drift upward unnoticed. **It weighs the production build**, see below. |
 | 12 | Licences | `gates:licences` | Every dependency's licence is on an allow-list of permissive licences. The repository is public and MIT; a copyleft dependency arriving transitively is caught here, not by a stranger. |
 | 13 | Provenance | `gates:provenance` | A weak, mechanical companion to `AGENTS.md` §1: no dependency, file name or committed string referring to the extension's package or publisher. It cannot prove a clean room. The reviewer's reading of the diff remains the real check. |
 | 14 | Commits | `gates:commits` | Conventional Commits over the range, and **no AI attribution of any kind** (`AGENTS.md` §9), which is otherwise a rule only a human remembers. |
@@ -54,6 +54,21 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 
 Gates 1 to 8 and 11 to 15 run on any platform. Gate 9 and 10 run on Windows, the verified platform
 (ADR-0001).
+
+**The size gate weighs the production build, not the development one.** Decided 2026-09-13, on numbers
+E01-M01-FIX-11 measured rather than on any I took myself.
+
+A size budget exists to keep the distributable from drifting upward, and the distributable is the production
+build. Weighing the development build instead makes a doc comment in a module a bundle reads spend that
+bundle's budget: that lane measured one type's two documentation blocks at 1 748 bytes of source against a
+whole renderer budget of a few kilobytes. **That is a gate that pays an author to delete the explanation of
+why the code is the way it is**, in a project whose entire discipline is writing that down, and every other
+gate would stay green while they did it.
+
+Nothing is lost by the change, which is what makes it safe rather than merely appealing. The same lane
+established that minification never dropped the unread constants: the regression this gate was used to
+catch was present in the production build too, so a production-only budget would have caught it. The
+development build stays unweighed and unbudgeted.
 
 ## Decision 3 · Mutation testing with StrykerJS
 
