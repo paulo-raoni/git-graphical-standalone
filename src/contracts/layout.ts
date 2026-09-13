@@ -2,7 +2,7 @@
  * Bits of one {@link LayoutRows.flags} entry. Combined with bitwise or, tested
  * with bitwise and. Always written through one of these names.
  */
-export const RowFlag = Object.freeze({
+export const RowFlag = /* @__PURE__ */ Object.freeze({
   /** The row's commit has more than one parent. */
   Merge: 1,
   /** The row is a stash entry rather than an ordinary commit. */

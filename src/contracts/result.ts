@@ -2,7 +2,7 @@
  * Why an operation did not produce a value. Always written through one of these
  * names, never as a bare string at a call site.
  */
-export const FailureKind = Object.freeze({
+export const FailureKind = /* @__PURE__ */ Object.freeze({
   /** No git executable was found where the application looked for one. */
   GitMissing: 'git-missing',
   /** The path exists but git does not consider it a repository. */

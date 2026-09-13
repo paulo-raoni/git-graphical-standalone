@@ -10,7 +10,7 @@ import type { Result } from './result';
  * Frozen at runtime as well as at the type level, because the object is handed
  * to the preload, which runs beside untrusted page content.
  */
-export const CHANNELS = Object.freeze({
+export const CHANNELS = /* @__PURE__ */ Object.freeze({
   /** Open a repository at a known path and return its first page. */
   openRepository: 'repository:open',
   /** Ask the main process to show a folder chooser. */
