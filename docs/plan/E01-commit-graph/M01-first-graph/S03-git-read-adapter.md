@@ -273,6 +273,58 @@ here is a machine format that a locale does not move. **Colour is not touched**,
 `%C` placeholder emits none and no porcelain format is coloured. Hooks, credential helpers, signing
 configuration, `include` directives and everything else stay exactly as the user wrote them.
 
+## Which boundaries these tests pin, and which they cannot
+
+Coverage over `src/core/parse/` is 100 per cent, which says every line runs and nothing about whether the
+comparison on it is the right one. The mutation gate is what asks the second question, and it found five
+mutants here, on four lines of three files, that every test in the folder ran over and none could see.
+
+**The decoder's lead-byte ranges are now asserted at both of their edges**, in `bytes.test.ts`, one byte
+sequence each:
+
+| the comparison in `sequenceLength` | the last lead below it | the first lead at or above it |
+| --- | --- | --- |
+| `lead < 0x80` | `7F` decodes to U+007F | `80` is a replacement character |
+| `lead < 0xc2` | `C0` and `C1` are replacement characters | `C2 80` decodes to U+0080, and `C2 A9` to `©` |
+| `lead < 0xe0` | `DF BF` decodes to U+07FF | `E0 A0 80` decodes to U+0800 |
+| `lead < 0xf0` | `EF BF BF` decodes to U+FFFF | `F0 90 80 80` decodes to U+10000 |
+| `lead < 0xf5` | `F4 8F BF BF` decodes to U+10FFFF | `F5` and `FF` are replacement characters |
+
+The surrogate range is asserted on all four sides: U+D7FF and U+E000 decode, and both U+D800 and U+DFFF are
+three replacement characters. U+FFFF and U+10000 together also pin the point where one code unit becomes a
+surrogate pair.
+
+`C2` is the one that mattered, and it is worth naming why. The suite decoded `C3 A9` and refused the overlong
+`C0 C1`, and nothing decoded the byte between them, so `lead < 0xc2` could have been written `lead <= 0xc2`
+and the whole unit suite would still have passed — measured here, at 21 files and 326 tests. Under that
+comparison every code point from U+0080 to U+00BF, which is `©`, `«`, `»`, `°`, `±` and the lower half of
+Latin-1, becomes two replacement characters in a commit subject.
+
+**The empty-record guard in `readRecord` is observable, and what makes it observable is a fact about the
+splitter.** `pushRecords` hands over `[start, at)` at every terminator, so two terminators in a row produce a
+range whose `from` equals its `to`, and the byte at `from` — were the guard not there to stop it being read —
+is the NUL that ended the empty record. No classifier claims that byte, so an empty record standing alone is
+inert either way, which is why a test that feeds one first passes with the guard removed. The state the guard
+protects is the rename's `pendingOriginalPath`: without it an empty record arriving between a rename and its
+original path spends that flag, and the original path is then counted as an entry of its own. A rename, an
+empty record, and an original path called `?old.txt` is one changed file and no untracked one, and one of each
+with the guard gone. That is the assertion `working-tree-status.test.ts` now carries.
+
+**Two diagnostics are asserted for the numbers they carry, and not for their wording.** `entryAt`'s
+`RangeError` exists to say which index was refused and how long the buffer was, and `writeObjectName`'s
+`SyntaxError` to say how many hex digits it actually got; those numbers are the whole of what the reader of a
+crash can act on, and both were free to change without a test noticing. The object-name message was already
+matched, but only over a span starting at zero, where `to - from` and `to + from` are the same number. The
+assertions look for the digits, so either message can be reworded freely and neither can lose its number.
+
+**Two mutants in this folder are on `scripts/gates/mutation-survivors.json` because no behavioural test can
+kill them**, which is a different thing from a test nobody has written yet. Emptying `prefixAt` in
+`commit-lookup.ts` puts every object name in one bucket, and the full twenty-byte comparison still resolves
+every reference; running the batching loop in `bytes.ts` one iteration too far appends the empty string. Both
+were re-measured against this tree with the whole unit suite: 21 files and 333 tests pass with either planted.
+What the first changes is work done, and this ring exposes no work counter to assert it against, where
+`src/core/store/` has `storeWork` and `src/core/layout/` has `layoutWork`.
+
 ## Which tests are in which suite, and why
 
 `src/core/parse/**/*.test.ts` is in the **module suite**. It is pure and fast, it inherits the 100 per cent
