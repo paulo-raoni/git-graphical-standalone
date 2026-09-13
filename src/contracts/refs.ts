@@ -3,7 +3,7 @@
  * always written through one of these names so that no bare number appears at a
  * call site.
  */
-export const RefKind = Object.freeze({
+export const RefKind = /* @__PURE__ */ Object.freeze({
   /** A local branch, `refs/heads/*`. */
   LocalHead: 0,
   /** A remote-tracking branch, `refs/remotes/<remote>/<branch>`. */
@@ -23,7 +23,7 @@ export type RefKind = (typeof RefKind)[keyof typeof RefKind];
  * Bits of one {@link Refs.flags} entry. Combined with bitwise or, tested with
  * bitwise and. Always written through one of these names.
  */
-export const RefFlag = Object.freeze({
+export const RefFlag = /* @__PURE__ */ Object.freeze({
   /** This reference is the one currently checked out. */
   CheckedOut: 1,
   /** This tag is an annotated tag object, not a lightweight ref. */
