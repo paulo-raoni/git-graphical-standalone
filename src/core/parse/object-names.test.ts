@@ -59,6 +59,13 @@ describe('writeObjectName', () => {
     }).toThrow(/40 hex digits, not 3/);
   });
 
+  it('counts the digits of the span it was given, not the offset it started at', () => {
+    const bytes = bytesOf('..abc');
+    expect(() => {
+      writeObjectName(bytes, 2, 5, new Uint8Array(20), 0);
+    }).toThrow(/hex digits, not 3/);
+  });
+
   it('refuses a digit that is not hexadecimal, and says which', () => {
     const bytes = bytesOf(`${'0'.repeat(HEX_NAME_LENGTH - 1)}z`);
     expect(() => {

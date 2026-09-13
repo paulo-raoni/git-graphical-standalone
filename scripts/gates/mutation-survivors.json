@@ -1,6 +1,6 @@
 {
   "comment": "Every mutant known to survive the mutation gate, one entry each, with the reason it survives. This list is the ratchet AGENTS.md section 11 asks for, and Stryker's own break threshold is only the backstop beside it: break compares one global score, so over the 1195 mutants of this scope a run needs 180 survivors to fail while the largest single file carries 140, which means deleting the tests of the largest file in the project reads 88.28 and passes. A survivor that is not on this list fails the build. The list moves in the shrinking direction on its own — an entry whose mutant a test now kills is dropped in the commit that wrote the test — and it grows only in a commit that says why, which a reviewer reads.",
-  "identity": "An entry stands for one mutant, matched on file, line, column, mutator and replacement, all five exactly. Four are not enough: 187 positions of the recorded run carry more than one mutant with the same file, line, column and mutator, and two of those positions are on this list — at working-tree-status.ts 141:7 the replacement `true` is killed while `false` survives, and at bytes.ts 70:7 `lead >= 0xc2` is killed while `lead <= 0xc2` survives. The cost of matching exactly is that an edit above a listed line moves it, and the entry then names no mutant; the gate reports that as a separate refusal rather than passing quietly, and says so in the message. When it happens, re-record the entry against a run — do not add a second one. The five are not a unique key either: 12 of the 1195 mutants share all five with another, all of them a ConditionalExpression Stryker emits twice where a compound condition is mutated once whole and once in part. None of those 12 is on this list and every one was killed, and the gate counts mutants rather than entries so its survivor count matches Stryker's.",
+  "identity": "An entry stands for one mutant, matched on file, line, column, mutator and replacement, all five exactly. Four are not enough: 187 positions of the recorded run carry more than one mutant with the same file, line, column and mutator, and this list has already carried two of them — at working-tree-status.ts 141:7 the replacement `true` was killed while `false` survived, and at bytes.ts 70:7 `lead >= 0xc2` was killed while `lead <= 0xc2` survived. Both are written in the past tense because both are now killed outright and neither is listed any more; what they illustrate is not past, because an entry that named only four fields would have excused the killed half of each pair as well. The cost of matching exactly is that an edit above a listed line moves it, and the entry then names no mutant; the gate reports that as a separate refusal rather than passing quietly, and says so in the message. When it happens, re-record the entry against a run — do not add a second one. The five are not a unique key either: 12 of the 1195 mutants share all five with another, all of them a ConditionalExpression Stryker emits twice where a compound condition is mutated once whole and once in part. None of those 12 is on this list and every one was killed, and the gate counts mutants rather than entries so its survivor count matches Stryker's.",
   "kinds": {
     "test gap": "A behavioural assertion over a value this code returns, or over the state it changes, would kill it. Closing it is test work in the folder that owns the file.",
     "diagnostic text": "Only the text of a thrown error changes. An assertion on the message would kill it, which constrains wording rather than behaviour.",
@@ -19,24 +19,6 @@
     },
     {
       "file": "src/core/parse/bytes.ts",
-      "line": 60,
-      "column": 26,
-      "mutator": "StringLiteral",
-      "replacement": "``",
-      "kind": "diagnostic text",
-      "why": "The RangeError entryAt throws loses its text: measured, the message goes from \"entry 1 is outside a buffer of 1\" to \"\" while the whole unit suite still passes. The one test that reaches this throw asserts the class and not the wording."
-    },
-    {
-      "file": "src/core/parse/bytes.ts",
-      "line": 70,
-      "column": 7,
-      "mutator": "EqualityOperator",
-      "replacement": "lead <= 0xc2",
-      "kind": "test gap",
-      "why": "0xC2 is the smallest legal two-byte lead, so this is the boundary of the overlong check and the mutant rejects a byte that is valid. Measured: with it planted the whole unit suite passes, and decodeUtf8 of the two bytes C2 A9 returns two replacement characters where the unmodified tree returns \"©\". One assertion on that decoding closes it."
-    },
-    {
-      "file": "src/core/parse/bytes.ts",
       "line": 166,
       "column": 20,
       "mutator": "EqualityOperator",
@@ -52,33 +34,6 @@
       "replacement": "{}",
       "kind": "not behavioural",
       "why": "prefixAt returns undefined, so every target lands in one bucket of the map. The bucket only narrows the candidates; the full twenty-byte comparison still decides, so the answers do not change. Measured: identical resolutions over 1220 lookups seeded to include hits, misses and forced prefix collisions, and the whole unit suite passes. What changes is the work done, and src/core/parse/ exposes no work counter to assert it against where src/core/store/ has storeWork and src/core/layout/ has layoutWork."
-    },
-    {
-      "file": "src/core/parse/object-names.ts",
-      "line": 51,
-      "column": 78,
-      "mutator": "ArithmeticOperator",
-      "replacement": "to + from",
-      "kind": "diagnostic text",
-      "why": "The arithmetic inside the SyntaxError's message, not the check above it. The message is asserted — object-names.test.ts matches /40 hex digits, not 3/ — but only from a span starting at 0, where to - from and to + from are the same number. Measured: at from 0 and to 3 both trees say \"not 3\"; at from 2 and to 5 the unmodified tree says \"not 3\" and the mutant says \"not 7\". An assertion from a non-zero offset closes it."
-    },
-    {
-      "file": "src/core/parse/working-tree-status.ts",
-      "line": 141,
-      "column": 7,
-      "mutator": "ConditionalExpression",
-      "replacement": "false",
-      "kind": "test gap",
-      "why": "The empty-record guard never fires. The test named 'ignores an empty record' executes the line and cannot see it, because an empty record's first byte is the NUL that terminated it and no classifier claims that byte. It is observable through the one piece of state the guard protects: measured, for a rename record followed by an empty record and an original path called ?old.txt, the unmodified tree counts one changed file and no untracked one, and the mutant counts one of each, because the empty record consumed the pending original path."
-    },
-    {
-      "file": "src/core/parse/working-tree-status.ts",
-      "line": 141,
-      "column": 20,
-      "mutator": "BlockStatement",
-      "replacement": "{}",
-      "kind": "test gap",
-      "why": "The same guard emptied rather than falsified, and the same measurement distinguishes it: one changed file and one untracked file where the unmodified tree counts one and none. The test that closes the entry above closes this one."
     }
   ]
 }
