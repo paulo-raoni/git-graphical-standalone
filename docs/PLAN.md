@@ -325,7 +325,16 @@ code.** They are decided in two documents, and this section only says where.
 | Delivered work does not regress | ADR-0003 §5 | four committed baselines that move in one direction only |
 | CI as one expandable line per pull request | ADR-0003 §6 and §7 | a single workflow file, a single required check |
 
-Two consequences that shape the plan rather than the code:
+### Gate work deferred past the first milestone
+
+Carried here rather than left in a review file, so it is a planned item with a parent and not a thing someone
+remembers. Each is scheduled into the milestone that follows E01-M01 and is not started before it.
+
+| item | why it waits | the measurement it starts from |
+| --- | --- | --- |
+| **Decide the two clocks the mutation gate runs under.** The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | 83 of 1 183 detections rest on a clock rather than an assertion, of which 39 are recorded as kills because the inner clock fired before the outer one. |
+
+### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
   every wave and before every promotion (`AGENTS.md` §7).
