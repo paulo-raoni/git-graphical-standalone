@@ -1,7 +1,7 @@
+import { entryAt } from '../../contracts/column-read';
 import { RowFlag } from '../../contracts/index';
 import type { CommitColumns, LayoutRows } from '../../contracts/index';
 
-import { entryAt } from './column-entry';
 import {
   createOpenLanes,
   firstFreeLane,

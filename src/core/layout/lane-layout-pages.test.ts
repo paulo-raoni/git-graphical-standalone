@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH, RowFlag, UNKNOWN_INDEX } from '../../contracts/index';
 import type { CommitColumns, LayoutRows, PersonTable } from '../../contracts/index';
 
-import { entryAt } from './column-entry';
 import {
   colourOfLane,
   createLayoutState,

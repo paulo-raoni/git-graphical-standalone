@@ -1,4 +1,4 @@
-import { entryAt } from './bytes';
+import { entryAt } from '../../contracts/column-read';
 
 /**
  * `--date=raw`: the seconds git recorded, and the offset the person was at.

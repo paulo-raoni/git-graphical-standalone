@@ -310,18 +310,32 @@ original path spends that flag, and the original path is then counted as an entr
 empty record, and an original path called `?old.txt` is one changed file and no untracked one, and one of each
 with the guard gone. That is the assertion `working-tree-status.test.ts` now carries.
 
-**Two diagnostics are asserted for the numbers they carry, and not for their wording.** `entryAt`'s
+**Two diagnostics were asserted for the numbers they carry, and not for their wording.** `entryAt`'s
 `RangeError` exists to say which index was refused and how long the buffer was, and `writeObjectName`'s
 `SyntaxError` to say how many hex digits it actually got; those numbers are the whole of what the reader of a
 crash can act on, and both were free to change without a test noticing. The object-name message was already
 matched, but only over a span starting at zero, where `to - from` and `to + from` are the same number. The
-assertions look for the digits, so either message can be reworded freely and neither can lose its number.
+assertions look for the digits, so `writeObjectName`'s message can be reworded freely and cannot lose its
+number.
+
+**`entryAt` is not a module of this folder any more.** `bytes.ts` held its own copy of the bounded
+typed-array read, under a `NumericBuffer` interface, and so did `src/core/layout/` and `src/contracts/`:
+three copies of the same twelve lines, differing only in the text of the `RangeError`. **E01-M01-FIX-09
+deleted this one.** Every module of `src/core/parse/` now imports `entryAt` from
+`src/contracts/column-read` by module path, which `core-only-inward` permits, and the two paths the three
+cases in `bytes.test.ts` covered are covered by `src/contracts/column-read.test.ts`. That test asserts the
+message **exactly** rather than by a regular expression over its two numbers, so `entryAt`'s wording is now
+pinned where it was deliberately free here; what the assertion cannot lose is either number, which was the
+point.
 
 **Two mutants in this folder are on `scripts/gates/mutation-survivors.json` because no behavioural test can
 kill them**, which is a different thing from a test nobody has written yet. Emptying `prefixAt` in
 `commit-lookup.ts` puts every object name in one bucket, and the full twenty-byte comparison still resolves
 every reference; running the batching loop in `bytes.ts` one iteration too far appends the empty string. Both
-were re-measured against this tree with the whole unit suite: 21 files and 333 tests pass with either planted.
+were re-measured against this tree with the whole unit suite, planted one at a time: **20 files and 326 tests
+pass with either**. E01-M01-FIX-09 took that measurement again after deleting `column-entry.test.ts` and the
+three `entryAt` cases of `bytes.test.ts`, which is what took the suite from the 21 files and 333 tests the
+previous measurement here recorded; neither mutant is killed by anything those tests were carrying.
 What the first changes is work done, and this ring exposes no work counter to assert it against, where
 `src/core/store/` has `storeWork` and `src/core/layout/` has `layoutWork`.
 

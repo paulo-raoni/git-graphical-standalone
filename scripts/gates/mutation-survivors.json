@@ -19,16 +19,16 @@
     },
     {
       "file": "src/core/parse/bytes.ts",
-      "line": 166,
+      "line": 144,
       "column": 20,
       "mutator": "EqualityOperator",
       "replacement": "at <= units.length",
       "kind": "not behavioural",
-      "why": "The batching loop runs one extra time and appends String.fromCharCode() — the empty string — so the decoded text is unchanged. Measured: identical output at lengths 0, 1, 2, 4095, 4096, 4097, 8192 and 8193, either side of the 4096 batch. It is an equivalent mutant, so no verdict other than Survived can be about the mutant: across five full runs it was reported Survived four times and Killed once, over identical source, and neither a Timeout nor a Kill for it can be anything but the machine being busy. The honest verdict is that it survives. A longer timeoutMS would stop the verdict moving and belongs in a lane of its own."
+      "why": "The batching loop runs one extra time and appends String.fromCharCode() — the empty string — so the decoded text is unchanged. Measured: identical output at lengths 0, 1, 2, 4095, 4096, 4097, 8192 and 8193, either side of the 4096 batch. It is an equivalent mutant, so no verdict other than Survived can be about the mutant: across five full runs it was reported Survived four times and Killed once, over identical source, and neither a Timeout nor a Kill for it can be anything but the machine being busy. The honest verdict is that it survives. A longer timeoutMS would stop the verdict moving and belongs in a lane of its own. E01-M01-FIX-09 deleted the duplicated bounded read above this loop and the line moved from 166 to 144, where that lane watched the verdict move once more: its first session's full run reported this mutant Killed and its second session's scoped re-run of this file reported it Survived, over the same source."
     },
     {
       "file": "src/core/parse/commit-lookup.ts",
-      "line": 28,
+      "line": 27,
       "column": 62,
       "mutator": "BlockStatement",
       "replacement": "{}",

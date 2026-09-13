@@ -1,7 +1,7 @@
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH, RefFlag, UNKNOWN_INDEX } from '../../contracts/index';
 import type { RefKind, Refs } from '../../contracts/index';
 
-import { entryAt } from './bytes';
 import { writeObjectName } from './object-names';
 
 /**

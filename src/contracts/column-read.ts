@@ -13,18 +13,43 @@
  * an assertion silences the check without performing it, and because a single
  * function is one place to test.
  *
- * It lives in `src/contracts/` because `./commit-columns` needs it and this ring
- * may import nothing outside itself. It is deliberately **not** re-exported from
- * `./index`: it is a helper the decoders and the store's own tables share, not a
+ * **This module is the only home for it.** Every ring that needs a bounded read
+ * of a typed array imports it from here **by module path**: `src/core/store/`,
+ * `src/core/parse/` and `src/core/layout/` each name
+ * `../../contracts/column-read`, and none of them keeps its own. It lives in
+ * `src/contracts/` because `./commit-columns` needs it and this ring may import
+ * nothing outside itself, so the one copy has to sit in the ring that imports
+ * nothing and everything else has to reach inward for it, which
+ * `core-only-inward` permits.
+ *
+ * Two further copies of these twelve lines grew in `src/core/` while wave 3 was
+ * in flight, each for a reason its own doc comment recorded and each of which had
+ * expired by the time the wave landed. E01-M01-FIX-09 deleted both; the record of
+ * why they existed is kept in
+ * `docs/plan/E01-commit-graph/M01-first-graph/S04-lane-layout.md`, because the
+ * next person to meet the same situation should see how it was handled.
+ *
+ * It is deliberately **not** re-exported from `./index`: it is a helper the
+ * decoders, the store's own tables, the parsers and the layout pass share, not a
  * term of the contract, and the ring's exported surface is snapshotted by
- * `gates:contract`. `src/core/store/` names it by module path, which
- * `core-only-inward` allows.
+ * `gates:contract`. Naming it by module path is what keeps it out of that
+ * snapshot.
+ *
+ * **The message it throws names the index and the length and nothing else.** The
+ * two deleted copies each named the ring that was reading — `layout read entry …`
+ * and `… is outside a buffer of …` — which a reader of the crash can see in the
+ * stack trace above it and cannot act on, while the index and the length are the
+ * two numbers that say what actually went wrong.
  */
 
 /**
  * The shape every typed array satisfies: numeric entries addressed by index.
- * Written structurally so the same function serves `Uint8Array`, `Uint32Array`,
- * `Int16Array` and `Float64Array` without a generic parameter per column.
+ *
+ * Written structurally so that one function serves every column of every ring
+ * without a generic parameter each: the `Uint8Array` of git's bytes, of a page's
+ * object names and of a row's flags; the `Uint16Array` of lanes; and the
+ * `Uint32Array` of every offset, index and slot table. It admits any typed
+ * array, and `column-read.test.ts` reads four widths back through it.
  */
 export interface NumericColumn {
   readonly [index: number]: number | undefined;

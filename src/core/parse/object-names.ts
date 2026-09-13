@@ -1,6 +1,5 @@
+import { entryAt } from '../../contracts/column-read';
 import { HASH_BYTE_LENGTH } from '../../contracts/index';
-
-import { entryAt } from './bytes';
 
 /**
  * Object names, from the hex git prints to the binary bytes the store keeps.
