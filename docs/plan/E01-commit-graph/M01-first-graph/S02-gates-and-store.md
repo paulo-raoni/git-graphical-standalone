@@ -383,13 +383,20 @@ close, **diagnostic text** where only a thrown message changes, **not behavioura
 answer is identical under the mutant, and **another gate** where the mutant is observable only from a ring the
 unit suite does not cover. **Eight entries** at the commit that introduced it, which are the same eight the
 paragraphs above name — three in `bytes.ts`, two in `working-tree-status.ts`, one each in `commit-lookup.ts`,
-`object-names.ts` and `src/contracts/bridge.ts` — reproduced there rather than carried over. Two full runs of
-identical source at that commit both report exactly those eight, at 1195 mutants and 99.33: 1143 killed and 44
-timed out in 63 minutes, then 1141 and 46 in 68. **Two verdicts moved between those runs**, both in
-`reference-list.ts` and both from `Killed` to `Timeout`, which is a detection either way; that is this
-project's own measurement of how much a verdict drifts, and it is why a listed mutant coming back detected is
-reported rather than refused. The one reading in this document that the re-measurement changed is
-`bytes.ts:166:20`, which the paragraph above now records as equivalent rather than slow.
+`object-names.ts` and `src/contracts/bridge.ts` — reproduced there rather than carried over. The one reading
+in this document that the re-measurement changed is `bytes.ts:166:20`, which the paragraph above now records
+as equivalent rather than slow.
+
+**Three full runs of identical unmodified source at that commit, and they do not agree.** Two report those
+eight survivors at 99.33 — 1143 killed and 44 timed out in 63 minutes, then 1141 and 46 in 68 — differing in
+exactly two verdicts, both in `reference-list.ts` and both between `Killed` and `Timeout`, which is a
+detection either way. The third reports **seven** survivors at **99.41**: `bytes.ts:166:20` came back
+`Killed`, and it cannot have been killed, because the mutant is equivalent and no assertion can distinguish
+it. What the command runner saw was the suite exiting non-zero for a reason that was not the mutant, which is
+the same family as a timeout scored as a kill. **That is why a listed mutant coming back detected is reported
+and not refused**: the clause that refused it would have failed this very run, on an unmodified tree with a
+correct list, and `AGENTS.md` §11 calls a gate that flaps a defect of the gate. It is also why a lane should
+read the survivor list rather than the third decimal of the score: 99.33 and 99.41 are the same tree.
 
 `scripts/gates/mutation.js` reads that list beside the two clauses FIX-04 built, and splits what it finds by
 whether the fact is deterministic:

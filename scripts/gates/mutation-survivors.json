@@ -42,7 +42,7 @@
       "mutator": "EqualityOperator",
       "replacement": "at <= units.length",
       "kind": "not behavioural",
-      "why": "The batching loop runs one extra time and appends String.fromCharCode() — the empty string — so the decoded text is unchanged. Measured: identical output at lengths 0, 1, 2, 4095, 4096, 4097, 8192 and 8193, either side of the 4096 batch. It is an equivalent mutant, which is also why a run that reports it Timeout rather than Survived is reporting a busy machine and not a loop: the honest verdict is that it survives, and a longer timeoutMS would stop the verdict moving."
+      "why": "The batching loop runs one extra time and appends String.fromCharCode() — the empty string — so the decoded text is unchanged. Measured: identical output at lengths 0, 1, 2, 4095, 4096, 4097, 8192 and 8193, either side of the 4096 batch. It is an equivalent mutant, so no verdict other than Survived can be about the mutant: across five full runs it was reported Survived four times and Killed once, over identical source, and neither a Timeout nor a Kill for it can be anything but the machine being busy. The honest verdict is that it survives. A longer timeoutMS would stop the verdict moving and belongs in a lane of its own."
     },
     {
       "file": "src/core/parse/commit-lookup.ts",

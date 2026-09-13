@@ -98,11 +98,14 @@ import { repositoryRoot, report } from './tree.js';
  * What the clause does **not** do is fail when a listed mutant comes back
  * detected, because that verdict is not deterministic. Under the command runner
  * a mutant counts as detected whenever the suite exits non-zero, for any reason,
- * and seven suites share the machine: two full runs of identical source recorded
- * in `docs/plan/E01-commit-graph/M01-first-graph/S02-gates-and-store.md` disagree
- * about one mutant of 1195, and a third mutant straddles the timeout budget. A
- * clause that failed on those would flap, and `AGENTS.md` §11 says a gate that
- * flaps is a defect of the gate. It is reported instead, with what to do: an
+ * and seven suites share the machine. Measured over three full runs of identical
+ * unmodified source, recorded in
+ * `docs/plan/E01-commit-graph/M01-first-graph/S02-gates-and-store.md`: two agree
+ * on eight survivors and differ in two verdicts, and the third reports seven,
+ * because a mutant this file's own list records as **equivalent** came back
+ * `Killed`. A clause that refused a detected entry would have failed that run,
+ * on an unmodified tree with a correct list, and `AGENTS.md` §11 says a gate
+ * that flaps is a defect of the gate. It is reported instead, with what to do: an
  * entry whose mutant a test now kills is removed in the commit that wrote the
  * test, which is the list shrinking, which is the direction §11 allows it to move
  * without an argument.
