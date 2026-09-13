@@ -46,7 +46,7 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 | 8 | Build | `gates:build` | esbuild produces main, preload and renderer bundles. |
 | 9 | End to end | `gates:e2e` | Playwright drives the built Electron application on fixture repositories. This is `AGENTS.md` §7's "open the actual thing", made repeatable. |
 | 10 | **Performance** | `gates:perf` | Counters and budgets against committed baselines. See decision 4. |
-| 11 | Size | `gates:size` | Bundle and installer size budget, so the distributable does not drift upward unnoticed. **It weighs the production build**, see below. |
+| 11 | Size | `gates:size` | Bundle and installer size budget, so the distributable does not drift upward unnoticed. **To weigh the production build, plus a module manifest**, see below; not yet implemented. |
 | 12 | Licences | `gates:licences` | Every dependency's licence is on an allow-list of permissive licences. The repository is public and MIT; a copyleft dependency arriving transitively is caught here, not by a stranger. |
 | 13 | Provenance | `gates:provenance` | A weak, mechanical companion to `AGENTS.md` §1: no dependency, file name or committed string referring to the extension's package or publisher. It cannot prove a clean room. The reviewer's reading of the diff remains the real check. |
 | 14 | Commits | `gates:commits` | Conventional Commits over the range, and **no AI attribution of any kind** (`AGENTS.md` §9), which is otherwise a rule only a human remembers. |
@@ -55,20 +55,33 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 Gates 1 to 8 and 11 to 15 run on any platform. Gate 9 and 10 run on Windows, the verified platform
 (ADR-0001).
 
-**The size gate weighs the production build, not the development one.** Decided 2026-09-13, on numbers
-E01-M01-FIX-11 measured rather than on any I took myself.
+**The size gate is to weigh the production build, and to gain a second instrument beside the byte count.**
+Decided 2026-09-13. **Not yet implemented**: at the time of writing, `scripts/gates/size.js` still weighs
+the development build, and this paragraph describes what it must become, not what it does. Every number
+below was measured by others and is attributed; I took none of them.
 
-A size budget exists to keep the distributable from drifting upward, and the distributable is the production
-build. Weighing the development build instead makes a doc comment in a module a bundle reads spend that
-bundle's budget: that lane measured one type's two documentation blocks at 1 748 bytes of source against a
-whole renderer budget of a few kilobytes. **That is a gate that pays an author to delete the explanation of
-why the code is the way it is**, in a project whose entire discipline is writing that down, and every other
-gate would stay green while they did it.
+**Why the change.** A size budget exists to keep the distributable from drifting upward, and the
+distributable is the production build. Weighing the development build makes a doc comment in a module a
+bundle reads spend that bundle's budget. E01-M01-FIX-11 measured one type's two documentation blocks at
+1 748 bytes of source against a whole renderer budget of a few kilobytes, and review round 11 measured a
+stand-in renderer that merely reads the existing decode API, with no row recycler and no canvas, at **6 520
+development bytes against a 3 072 budget** — over budget by more than its whole budget, before a line of
+rendering is written, entirely from prose. **That is a gate that pays an author to delete the explanation of
+why the code is the way it is**, in a project whose discipline is writing that down, while every other gate
+stays green.
 
-Nothing is lost by the change, which is what makes it safe rather than merely appealing. The same lane
-established that minification never dropped the unread constants: the regression this gate was used to
-catch was present in the production build too, so a production-only budget would have caught it. The
-development build stays unweighed and unbudgeted.
+**What the change gives up, which an earlier draft of this paragraph got wrong.** It claimed nothing was
+lost, reasoning from FIX-11's finding that minification never drops unread constants. The finding is true
+and was reproduced. The inference was false. Review round 11 measured the regression this gate was used to
+catch as **+4 702 bytes in development and +76 in production**, and showed that this project's own margin
+rule over a production build leaves that regression **1 129 and 1 844 bytes of room to pass silently**. A
+production-only byte count would not have caught it. What is given up is the only instrument that saw it.
+
+**So the byte count is not enough on its own, and a second instrument replaces what it loses.** A committed
+manifest of which modules each bundle contains, refused on addition, in the manner of the survivor baseline
+(decision 5). It catches "the whole contract ring came back" at **zero bytes of drift**, and it is completely
+insensitive to prose, which is the property the byte count cannot have. The module markers it reads are what
+FIX-11 used as its own evidence, so the instrument already exists as a technique and needs only a home.
 
 ## Decision 3 · Mutation testing with StrykerJS
 
