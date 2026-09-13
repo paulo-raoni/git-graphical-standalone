@@ -144,3 +144,11 @@ if (Test-Path $vswhere) {
   per worktree**, because each worktree has its own `node_modules`, which comes to **560 MB** per worktree in
   total. Budget for that when cutting a wave: three lanes at once cost about **1.6 GB** of disk in
   `.worktrees/`, two thirds of it the Electron runtime.
+
+- **A shell can silently re-encode a source file, and no gate here would notice.** PowerShell's
+  `Set-Content` rewrote a UTF-8 source as mojibake while planting a probe, in a lane that then ran a full
+  green pipeline. **No gate in this repository reads a file for its encoding**: format, lint, types, build
+  and the tests all passed on the corrupted file. It was caught by the executor reading the file, and
+  repaired with `git checkout --` before anything was committed. Edit source through an editing tool, not
+  through a shell redirect, and if you must, grep the touched files for mojibake afterwards. Observed on
+  2026-09-12 in a fix lane.

@@ -70,14 +70,27 @@ Gates 1 to 8 and 11 to 15 run on any platform. Gate 9 and 10 run on Windows, the
 reads the existing Vitest configuration, needs one configuration file, and requires no change to a single
 test. The owner named it, and nothing here argues against it.
 
-- **Scope: `core/` and the pure parsers in `adapters/`.** These hold every decision that can be wrong, and
-  they are pure, so their tests are fast enough for mutation to be affordable. The renderer and the
-  composition root are excluded: mutating wiring produces mostly equivalent mutants and long runs, and their
-  guarantee comes from the end-to-end gate instead.
-- **Thresholds:** `break` at 85 for `core/`, 75 for the parsers, raised as a ratchet (decision 5), never
-  lowered without a commit that says why. Stryker fails the build below `break`.
-- **Speed:** incremental mode, with the incremental file cached in CI keyed by the lockfile and the source
-  tree. A full run happens on `main` and on the promotion pull request; a pull request runs incrementally.
+- **Scope: `core/` and `contracts/`.** These hold every decision that can be wrong, and they are pure, so
+  their tests are fast enough for mutation to be affordable. The parsers live in `core/` and the decoders in
+  `contracts/`, so both are covered (ADR-0002 decision 3, amended). The renderer, the adapters and the
+  composition root are excluded: mutating wiring and process handling produces mostly equivalent mutants and
+  long runs, and their guarantee comes from the end-to-end gate instead. **A lane may run over less than that
+  scope, but only a scope its task file names** (`TASK_TEMPLATE.md`), because narrowing which files are
+  mutated never changes which tests run, while an executor choosing its own scope can narrow until the result
+  flatters it. The wave-end review runs the configured scope in full.
+- **The ratchet is a committed survivor baseline, not a threshold.** `break` stays at 85 as a collapse
+  backstop and is not raised. It cannot be the ratchet: measured over 1 195 mutants, failing at 85 needs 170
+  survivors while the largest file in scope carries 133, so **no single file's tests can break a global
+  percentage**. Instead every surviving mutant is listed, with its file, line, column, mutator, replacement,
+  a kind and a measured reason, and **an unlisted survivor refuses the run**. That catches the first survivor
+  at any denominator, forces each one to be told apart in writing, and survives a narrowed scope. The list
+  moves **down** only (decision 5).
+- **Speed: incremental mode is off, and the gate refuses it.** It was measured returning a stale score over
+  rewritten tests, and this document exists because of gates that are green for an unrelated reason. The full
+  run costs most of an hour and that cost is paid rather than escaped.
+- **The gate checks the shape of its own run.** A run that reports a killed or surviving mutant with no
+  completed test, or whose detections are more than a quarter timeouts, is refused whatever it scores. The
+  reason is recorded below.
 - **It does not replace the reviewer's mutation pass** (`AGENTS.md` §7). Stryker raises the floor
   mechanically; the reviewer still breaks a line by hand, predicts the failures per configuration first and
   compares. Where Stryker reports a **surviving mutant**, that is the reviewer's best candidate line, and the
@@ -109,7 +122,7 @@ explicit and explained commit:
 | baseline | file | moves |
 | --- | --- | --- |
 | Coverage thresholds, per directory | test configuration | up only |
-| Mutation `break` thresholds | Stryker configuration | up only |
+| Surviving mutants, each with its measured reason | `scripts/gates/mutation-survivors.json` | down only |
 | Performance counters and budgets | `perf/baselines.json` | toward less time and less memory only |
 | Distributable size budget | size configuration | down only |
 
