@@ -1,0 +1,39 @@
+{
+  "comment": "Which source modules contribute code to each bundle `gates:size` weighs. A module that appears in a bundle and is not named here refuses the build, and so does an entry naming a module the bundle no longer contains. This is the second instrument of ADR-0003 section 2, gate 11, standing beside the byte budget in size-budget.json, and it exists because the byte budget stopped being able to do this job when the gate moved to the production build. Review round 11 measured the regression E01-M01-FIX-11 removed — the whole unread contract ring returning to both shell bundles — at +4702 bytes in the development build and +76 in the production one, and showed that this project's own margin rule over a production build passes it with 1129 and 1844 bytes of room unused. A list of modules catches the same regression at zero bytes of drift and cannot be moved by prose at all, which is the property the byte count can never have. || WHAT IT CANNOT SEE, written down because a reader who believes the pair is complete will not look for the third thing. It asserts which modules are present and never how large they are: a module that legitimately belongs here and grows tenfold is caught only by the byte budget, in its minified form, where a line of this project's code was measured on 2026-09-13 costing between 4.9 and 19.9 bytes across the nine modules built one at a time, so a small module doubling sits well inside a budget's margin. It reads the production build only, so a module the development build carries and minification shakes out never appears here — and the development build is what `npm start` and `gates:e2e` run. **A module whose whole contribution is a constant is exactly that case**, measured in this lane on 2026-09-13: a consumer importing UNKNOWN_INDEX from the barrel pulls src/contracts/indices.ts into the development bundle at 34 bytes, and the production bundle carries no trace of it — esbuild folds the value into its one use and the module is absent from the metafile altogether, so this list cannot refuse it and did not, watched, while the import was planted. What is left over it is `gates:boundaries`, which refuses a forbidden ring edge but not a permitted one, and the reviewer reading the diff. Stated as what it is rather than as a bound on every case: a module whose entire contribution minification inlines or eliminates leaves nothing for this list to name, and a constant is the one kind of that met so far. And it says nothing whatever about what a module does: a rewritten module is the same entry. || WHEN IT FAILS. An unlisted module means something new reached a bundle. Find out why it is imported before touching this file. If it belongs there, add its path in the same commit that made it belong, with the reason in the commit body, which is the diff a reviewer reads. If it does not belong there, fix the import rather than adding the line: the cause met so far is a barrel re-export retained because `Object.freeze({...})` is a call expression esbuild cannot prove free of side effects, and the fix was the `/* @__PURE__ */` annotation E01-M01-FIX-11 put on each of those calls. A stale entry is the opposite case and is the improving direction; the fix is to delete the line, and the gate says so in its own message. || HOW THE LIST IS PRODUCED. From esbuild's `metafile`, `outputs[<bundle>].inputs[<module>].bytesInOutput`, filtered to modules above zero bytes, out of the same build the byte budget weighs — a supported API rather than a parse of the `// src/...` comment markers esbuild writes into an unminified bundle. Those markers were E01-M01-FIX-11's own evidence and they are the wrong instrument here, for two measured reasons. Measured 2026-09-13 at esbuild 0.28.2 on this tree: the production bundles carry **no markers at all**, main.cjs, preload.cjs and renderer.js alike, so a manifest reading markers could only ever read the build that does not ship; and a marker is emitted per contiguous run of a module's output rather than per module, so development preload.cjs carries four markers naming three modules and development main.cjs carries three naming two, which means counting markers does not even count modules. The zero-byte filter is load-bearing rather than tidy: src/contracts/index.ts is read by all three bundles and contributes 0 bytes to each, because it only re-exports, so a list of every module esbuild read would name it permanently and would say nothing.",
+  "identity": "An entry stands for one module, matched on its path relative to the repository root, spelled with `/` separators, compared exactly: same characters, same case. Normalisation is the whole of what this list's guarantee hangs on, so the gate resolves esbuild's reported path against the working directory and re-bases it on the repository root before comparing, which makes the recorded spelling identical on Windows and on Linux without touching the characters that identify the file. Nothing else is folded. Case in particular is compared even though the Windows file system does not distinguish it, and the consequence is deliberate: importing `../Contracts/index` on this machine resolves to the same file and arrives spelled differently, and the run then reports both an unlisted module and a stale entry instead of quietly matching. That failure is noisy and correct, and it is the direction this rule is written to fail in — a rule that folded case, or that matched on a basename, would start excusing modules nobody wrote its entry for, which is the allow-list-into-blanket failure `mutation-survivors.json`'s `identity` field exists to prevent. A path that cannot be expressed under the repository root at all — a dependency pulled into a bundle, which would today be the first runtime dependency this project has — is refused by name rather than compared against anything, so the one thing this list must never do, silently admit something, does not depend on an entry being written correctly.",
+  "measured": {
+    "date": "2026-09-13",
+    "mode": "production",
+    "method": "esbuild 0.28.2, the version pinned in package-lock.json, through the same `buildInto` call scripts/gates/size.js makes: outputs[<bundle>].bytes for the bundle and inputs[<module>].bytesInOutput for each module. Both were checked against the file on disk: at this version metafile's reported output size and `statSync().size` are equal for all three bundles in both modes, the linked source-map comment of a development build included.",
+    "note": "These are a measurement with a date, not a threshold. The gate never reads them and nothing fails because one of them moved; they are here so that a reader can see what each module costs where it is cheapest to hide, and they go stale the moment the code changes. Today's figures are printed by every run of the gate, beside the bundle each belongs to, so a transcript always carries the current numbers next to this dated set.",
+    "bytes": {
+      "main.cjs": {
+        "bundle": 1078,
+        "modules": {
+          "src/app/main.ts": 322,
+          "src/app/window.ts": 755
+        }
+      },
+      "preload.cjs": {
+        "bundle": 547,
+        "modules": {
+          "src/contracts/bridge.ts": 21,
+          "src/contracts/ipc.ts": 207,
+          "src/preload/bridge.ts": 318
+        }
+      },
+      "renderer.js": {
+        "bundle": 649,
+        "modules": {
+          "src/contracts/bridge.ts": 21,
+          "src/ui/renderer.ts": 616
+        }
+      }
+    }
+  },
+  "bundles": {
+    "main.cjs": ["src/app/main.ts", "src/app/window.ts"],
+    "preload.cjs": ["src/contracts/bridge.ts", "src/contracts/ipc.ts", "src/preload/bridge.ts"],
+    "renderer.js": ["src/contracts/bridge.ts", "src/ui/renderer.ts"]
+  }
+}
