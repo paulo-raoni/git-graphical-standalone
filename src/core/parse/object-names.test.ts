@@ -59,18 +59,20 @@ describe('writeObjectName', () => {
     }).toThrow(/40 hex digits, not 3/);
   });
 
-  it('counts the digits of the span it was given, not the offset it started at', () => {
-    const bytes = bytesOf('..abc');
-    expect(() => {
-      writeObjectName(bytes, 2, 5, new Uint8Array(20), 0);
-    }).toThrow(/hex digits, not 3/);
-  });
-
   it('refuses a digit that is not hexadecimal, and says which', () => {
     const bytes = bytesOf(`${'0'.repeat(HEX_NAME_LENGTH - 1)}z`);
     expect(() => {
       writeObjectName(bytes, 0, bytes.length, new Uint8Array(20), 0);
     }).toThrow(/"z" where an object name's hex digit belongs/);
+  });
+});
+
+describe('writeObjectName, over a span that does not start at the buffer', () => {
+  it('says how many digits the span held, not where in the buffer it began', () => {
+    const bytes = bytesOf('..abc');
+    expect(() => {
+      writeObjectName(bytes, 2, 5, new Uint8Array(20), 0);
+    }).toThrow(/hex digits, not 3/);
   });
 });
 
