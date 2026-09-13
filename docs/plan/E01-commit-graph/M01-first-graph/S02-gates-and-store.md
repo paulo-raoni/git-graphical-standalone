@@ -387,12 +387,12 @@ paragraphs above name — three in `bytes.ts`, two in `working-tree-status.ts`, 
 in this document that the re-measurement changed is `bytes.ts:166:20`, which the paragraph above now records
 as equivalent rather than slow.
 
-**Three full runs of identical unmodified source at that commit, and they do not agree.** Two report those
-eight survivors at 99.33 — 1143 killed and 44 timed out in 63 minutes, then 1141 and 46 in 68 — differing in
-exactly two verdicts, both in `reference-list.ts` and both between `Killed` and `Timeout`, which is a
-detection either way. The third reports **seven** survivors at **99.41**: `bytes.ts:166:20` came back
-`Killed`, and it cannot have been killed, because the mutant is equivalent and no assertion can distinguish
-it. What the command runner saw was the suite exiting non-zero for a reason that was not the mutant, which is
+**Four full runs of identical unmodified source across that lane, and they do not agree.** Three report those
+eight survivors at 99.33 — 1143 killed and 44 timed out in 63 minutes, then 1141 and 46 in 68, then 1141 and
+46 again in 67 — and even those three differ in two verdicts, both in `reference-list.ts` and both between
+`Killed` and `Timeout`, which is a detection either way. The fourth reports **seven** survivors at **99.41**:
+`bytes.ts:166:20` came back `Killed`, and it cannot have been killed, because the mutant is equivalent and no
+assertion can distinguish it. What the command runner saw was the suite exiting non-zero for a reason that was not the mutant, which is
 the same family as a timeout scored as a kill. **That is why a listed mutant coming back detected is reported
 and not refused**: the clause that refused it would have failed this very run, on an unmodified tree with a
 correct list, and `AGENTS.md` §11 calls a gate that flaps a defect of the gate. It is also why a lane should
