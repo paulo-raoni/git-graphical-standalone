@@ -193,7 +193,9 @@ failing exit status rather than burying the line under its own stack trace.
 ### What the bundles cost, and what `gates:size` is a budget of
 
 Measured 2026-09-13, by splitting each bundle on esbuild's own module markers. Two numbers per bundle: the
-development build, which is what `gates:size` weighs, and the same bundle built with `--production`.
+development build, which is what `gates:size` weighed when these were taken, and the same bundle built with
+`--production`, which is what it weighs now. *What `gates:size` became*, below, records the change and is
+where the current budgets are derived.
 
 | bundle | development | production | what the difference is |
 | --- | --- | --- | --- |
@@ -227,27 +229,73 @@ and uses three of the five constants gets those three, still frozen, and the oth
 is what a throwaway bundle over this ring was built to check. The import rule would have had to be
 remembered by every consumer written after it, and nothing in the gate set can express it.
 
-**The consequence worth writing down: `gates:size` measures the development build, so a doc comment in a
-module a bundle reads spends that bundle's budget.** That is most of the 1.9× to 2.6× between the two
-columns above, and it was 5.7× for `preload.cjs` before the dead constants left. `src/contracts/` is where
-this project puts its most load-bearing prose — `RowFlag`'s two clip-bit doc blocks are 1748 bytes of
+**The consequence that decided the question: while `gates:size` measured the development build, a doc
+comment in a module a bundle reads spent that bundle's budget.** That is most of the 1.9× to 2.6× between
+the two columns above, and it was 5.7× for `preload.cjs` before the dead constants left. `src/contracts/` is
+where this project puts its most load-bearing prose — `RowFlag`'s two clip-bit doc blocks are 1748 bytes of
 source on their own, the largest single piece of documentation in the project, and they were the bulk of
-the 2251 bytes `layout.ts` cost the renderer while the renderer was pulling it in — so the gate as it
-stands prices documentation of the contract against the renderer's size budget.
+the 2251 bytes `layout.ts` cost the renderer while the renderer was pulling it in — so the gate as it then
+stood priced documentation of the contract against the renderer's size budget.
 
-That is also why the new budget's margin is what it is. The two bounds are measured and they overlap: the
+That is also why the margin set that morning was what it was, and the reasoning is kept because a reader who
+cannot see what changed cannot check the change. The two bounds were measured and they overlapped: the
 smallest thing the budget should catch is one frozen constant returning, and the smallest of the four is
 `FailureKind` at 471 bytes of the renderer; the largest ordinary edit it should absorb is a doc block, and
-the largest of those is the 1748 bytes above. No margin satisfies both, so it is set towards the doc
+the largest of those is the 1748 bytes above. No margin satisfies both, so it was set towards the doc
 block — a gate that fired on good prose would be the worse error in a project whose contract is mostly
-prose — and what it still catches is the whole ring returning, which is the 4634 bytes it was set after.
+prose — and what it still caught was the whole ring returning, which is the 4634 bytes it was set after.
 
-`size.js` measures the development build on the stated reasoning that it is the stricter of the two and
-needs no second build. Both halves of that are still true. What the numbers add is that "stricter" is
-mostly *stricter about comments*, which is not what a distributable size budget is usually for: nothing
-ships the development build. **Which build the budget is a budget of is a decision of
-`docs/ADR-0003-quality-gates-and-ci.md` §2, gate 11, and is recorded here unresolved on purpose** — the
-measurement that makes it decidable is now on the record, and the decision is the orchestrator's.
+### What `gates:size` became
+
+The question the paragraph above left open — which build a size budget is a budget of — was decided the same
+day in `docs/ADR-0003-quality-gates-and-ci.md` §2, gate 11, and E01-M01-FIX-12 implemented it. **The gate
+weighs the production build and has gained a second instrument beside the byte count.** Every number below
+was measured in that lane, on this machine, at the pinned esbuild 0.28.2.
+
+The old reasoning was that unminified is the stricter measurement and needs no second build. Both halves
+were true and neither survived what "stricter" turned out to mean. A stand-in renderer built outside the
+repository, reading only the existing decode API and the flag constants — no row pool, no canvas, no
+markup — costs **7232 development bytes and 1745 production bytes**, so under the development weighing
+E01-M01-S05 was over a 3072-byte budget before a line of rendering existed, entirely from prose. Nothing
+ships the development build; the budget now weighs the one that does.
+
+What that gives up is the only instrument that saw the regression above. Weighed in production, the whole
+unread contract ring returning to both shell bundles is +76 bytes, and a production budget passes it. So the
+byte count no longer sees a module arrive, and `scripts/gates/module-manifest.json` does: a committed list of
+which source modules contribute code to each bundle, refused on addition, taken from esbuild's `metafile`
+rather than from the `// src/…` comment markers, because the production bundles carry **no markers at all**
+and a marker is emitted per contiguous run rather than per module. Watched, with the `/* @__PURE__ */`
+annotations removed: the byte count passed at 919 and 1228 against budgets of 2048 and 12288, and the
+manifest refused, naming `layout.ts`, `refs.ts` and `result.ts` in `preload.cjs` and those three plus
+`ipc.ts` in `renderer.js`.
+
+The production build goes to `reports/size/production/`, which the gate makes itself and empties on every
+run. It is not `dist/`: `gates:build`, `gates:e2e` and `npm start` keep the development build, verified by
+hashing all eight files of `dist/` either side of a gate run and finding them unchanged. `reports/` is
+already ignored by git, Prettier, ESLint and `scripts/gates/tree.js`, so the new directory needed no entry
+added to any of their lists.
+
+**The five budgets, re-based on production measurements.** `main.cjs` 3072, `preload.cjs` 2048,
+`index.html` 2048 and `renderer.css` 3072 are each the measured size plus a kibibyte, rounded up — the
+measurements being 1078, 547, 898 and 1313. `renderer.js` is **12288 and is an initial budget**, on the
+precedent of `docs/ADR-0002-architecture-and-performance.md` decision 6, which sets ten budgets over an
+application that does not exist and calibrates them at E01-M01-S07 by measuring the assembled one. This
+budget is calibrated there too, so the movement expected of it is **downward at calibration**, not upward at
+S05; it is not exempt from the ratchet. It is derived rather than defaulted: the floor is the 1745
+production bytes above, of which 1320 are contract modules; the rate is **19.9 production bytes per line of
+code**, the densest of nine modules built one at a time (the range is 4.9 to 19.9, and 19.9 is
+`src/ui/renderer.ts` itself); and the one inference, labelled as one, is that a renderer meeting ADR-0002
+decision 5 is about 500 lines of code. 500 × 19.9 + 1320 = 11270, and the next whole kibibyte is 12288. The
+total is 20480, which leaves `renderer.js`'s allocation whole and still binds the other four: any two of
+them may spend their full margin at once and any three may not.
+
+**One correction to the record.** The measurement that set this lane going reported esbuild's
+`metafile.outputs[…].bytes` and the file's size on disk as different numbers — 1365 against 1402 for the
+development `preload.cjs` — and attributed the gap to the source-map comment a development build appends.
+At esbuild 0.28.2 they are **equal**: all three bundles, both modes, `metafile.bytes` exactly the size on
+disk, source-map comment included. The comment is indeed 37 bytes, which is the gap, so the two numbers
+differ by whether that comment is counted — but the one `metafile` reports counts it. The budgets compare
+the file on disk regardless, because that is what a distributable is.
 
 ## The scripts, which CI will call
 
