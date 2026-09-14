@@ -46,7 +46,7 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 | 8 | Build | `gates:build` | esbuild produces main, preload and renderer bundles. |
 | 9 | End to end | `gates:e2e` | Playwright drives the built Electron application on fixture repositories. This is `AGENTS.md` §7's "open the actual thing", made repeatable. |
 | 10 | **Performance** | `gates:perf` | Counters and budgets against committed baselines. See decision 4. |
-| 11 | Size | `gates:size` | Bundle and installer size budget, so the distributable does not drift upward unnoticed. **To weigh the production build, plus a module manifest**, see below; not yet implemented. |
+| 11 | Size | `gates:size` | Bundle and installer size budget over the **production** build, so the distributable does not drift upward unnoticed, **plus a committed manifest of the modules in each bundle**, which the byte count cannot replace. See below. |
 | 12 | Licences | `gates:licences` | Every dependency's licence is on an allow-list of permissive licences. The repository is public and MIT; a copyleft dependency arriving transitively is caught here, not by a stranger. |
 | 13 | Provenance | `gates:provenance` | A weak, mechanical companion to `AGENTS.md` §1: no dependency, file name or committed string referring to the extension's package or publisher. It cannot prove a clean room. The reviewer's reading of the diff remains the real check. |
 | 14 | Commits | `gates:commits` | Conventional Commits over the range, and **no AI attribution of any kind** (`AGENTS.md` §9), which is otherwise a rule only a human remembers. |
@@ -55,10 +55,10 @@ Ordered cheapest first, so a failure is reported in seconds rather than minutes.
 Gates 1 to 8 and 11 to 15 run on any platform. Gate 9 and 10 run on Windows, the verified platform
 (ADR-0001).
 
-**The size gate is to weigh the production build, and to gain a second instrument beside the byte count.**
-Decided 2026-09-13. **Not yet implemented**: at the time of writing, `scripts/gates/size.js` still weighs
-the development build, and this paragraph describes what it must become, not what it does. Every number
-below was measured by others and is attributed; I took none of them.
+**The size gate weighs the production build, and has a second instrument beside the byte count.**
+Decided 2026-09-13 and implemented by E01-M01-FIX-12. Every number below was measured by a lane or by a
+review and is attributed to whoever took it; I have taken none of them myself. The development build stays
+unweighed and unbudgeted.
 
 **Why the change.** A size budget exists to keep the distributable from drifting upward, and the
 distributable is the production build. Weighing the development build makes a doc comment in a module a
@@ -78,10 +78,20 @@ rule over a production build leaves that regression **1 129 and 1 844 bytes of r
 production-only byte count would not have caught it. What is given up is the only instrument that saw it.
 
 **So the byte count is not enough on its own, and a second instrument replaces what it loses.** A committed
-manifest of which modules each bundle contains, refused on addition, in the manner of the survivor baseline
-(decision 5). It catches "the whole contract ring came back" at **zero bytes of drift**, and it is completely
-insensitive to prose, which is the property the byte count cannot have. The module markers it reads are what
-FIX-11 used as its own evidence, so the instrument already exists as a technique and needs only a home.
+manifest of which modules contribute code to each bundle, refused on addition **and on staleness**, in the
+manner of the survivor baseline (decision 5). It catches "the whole contract ring came back" at **zero bytes
+of drift**, and it is completely insensitive to prose, which is the property the byte count cannot have.
+
+Its source is the bundler's own module graph, read through a supported interface, **not the comment markers
+an earlier draft of this paragraph named.** E01-M01-FIX-12 measured those markers wrong twice over: a marker
+marks a contiguous run rather than a module, so counting them counts the wrong thing, and the counts quoted
+here were taken from a tree two lanes out of date. The module graph is reported for the production build as
+well as the development one, so the manifest reads **what ships** rather than a proxy for it, and the same
+call yields a per-module byte table that two separate lanes had each been assembling by hand.
+
+**What the manifest still cannot see**, measured rather than assumed: a module whose entire contribution
+folds into a constant leaves no trace in the production graph at all. That gap is recorded beside the
+manifest, with the instance that demonstrated it.
 
 ## Decision 3 · Mutation testing with StrykerJS
 
