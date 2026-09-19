@@ -1,4 +1,5 @@
 import { entryAt } from '../contracts/column-read';
+import { RowFlag } from '../contracts/index';
 import type { GraphPage, LayoutRows } from '../contracts/index';
 
 import { laneCentreX, rowTopY, ROW_HEIGHT, segmentLines, VERTEX_RADIUS } from './geometry';
@@ -33,6 +34,20 @@ import { laneColour } from './palette';
 
 /** Width of a drawn line, in CSS pixels. */
 const LINE_WIDTH = 1.6;
+
+/**
+ * Radius of the ring drawn around the vertex of the commit `HEAD` resolves to.
+ *
+ * The reference behaviour this slice carries asks for that commit to be marked
+ * and says nothing about how, so the shape is this lane's. A ring around the dot
+ * rather than a different dot, because it says *this one* without saying
+ * anything about what kind of commit it is — the dot keeps its lane's colour and
+ * its filled or hollow reading — and because it is the only mark that costs a
+ * row nothing when it is absent. Two pixels outside the dot leaves it inside
+ * half a lane's width, which is 7 pixels (`./geometry`), so a ring can never
+ * reach a neighbouring lane's line.
+ */
+const HEAD_RING_RADIUS = VERTEX_RADIUS + 2;
 
 /**
  * Scratch for `segmentLines`, which writes at most two lines of four numbers.
@@ -104,6 +119,11 @@ function paintRow(
  * what `src/contracts/graph-page.ts` makes the two row counts differ by, and the
  * flag belongs to the caller that prepends the row. Reading the two differently
  * is how the dot and the description end up disagreeing about the same row.
+ *
+ * `RowFlag.Head` **is** read from the flags, because unlike the uncommitted row
+ * it is not a property of the page's shape: it is a bit the composition root
+ * wrote onto one row (`src/core/page/row-block.ts`), and the flags are where it
+ * put it.
  */
 function paintVertex(
   context: CanvasRenderingContext2D,
@@ -113,21 +133,22 @@ function paintVertex(
   uncommitted: boolean,
 ): void {
   const colour = laneColour(entryAt(rows.colourIndex, row));
+  const x = laneCentreX(entryAt(rows.laneIndex, row));
+  const y = top + ROW_HEIGHT / 2;
   context.beginPath();
-  context.arc(
-    laneCentreX(entryAt(rows.laneIndex, row)),
-    top + ROW_HEIGHT / 2,
-    VERTEX_RADIUS,
-    0,
-    Math.PI * 2,
-  );
-  if (uncommitted) {
-    context.strokeStyle = colour;
-    context.stroke();
-    return;
-  }
+  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  context.strokeStyle = colour;
   context.fillStyle = colour;
-  context.fill();
+  if (uncommitted) {
+    context.stroke();
+  } else {
+    context.fill();
+  }
+  if ((entryAt(rows.flags, row) & RowFlag.Head) !== 0) {
+    context.beginPath();
+    context.arc(x, y, HEAD_RING_RADIUS, 0, Math.PI * 2);
+    context.stroke();
+  }
 }
 
 /**
