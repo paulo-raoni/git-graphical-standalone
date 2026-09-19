@@ -73,9 +73,7 @@ function fixtureCommits(count: number, hasMore: boolean): CommitColumns {
     } else if (hasMore) {
       parents.push(UNKNOWN_INDEX);
     }
-    if (row % 12 === 0 && row + 3 < count) {
-      parents.push(row + 3);
-    }
+    if (row % 12 === 0 && row + 3 < count) parents.push(row + 3);
     subjects += `${VERBS[row % VERBS.length] ?? 'add'} the widget in row ${String(row)}`;
     subjectOffsets[row + 1] = subjects.length;
   }
@@ -167,7 +165,7 @@ function fixturePage(count: number, dirty: boolean, hasMore: boolean): GraphPage
   };
 }
 
-type Counters = Record<'frames' | 'draws' | 'strokes' | 'timers', number>;
+type Counters = Record<'frames' | 'draws' | 'strokes' | 'timers' | 'asked', number>;
 
 type Timer = (callback: () => void, ms?: number) => number;
 
@@ -175,8 +173,9 @@ interface PageScope {
   requestAnimationFrame: (callback: () => void) => number;
   setTimeout: Timer;
   setInterval: Timer;
+  Event: new (type: string) => object;
   CanvasRenderingContext2D: { prototype: ContextLike };
-  document: { querySelector: (at: string) => { scrollTop: number; clientHeight: number } | null };
+  document: { querySelector: (at: string) => ScrollerLike | null };
   gitGraphicalView: { showPage: (p: GraphPage) => void; onLoadMore: (fn: () => void) => void };
   fixtureCounters: Counters;
   loadMoreAsked: boolean;
@@ -187,6 +186,12 @@ interface ContextLike {
   stroke: () => void;
 }
 
+interface ScrollerLike {
+  scrollTop: number;
+  clientHeight: number;
+  dispatchEvent: (event: object) => boolean;
+}
+
 /** Runs in the page: hand the mounted view a page, and listen for its intent. */
 function handPage(page: GraphPage): void {
   const scope = globalThis as unknown as PageScope;
@@ -195,13 +200,26 @@ function handPage(page: GraphPage): void {
   scope.gitGraphicalView.showPage(page);
 }
 
-/** Runs in the page: put the scroller at each offset in turn, all in one task. */
+/**
+ * Runs in the page: put the scroller at each offset in turn, all in one task,
+ * announcing each move as its own `scroll` event.
+ *
+ * **The announcement is the whole of the coalescing probe.** Chromium coalesces
+ * programmatic scrolling by itself: measured in this lane, twenty-five
+ * `scrollTop` writes in one task produced **one** scroll event, so a view that
+ * requested an animation frame for every event it received still redrew once,
+ * and the assertion below passed with the view's own coalescing removed. A
+ * green check that cannot fail is what `AGENTS.md` §7 is about. Dispatching the
+ * events makes the listener run once per move, which is the path the view's
+ * `schedule` is the only thing standing in.
+ */
 function scrollTo(offsets: readonly number[]): number {
   const scope = globalThis as unknown as PageScope;
   const element = scope.document.querySelector('.graph__scroll');
   if (element === null) return -1;
   for (const offset of offsets) {
     element.scrollTop = offset;
+    element.dispatchEvent(new scope.Event('scroll'));
   }
   return element.scrollTop;
 }
@@ -212,24 +230,28 @@ function measureViewport(): number {
   return scope.document.querySelector('.graph__canvas')?.clientHeight ?? -1;
 }
 
-/** Runs in the page: count frames, repaints, strokes and timer registrations. */
+/**
+ * Runs in the page: count frames, repaints, strokes and timer registrations.
+ *
+ * Installed through `addInitScript` and a reload, so that it is in place
+ * **before** `renderer.js` runs. Installed afterwards it would miss whatever the
+ * view registered while mounting, which is exactly where a polling loop would be
+ * written, and `timers` would then be zero for a window that wakes ten times a
+ * second.
+ */
 function installCounters(): void {
   const scope = globalThis as unknown as PageScope;
-  const counters: Counters = { frames: 0, draws: 0, strokes: 0, timers: 0 };
+  const counters: Counters = { frames: 0, draws: 0, strokes: 0, timers: 0, asked: 0 };
   scope.fixtureCounters = counters;
-  const frame = scope.requestAnimationFrame.bind(scope);
-  scope.requestAnimationFrame = (callback: () => void): number => {
-    counters.frames += 1;
-    return frame(callback);
-  };
   const counted =
-    (original: Timer): Timer =>
+    (original: Timer, key: 'frames' | 'timers'): Timer =>
     (callback, ms): number => {
-      counters.timers += 1;
+      counters[key] += 1;
       return original(callback, ms);
     };
-  scope.setTimeout = counted(scope.setTimeout.bind(scope));
-  scope.setInterval = counted(scope.setInterval.bind(scope));
+  scope.requestAnimationFrame = counted(scope.requestAnimationFrame.bind(scope), 'frames');
+  scope.setTimeout = counted(scope.setTimeout.bind(scope), 'timers');
+  scope.setInterval = counted(scope.setInterval.bind(scope), 'timers');
   const prototype = scope.CanvasRenderingContext2D.prototype;
   const clear = prototype.clearRect;
   const stroke = prototype.stroke;
@@ -243,14 +265,10 @@ function installCounters(): void {
   };
 }
 
-/** Runs in the page: what the counters say now. */
+/** Runs in the page: what the counters say now, and whether the intent arrived. */
 function readCounters(): Counters {
-  return (globalThis as unknown as PageScope).fixtureCounters;
-}
-
-/** Runs in the page: whether the Load More intent reached its listener. */
-function readAsked(): boolean {
-  return (globalThis as unknown as PageScope).loadMoreAsked;
+  const scope = globalThis as unknown as PageScope;
+  return { ...scope.fixtureCounters, asked: scope.loadMoreAsked ? 1 : 0 };
 }
 
 /**
@@ -316,7 +334,8 @@ test('the fixture carries every shape the painter has a case for', () => {
 
 test('the window draws a page: rows, labels, lines and the Load More control', async () => {
   await withWindow(async (page) => {
-    await page.evaluate(installCounters);
+    await page.addInitScript(installCounters);
+    await page.reload();
     await page.evaluate(handPage, fixturePage(96, true, true));
     await expect(page.locator('.graph__head')).toContainText('Description');
     await expect(page.locator('.row').first()).toContainText('Uncommitted changes (3)');
@@ -325,11 +344,10 @@ test('the window draws a page: rows, labels, lines and the Load More control', a
     await expect(page.locator('.ref--tag')).toHaveText('v1.4.0');
     await expect(page.locator('.graph__more')).toBeVisible();
     const drawn = await page.evaluate(readCounters);
-    process.stdout.write(`first page: ${String(drawn.strokes)} strokes drawn\n`);
-    expect(drawn.draws).toBeGreaterThan(0);
+    process.stdout.write(`drew ${String(drawn.strokes)} strokes, ${String(drawn.draws)} redraws\n`);
     expect(drawn.strokes).toBeGreaterThan(20);
     await page.locator('.graph__more').click();
-    expect(await page.evaluate(readAsked)).toBe(true);
+    expect((await page.evaluate(readCounters)).asked).toBe(1);
     await page.evaluate(handPage, fixturePage(20, true, false));
     await expect(page.locator('.graph__more')).toBeHidden();
     await expect(page.locator('.row:visible')).toHaveCount(21);
@@ -359,7 +377,8 @@ test('live row elements stay inside the budget, at page sizes an order apart', a
 
 test('scroll events in one task cost one redraw, and an idle window costs none', async () => {
   await withWindow(async (page) => {
-    await page.evaluate(installCounters);
+    await page.addInitScript(installCounters);
+    await page.reload();
     await page.evaluate(handPage, fixturePage(10000, false, true));
     await page.waitForTimeout(400);
     const settled = await page.evaluate(readCounters);
