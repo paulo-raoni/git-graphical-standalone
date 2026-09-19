@@ -12,8 +12,18 @@ graph, the description and the reference labels in front of it, the date, the au
 object name; the uncommitted-changes row above every commit; and a **Load More Commits** control that emits
 an intent and loads nothing.
 
-It was run and looked at rather than inferred from green gates. What was on screen is in
-`AUDIT-S05-graph-table-renderer.md`.
+It was run and looked at rather than inferred from green gates, twice, on a 1280 × 800 window at
+`devicePixelRatio` 1. The uncommitted row sat at the top with a **hollow** dot and its line descending into
+the first commit; row 0 carried `main` in a solid box and `origin/main` in a dashed one and row 2 carried
+`v1.4.0` in a rounded one, all three in lane 0's colour, while `origin/HEAD` — which is also on row 0 —
+correctly showed nothing. The mainline ran straight down lane 0 with a filled dot on every row; every
+twelfth row was a merge whose red line left its dot, crossed two rows in lane 1 and leaned back in three
+rows down; four rows later a tip opened as a red dot with nothing above it, ran two commits in lane 1 and
+leaned back into lane 0. **A tip looked like an end and a merge looked like a merge**, and on a page built
+complete the last row's dot had no line below it. Driven to a fractional offset of `17 × 24 + 9` pixels the
+canvas and the rows stayed in step, the partially visible row cut at the same line in the text and in the
+graph; nothing stuttered and no label jumped. That is an observation on this machine at this size, not a
+frame-time measurement — the 8 ms budget is S07's.
 
 Seven modules, none of which knows what a repository is:
 
@@ -255,7 +265,8 @@ What S06 owns, and this slice does not:
 | redraws | **1 redraw in 1 frame** for a burst of 25 scroll events dispatched in one task | `clearRect` and `requestAnimationFrame` counted in the page, installed before `renderer.js` runs |
 | an idle window | **no frame, no redraw and no timer registration** over two seconds | the same counters, read twice |
 | drawing | **200 stroke calls** for the first page of a 96-row fixture | the same counters |
-| `renderer.js` | see the audit for the current figure, against a budget of 12 288 | `npm run gates:size`, which weighs the production build |
+| `renderer.js` | **8 113** production bytes against a budget of 12 288, and `renderer.css` **2 978** against 3 072 | `npm run gates:size`, which builds production into `reports/size/production/` and weighs the files on disk |
+| the `Refs` decoders, which are the contract's cost and not the renderer's | **535** production bytes for `src/contracts/ref-list.ts` | the same run's per-module attribution |
 
 The numbers in that table are a measurement with a date and a method, not a threshold. **S07 owns
 `perf/baselines.json`**; this lane recommends the live-element count and the redraws-per-frame ratio as the
