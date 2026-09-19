@@ -55,6 +55,83 @@ body {
   flex-direction: column;
 }
 
+/*
+ * The control bar, the stage the table is mounted into, and the failure view.
+ * The stage is a flex column of its own so that `.graph`, which fills it and
+ * positions everything inside itself absolutely, has a height to fill; without
+ * `min-height: 0` a flex item refuses to shrink below its content and the table
+ * would push the window instead of scrolling.
+ */
+.bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  gap: 8px;
+}
+
+.bar__path {
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.bar__button,
+.graph__more {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.bar__button {
+  flex: none;
+}
+
+.bar__button:disabled,
+.graph__more:disabled {
+  color: var(--text-secondary);
+}
+
+.stage {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.failure {
+  display: flex;
+  overflow: auto;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 24px;
+  gap: 12px;
+}
+
+.failure__headline {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.failure__message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
 .empty-state {
   display: flex;
   margin: auto;
@@ -181,10 +258,4 @@ body {
 .graph__more {
   display: block;
   margin: 6px 8px 10px;
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: none;
-  color: inherit;
-  font: inherit;
 }

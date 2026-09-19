@@ -12,8 +12,16 @@
  * of the rule and there is nowhere else to look.
  */
 
-/** Entry points: by definition nothing imports them, so they are not orphans. */
-const ENTRY_POINTS = '^src/(app/main|preload/bridge|ui/renderer)\\.ts$';
+/**
+ * Entry points: by definition nothing imports them, so they are not orphans.
+ *
+ * There are four, one per bundle `scripts/build.js` makes. `app/repository-host`
+ * is the utility process of
+ * `docs/ADR-0002-architecture-and-performance.md` decision 2: it is started by
+ * the main process by path, never imported, so without a line here the rule
+ * against dead modules would refuse it.
+ */
+const ENTRY_POINTS = '^src/(app/main|app/repository-host|preload/bridge|ui/renderer)\\.ts$';
 
 /** The rings that may not reach the platform. */
 const PURE_RINGS = '^src/(core|ports)/';
@@ -146,8 +154,24 @@ module.exports = {
       comment:
         'src/ui/ holds no rule. It renders what it is given and may name only the shared ' +
         'vocabulary; a question like "which lane is this commit in" is never answered here.',
-      from: { path: '^src/ui/' },
+      from: { path: '^src/ui/', pathNot: TEST_FILES },
       to: { pathNot: '^src/(contracts|ui)/' },
+    },
+    {
+      name: 'ui-tests-only-the-runner',
+      severity: 'error',
+      comment:
+        'A colocated test of src/ui/ obeys its ring and names one thing besides: the test ' +
+        'runner. The rule above excludes test files rather than widening itself, for the reason ' +
+        'its two predecessors give: widening it would let the renderer itself reach vitest, and ' +
+        'then the ring that may name only the contract would name whatever a file happens to. ' +
+        'Until E01-M01-S06 there was no such pair here at all, so S05 could not colocate a ' +
+        'single test and its pure arithmetic had to be tested from test/e2e/ on the slowest ' +
+        'runner in the project, outside the coverage report. The two rules against Electron and ' +
+        'against Node builtins still cover these files, so a renderer test that opens a file ' +
+        'still fails.',
+      from: { path: '^src/ui/.*\\.test\\.ts$' },
+      to: { pathNot: '^src/(contracts|ui)/|^node_modules/vitest/' },
     },
     {
       name: 'app-is-private',
