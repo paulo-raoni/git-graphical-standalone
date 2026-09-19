@@ -102,13 +102,16 @@ function pad(value: number): string {
 /**
  * The references sitting on `commitRow`, in the order the column shows them.
  *
- * It walks the whole block once per row that is about to be written, which is
- * the repository's reference count and never its commit count: the cost is the
- * references times the rows entering the view, so a scroll of one row costs one
- * walk however many commits are loaded. An index over the block would turn that
- * into a lookup and is the obvious next step if a repository with thousands of
- * tags ever measures badly; it is not built now because the measurement that
- * would justify it does not exist yet (`AGENTS.md` §7).
+ * It walks the whole block **once per labelled kind** — three times — for each
+ * row that is about to be written, which is what puts the labels in kind order
+ * without a sort. That is three times the repository's reference count and
+ * nothing to do with its commit count, so a scroll of one row costs three walks
+ * however many commits are loaded. An index over the block, built once per page,
+ * would turn that into a lookup and would be the obvious next step if a
+ * repository with thousands of tags ever measured badly; it is not built now
+ * because the measurement that would justify it does not exist yet
+ * (`AGENTS.md` §7), and the constant is not what would decide it — three walks
+ * and one walk are both linear in the reference count.
  *
  * Only the three kinds the reference behaviour names are shown. A remote's
  * symbolic HEAD and the stash's own reference point at commits too, and showing

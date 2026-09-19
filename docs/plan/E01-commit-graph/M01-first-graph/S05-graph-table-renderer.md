@@ -134,11 +134,13 @@ Which commit a layout row is about comes from `workingTree.hasChanges`, not from
 belongs to the caller that prepends the row. The painter reads the same source for the same reason — read
 differently, the dot and the description end up disagreeing about the same row.
 
-Labels walk the whole reference block once per row that is about to be written. That is the repository's
-reference count and never its commit count, so a scroll of one row costs one walk however many commits are
-loaded. An index over the block would make it a lookup and is the obvious next step if a repository with
-thousands of tags ever measures badly; it is not built now, because the measurement that would justify it
-does not exist yet.
+Labels walk the whole reference block **once per labelled kind** — three times — for each row that is about
+to be written, which is what puts them in kind order without a sort. That is three times the repository's
+reference count and never anything to do with its commit count, so a scroll of one row costs three walks
+however many commits are loaded. An index over the block, built once per page, would make it a lookup and
+would be the obvious next step if a repository with thousands of tags ever measured badly; it is not built
+now, because the measurement that would justify it does not exist yet, and the constant is not what would
+decide it — three walks and one walk are both linear in the reference count.
 
 ## The palette, and what happens past its end
 
