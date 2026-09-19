@@ -40,6 +40,18 @@ export {
 } from './commit-columns';
 export type { Person } from './commit-columns';
 
+/**
+ * Reading a {@link Refs}.
+ *
+ * Here for the same reason the page decoders above are, and by the same test:
+ * a reference's name is the slice of the name blob between its two offsets and
+ * cannot be anything else, so reading it back is the contract's own job. `Refs`
+ * is a columnar block with a name blob and an offset table, so without these a
+ * consumer of the contract has **no way to read a reference's name at all**,
+ * which is the same incompleteness `CommitColumns` had before S08.
+ */
+export { refCommitOf, refCount, refFlagsOf, refKindOf, refNameOf } from './ref-list';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';

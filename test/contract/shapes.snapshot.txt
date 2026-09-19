@@ -151,4 +151,14 @@ value hexHashOf: (columns: CommitColumns, row: number) => string
 
 value parentsOf: (columns: CommitColumns, row: number) => Uint32Array
 
+value refCommitOf: (refs: Refs, ref: number) => number
+
+value refCount: (refs: Refs) => number
+
+value refFlagsOf: (refs: Refs, ref: number) => number
+
+value refKindOf: (refs: Refs, ref: number) => RefKind
+
+value refNameOf: (refs: Refs, ref: number) => string
+
 value subjectOf: (columns: CommitColumns, row: number) => string
