@@ -1,16 +1,48 @@
 import { BRIDGE_GLOBAL_NAME } from '../contracts/index';
+import type { GraphPage } from '../contracts/index';
+
+import { mountGraphTable } from './graph-table';
+import type { GraphTableView } from './graph-table';
 
 /**
- * The product's display name, as the window shows it.
- *
- * It is spelled here and in the document's title, and nowhere else. The final
- * name is still an owner decision (`docs/INPUTS.md`, open item 6), so it is kept
- * in one place per process rather than threaded through the contract.
+ * The renderer's entry point: assert the window was built correctly, mount the
+ * view, and publish the three things the rest of the application drives it with.
  */
-const APPLICATION_NAME = 'Git Graphical Standalone';
 
-/** What the window says when it has nothing to draw. */
-const EMPTY_STATE_MESSAGE = 'No repository is open.';
+/** Where the view is published on the window's global. */
+const VIEW_GLOBAL_NAME = 'gitGraphicalView';
+
+/**
+ * The view, as everything outside this ring sees it.
+ *
+ * **Why it is on a global at all.** S06 composes the application in-process and
+ * imports `mountGraphTable` directly; it does not need this. The end-to-end gate
+ * does. `src/ui/renderer.ts` is a bundle entry point that runs at module scope,
+ * so without a published handle there is no seam for a driver to hand the view a
+ * page — and the alternative, a second bundle entry holding fixtures, would ship
+ * test data in the distributable and would need a size budget that is not this
+ * task's to write. One named property costs the bundle a few bytes and keeps the
+ * fixtures in `test/e2e/`, where the driver builds them and this ring never sees
+ * them.
+ */
+export interface GraphTableGlobal {
+  /** Mount a table into an element, which is what S06 calls. */
+  readonly mount: (root: HTMLElement) => GraphTableView;
+  /** Hand the mounted view a page to draw. */
+  readonly showPage: (page: GraphPage) => void;
+  /** Register the listener the Load More Commits control calls. */
+  readonly onLoadMore: (listener: () => void) => void;
+}
+
+declare global {
+  interface Window {
+    /**
+     * The mounted view. Present in every window this renderer starts; absent
+     * anywhere else, which is why nothing may assume it.
+     */
+    gitGraphicalView?: GraphTableGlobal;
+  }
+}
 
 /**
  * Fail loudly when the preload did not run.
@@ -28,37 +60,18 @@ function assertBridgeIsPresent(): void {
   }
 }
 
-/**
- * Build the empty state.
- *
- * The document is assembled from elements and `textContent` rather than from a
- * markup string, so that no path in the renderer can ever interpret data as
- * markup. The content security policy in the document forbids inline script;
- * this is the same rule applied to the code that runs after it.
- */
-function buildEmptyState(): HTMLElement {
-  const container = document.createElement('section');
-  container.className = 'empty-state';
-
-  const title = document.createElement('h1');
-  title.className = 'empty-state__title';
-  title.textContent = APPLICATION_NAME;
-
-  const message = document.createElement('p');
-  message.className = 'empty-state__message';
-  message.textContent = EMPTY_STATE_MESSAGE;
-
-  container.append(title, message);
-  return container;
-}
-
-function render(): void {
+function start(): void {
   const root = document.getElementById('app');
   if (root === null) {
     throw new Error('The document has no #app element to render into.');
   }
-  root.replaceChildren(buildEmptyState());
+  const view = mountGraphTable(root);
+  window[VIEW_GLOBAL_NAME] = {
+    mount: mountGraphTable,
+    showPage: view.showPage,
+    onLoadMore: view.onLoadMore,
+  };
 }
 
 assertBridgeIsPresent();
-render();
+start();
