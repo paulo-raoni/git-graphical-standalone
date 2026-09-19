@@ -11,6 +11,8 @@ import type { Result } from './result';
  * to the preload, which runs beside untrusted page content.
  */
 export const CHANNELS = /* @__PURE__ */ Object.freeze({
+  /** Report the folder the application was started with, if it was given one. */
+  startupRepository: 'repository:startup',
   /** Open a repository at a known path and return its first page. */
   openRepository: 'repository:open',
   /** Ask the main process to show a folder chooser. */
@@ -25,6 +27,22 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
 
 /** One of the channel names in {@link CHANNELS}. */
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
+
+/**
+ * The repository the application was started with.
+ *
+ * It is a reply rather than a push, because the renderer is what decides when it
+ * is ready to draw one and a message sent before the document loads is a message
+ * nobody received. `path` is `null` when the application was started with no
+ * folder, which is the empty state and not a failure.
+ */
+export interface StartupRepository {
+  /** An absolute path, or `null` when no folder was named on the command line. */
+  readonly path: string | null;
+}
+
+/** The startup folder, or why it could not be reported. */
+export type StartupRepositoryResponse = Result<StartupRepository>;
 
 /** Open the repository rooted at, or containing, `path`. */
 export interface OpenRepositoryRequest {

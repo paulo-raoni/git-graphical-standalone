@@ -7,6 +7,7 @@ import type {
   OpenRepositoryResponse,
   RefreshRequest,
   RefreshResponse,
+  StartupRepositoryResponse,
 } from './ipc';
 
 /** The property the preload attaches the bridge to on the renderer's global. */
@@ -25,6 +26,8 @@ export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
  * user could be told about; a rejection here means the bridge itself is broken.
  */
 export interface GitGraphicalBridge {
+  /** Report the folder the application was started with, if it was given one. */
+  readonly startupRepository: () => Promise<StartupRepositoryResponse>;
   /** Open a repository by absolute path. */
   readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>;
   /** Show the folder chooser and report what the user picked. */

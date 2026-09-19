@@ -13,9 +13,9 @@ type ApplicationInfoResponse = import("./result").Failure | import("./result").S
 
 value BRIDGE_GLOBAL_NAME: "gitGraphical"
 
-value CHANNELS: { readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; }
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; }
 
-type ChannelName = "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info"
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
 
@@ -55,6 +55,7 @@ interface GitGraphicalBridge {
     readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
     readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
+    readonly startupRepository: () => Promise<StartupRepositoryResponse>
 }
 
 interface GraphPage {
@@ -124,6 +125,12 @@ type Result<TValue> = import("./result").Failure | import("./result").Success<TV
 
 type RowFlag = 1 | 2 | 4 | 8 | 16 | 32
 value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; }
+
+interface StartupRepository {
+    readonly path: string | null
+}
+
+type StartupRepositoryResponse = import("./result").Failure | import("./result").Success<import("./ipc").StartupRepository>
 
 interface Success<TValue> {
     readonly ok: true
