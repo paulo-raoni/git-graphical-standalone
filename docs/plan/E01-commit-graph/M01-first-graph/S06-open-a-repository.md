@@ -140,8 +140,10 @@ producing side.
 - **The first page is sized against the window.** The frame opens at 1280 × 800 (`src/app/window.ts`) and a
   row is 24 pixels (`src/ui/geometry.ts`), so the table shows about 31 rows; 300 is nearly ten screenfuls,
   which is what makes the first screen full with somewhere to scroll rather than an immediate request for
-  more. `page-sizes.test.ts` holds the constant above that bound rather than at 300, so the assertion
-  survives the decision moving and fails if it is lost.
+  more. `graph-page.test.ts` holds the constant above that bound rather than at 300, so the assertion
+  survives the decision moving and fails if it is lost. It is in that file and not in one of its own
+  because the mutation gate runs this suite once per mutant, and this lane measured four new test files
+  taking it from 3.8 to 6.2 seconds — which showed up in that gate's clock-share clause.
 - **The further page is sized against what a press costs**, which is the next section. Equal to the first is
   the size at which the *n*th press reads *n + 1* pages.
 
