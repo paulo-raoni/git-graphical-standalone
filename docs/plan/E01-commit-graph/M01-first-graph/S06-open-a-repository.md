@@ -14,14 +14,16 @@ page. **Refresh** re-reads the repository. When git cannot be found, when the fo
 when git fails, the window says which in plain words and shows git's own message underneath, and the Open
 Repository control stays where it is so another folder can be chosen.
 
-It was run against this repository and looked at, at 1280 × 800. The rows matched
-`git log --graph --branches --tags --remotes --date-order` line for line over the whole of its 112 commits:
+It was run against this repository and looked at, at 1280 × 800, on 2026-09-19, when this repository had
+**112 commits** — a number that is wrong by the next merge and is written down because it is what the
+readings below are of. The rows matched `git log --graph --branches --tags --remotes --date-order` line for
+line over the whole of them:
 the seven commits of this lane straight down lane 0, then the merge at `0ccbd45` opening a second line in
 lane 1 that ran the seven commits of E01-M01-S05 and rejoined at `e7c5fce`, then the merge at `74cf434`
 doing the same over three commits and rejoining at `eb21c9a`. The lane branch's label sat on the tip in a
 solid box and `dev` on `ccdec244` seven rows down, which is where `git branch -v` puts them. The
 abbreviated object names were the first eight hex digits of the ones `git log --format=%H` printed, in the
-same order. With 112 commits and a page of 300 the Load More control was correctly hidden. A file written
+same order. With fewer commits than a page of 300 the Load More control was correctly hidden. A file written
 into the working tree and a press of Refresh put `Uncommitted changes (1)` at the top with a hollow dot and
 its line descending into the tip; deleting the file and pressing Refresh again took it away and put the tip
 back on row 0. That is an observation on this machine at this size on 2026-09-19, not a frame-time
@@ -52,9 +54,14 @@ renderer  --preload bridge, allow-listed channels-->  main  --utilityProcess mes
   lays out nothing.
 - **The utility process is started on the first request and stopped with the last window.**
   `src/app/repository-client.ts` forks it lazily, correlates replies to requests by an integer, and fails
-  every outstanding request when the process ends, so a control is never disabled for ever. `src/app/main.ts`
-  stops it on `window-all-closed` and again on `before-quit` — two events, neither implying the other, and
-  a utility process outliving its window is this slice's characteristic leak.
+  every outstanding request when the process ends, so a control is never disabled for ever. **Every request
+  settles**, and that is the property the client is written around rather than a hope: the death of the
+  process is an answer like any other, the promise that waits for it to start is resolved by a spawn *or*
+  an exit, and the next request after a death starts a new process — which is also what makes a crash
+  recoverable without a restart. Driven with the bundle deliberately missing, the window showed the failure
+  view in half a second and kept its Open Repository control. `src/app/main.ts` stops the process on
+  `window-all-closed` and again on `before-quit` — two events, neither implying the other, and a utility
+  process outliving its window is this slice's characteristic leak.
 
 **What crosses, and in what form.** A `GraphPage` crosses twice, once by `MessagePort` from the utility
 process to main and once by `ipcRenderer.invoke` from main to the renderer. Both are structured clones, and
