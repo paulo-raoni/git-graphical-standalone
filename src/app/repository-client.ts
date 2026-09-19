@@ -99,8 +99,26 @@ function started(state: ClientState, entryPath: string): Promise<void> {
   child.on('exit', (code: number) => {
     abandon(state, `The process that reads repositories ended with status ${String(code)}.`);
   });
+  // Resolved by whichever of the two arrives, because a promise waiting only for
+  // `spawn` is a request that never settles and a control disabled for the life
+  // of the window — the one failure `abandon` above exists to prevent, reached
+  // by a different door.
+  //
+  // **The door this closes was not reached by the case that looks like it.**
+  // Measured here on 2026-09-19 by pointing `ENTRY_FILE` at a bundle that does
+  // not exist, building, and starting the application on a repository: the
+  // window showed the failure view in 470 to 530 milliseconds with `The process
+  // that reads repositories ended with status 1` — identical with this listener
+  // and without it — because Electron emits `spawn` first and the child then
+  // exits on its own. So this is a guard against a failure to start that emits
+  // no `spawn` at all, which is a case this lane could not produce; it is two
+  // lines, `resolve` is idempotent, and the alternative to being wrong about it
+  // is a window that hangs with no way back.
   state.spawned = new Promise<void>((resolve) => {
     child.once('spawn', () => {
+      resolve();
+    });
+    child.once('exit', () => {
       resolve();
     });
   });
