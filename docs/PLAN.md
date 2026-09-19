@@ -332,6 +332,7 @@ remembers. Each is scheduled into the milestone that follows E01-M01 and is not 
 
 | item | why it waits | the measurement it starts from |
 | --- | --- | --- |
+| **Give `src/ui/` colocated unit tests, and move the two pure suites home.** S05 had to put the renderer's pure tests on the end-to-end runner because the dependency rule had no carve-out for a test file beside the renderer. S06 adds the carve-out; moving the two existing suites is separate work. | The suites work where they are, so nothing is wrong today. What it costs is that they sit outside the unit gate's coverage report and run in the slowest gate instead of the fastest. | Two files, `test/e2e/graph-geometry.spec.ts` and the pure half of `test/e2e/graph-table.spec.ts`, as listed by review round 14. |
 | **Decide the two clocks the mutation gate runs under.** The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | Detections resting on a clock rather than an assertion were **73, 82, 88 and 100 across four runs of the configured scope on identical source**, against a runner timeout count that sat at 44 to 46 in the same four. The quantity moves with machine load and the single figure of 83 that an earlier draft of this row carried was one draw from that range, not the value. |
 
 ### What shapes the plan rather than the code
