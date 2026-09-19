@@ -27,6 +27,7 @@ It also lays the ground every later milestone stands on: the four rings and the 
 | S08 | the contract decode API | 3 | Move the pure decoders of CommitColumns out of core and into contracts, where the renderer can reach them (ADR-0002 decision 3, amended). |
 | S05 | graph table renderer | 4 | Recycled virtualised rows and the coalesced graph canvas, drawing layout buffers supplied as fixtures. |
 | S06 | open a repository | 5 | The composition root: open by argument or folder dialog, initial load, Load More, refresh, and the error page when git is missing. |
+| S09 | the mutation gate's two clocks | 5 | Choose the test runner's inner timeout, which was never set, and make it coherent with the mutation runner's budget, so the same source gets the same verdict at any machine load. |
 | S07 | budgets, baselines and render stability | 6 | The assembled application measured against every budget of ADR-0002, the baselines committed, and the golden-image question settled. |
 
 Scope and boundary of each slice live **only** in its task file (`AGENTS.md` §3).
