@@ -34,6 +34,20 @@
   "bundles": {
     "main.cjs": ["src/app/main.ts", "src/app/window.ts"],
     "preload.cjs": ["src/contracts/bridge.ts", "src/contracts/ipc.ts", "src/preload/bridge.ts"],
-    "renderer.js": ["src/contracts/bridge.ts", "src/ui/renderer.ts"]
+    "renderer.js": [
+      "src/contracts/bridge.ts",
+      "src/contracts/column-read.ts",
+      "src/contracts/commit-columns.ts",
+      "src/contracts/layout.ts",
+      "src/contracts/ref-list.ts",
+      "src/contracts/refs.ts",
+      "src/ui/geometry.ts",
+      "src/ui/graph-canvas.ts",
+      "src/ui/graph-table.ts",
+      "src/ui/palette.ts",
+      "src/ui/renderer.ts",
+      "src/ui/row-element.ts",
+      "src/ui/row-model.ts"
+    ]
   }
 }
