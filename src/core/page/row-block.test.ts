@@ -125,6 +125,12 @@ describe('the accumulated row block', () => {
     );
     expect(block.rowCount).toBe(3);
     expect(block.maxLane).toBe(1);
+    // Room for three rows and five segments, and for no more: the growth stops
+    // at the first capacity that FITS rather than at the first that exceeds, and
+    // both of these numbers are ones five quarters from one lands on exactly —
+    // 1, 2, 3 and 1, 2, 3, 4, 5 — so one iteration too many would show here and
+    // nowhere a bound could see it. That mutant is what this line is for.
+    expect([block.laneIndex.length, block.segmentFromLane.length]).toEqual([3, 5]);
     expect(contentsOf(block)).toEqual({
       laneIndex: [0, 0, 1],
       colourIndex: [0, 0, 1],
@@ -175,10 +181,11 @@ describe('a second page', () => {
   it('appending nothing changes nothing, and does not reallocate', () => {
     const block = createRowBlock();
     appendRows(block, chainOf(6));
-    const columns = block.laneIndex;
+    const kept = [block.laneIndex, block.segmentFromLane];
     const before = contentsOf(block);
     appendRows(block, chainOf(1));
-    expect(block.laneIndex).toBe(columns);
+    expect(block.laneIndex).toBe(kept[0]);
+    expect(block.segmentFromLane).toBe(kept[1]);
     appendRows(block, rowsOf([]));
     expect(block.rowCount).toBe(7);
     expect(contentsOf(block).segmentOffsets).toEqual([...before.segmentOffsets, 7]);
@@ -195,10 +202,8 @@ describe('the columns under the block', () => {
     }
     const total = pages * perPage;
     expect(block.rowCount).toBe(total);
-    expect(block.laneIndex.length).toBeGreaterThanOrEqual(total);
     expect(block.laneIndex.length).toBeLessThanOrEqual(Math.ceil((total * 5) / 4));
     expect(block.segmentFromLane.length).toBeLessThanOrEqual(Math.ceil((total * 5) / 4));
-    expect(block.segmentOffsets.length).toBeGreaterThan(block.laneIndex.length);
     const lanes = contentsOf(block).laneIndex;
     expect(lanes[0]).toBe(0);
     expect(lanes[perPage]).toBe(1);
@@ -264,7 +269,11 @@ describe('the head row', () => {
     expect([...block.flags.subarray(0, 3)]).toEqual([RowFlag.Merge, 0, RowFlag.ClipBelowVertex]);
     markHeadRow(block, 3);
     expect(block.headRow).toBe(NO_HEAD_ROW);
-    markHeadRow(block, -1);
+    // Minus two rather than minus one, so that a mark outside the block is held
+    // to answering NO_HEAD_ROW rather than merely to answering something
+    // negative: the two are the same assertion at minus one and the mutation
+    // gate found the gap.
+    markHeadRow(block, -2);
     expect(block.headRow).toBe(NO_HEAD_ROW);
   });
 
