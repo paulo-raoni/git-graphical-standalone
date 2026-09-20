@@ -26,11 +26,67 @@ import { defineConfig } from 'vitest/config';
  *
  * The numbers are a ratchet (`AGENTS.md` §11): they move up, and moving one down
  * is a commit that says why.
+ *
+ * ## The inner clock, and why this suite runs its files one at a time
+ *
+ * This suite is run two ways. `gates:unit` runs it once, alone. The mutation
+ * gate runs it **once per mutant**, seven copies at a time, which is Stryker's
+ * default concurrency on the eight-core development machine. Everything below is
+ * about the second way, and E01-M01-S09 measured all of it here by running the
+ * gate's own per-mutant command — `node node_modules/vitest/vitest.mjs run
+ * --reporter=dot --fsModuleCache` — in seven concurrent copies, which is that
+ * condition exactly.
+ *
+ * **`testTimeout` was never set, so every test ran under the framework's default
+ * of 5 000 ms, which nobody chose, and it fired.** Seven copies of a suite that
+ * itself spreads 21 files over as many workers is some 147 runnable threads on
+ * eight cores, and the scheduler's tail is long: over three batches of seven
+ * copies the slowest *healthy* test took 4.30 s, 4.06 s and 3.88 s against an
+ * idle 0.40 s, and **two of those 21 runs failed outright** on a test crossing
+ * 5 000 ms — 5.11 s and 6.26 s. A run that fails for that reason exits non-zero,
+ * and Stryker records the mutant as killed by a clock that says nothing about the
+ * mutant. That is the defect this configuration now fixes at its cause.
+ *
+ * **The cause is the nesting, so the fix is `fileParallelism: false`.** The
+ * mutation gate already saturates the machine with seven whole suites; the suite
+ * multiplying itself on top of that buys nothing and costs the tail. With the
+ * files run one at a time, measured over **57 concurrent runs in eight batches,
+ * 19 437 test observations and no failure at all**, the slowest healthy test was
+ * **1.07 s** — a quarter of what it was — and the per-copy wall clock was
+ * unchanged at 26 s, because the machine was the bottleneck either way. Under a
+ * deliberately tripled load (eight spinning processes beside the seven copies) it
+ * was **1.92 s** over a further 14 runs. What it costs is this suite run alone,
+ * where 21 workers do help: the gate's own command goes from 3.8–5.2 s to
+ * 8.4–9.4 s, and `gates:unit:modules`, which adds coverage, from 6.3 s to
+ * 11.3–14.0 s. That is about six seconds on a pipeline of an hour, paid so that
+ * both ways of running this suite are the same run.
+ *
+ * **`testTimeout` is 15 000 ms**: 7.8 times the slowest healthy test measured
+ * under that tripled load, 14 times the slowest measured without it, and about a
+ * ninth of the outer budget `stryker.config.json` sets over the whole command, so
+ * that an asynchronously hung test is caught here, by the clock that names the
+ * test, rather than there, by the clock that names nothing. It is one value for
+ * every run of this suite and not a mutation-only value: the mutation gate exists
+ * to measure what `gates:unit` runs, and two configurations would mean the two
+ * disagree about which test is hung. Alone, a generous inner clock costs one
+ * timeout on a test that hangs and nothing on any other run.
+ *
+ * `hookTimeout` is set to the same value and defaulted to 10 000 ms before.
+ * This suite has no `beforeAll`, `beforeEach` or `afterAll` today — grepped, not
+ * assumed — so the number is chosen in advance of the hook that will want it
+ * rather than left to be discovered by a hook crossing it.
+ *
+ * `vitest.fixtures.config.js` and `vitest.perf.config.js` already set their own
+ * timeouts explicitly, so this was the last run in the project still on a clock
+ * nobody picked.
  */
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
+    fileParallelism: false,
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
