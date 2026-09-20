@@ -25,7 +25,7 @@
   "jsonReporter": {
     "fileName": "reports/mutation/mutation.json"
   },
-  "timeoutMS": 60000,
+  "timeoutMS": 120000,
   "commandRunner": {
     "command": "node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache"
   }
