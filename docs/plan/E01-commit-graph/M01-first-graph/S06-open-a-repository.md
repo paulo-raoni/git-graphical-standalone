@@ -164,8 +164,13 @@ producing side.
   which is what makes the first screen full with somewhere to scroll rather than an immediate request for
   more. `graph-page.test.ts` holds the constant above that bound rather than at 300, so the assertion
   survives the decision moving and fails if it is lost. It is in that file and not in one of its own
-  because the mutation gate runs this suite once per mutant, and this lane measured four new test files
-  taking it from 3.8 to 6.2 seconds — which showed up in that gate's clock-share clause.
+  because the mutation gate runs this suite once per mutant, so whatever a test file costs is paid once per
+  mutant. This lane measured that on 2026-09-19, before E01-M01-S09 set `fileParallelism: false` and a
+  15 000 ms test timeout, with the suite on vitest's default 5 000 ms: four new test files took the gate's
+  per-mutant command from 3.65–3.88 s to 6.08–7.07 s on an idle machine (the message of commit `2020aee`), and
+  the gate's clock-share clause read 25.2 per cent against its cap of 25. Those numbers belong to that
+  condition. Under S09's settings the clause read 3.5 per cent at `6356c68`, with no kill carrying vitest's
+  test timeout, over four full runs — three by this lane, one by review round 15.
 - **The further page is sized against what a press costs**, which is the next section. Equal to the first is
   the size at which the *n*th press reads *n + 1* pages.
 
@@ -176,8 +181,9 @@ spelling of each to change, and there is one — with one exception, which is th
 
 `RepositoryReader.readPage` takes a page size and no offset (`src/ports/repository-reader.ts`), so **Load
 More asks for the whole page again, larger**: `pageSize` becomes the rows already laid out plus the count
-asked for. The alternative is to teach `src/adapters/` to skip, which was outside this lane's boundary and
-is reported in `AUDIT-S06-open-a-repository.md` rather than built.
+asked for. The alternative is a reader that can start a page at an offset, which was outside this lane's
+boundary and was raised rather than built; *What is not here* says what it is, why it can wait, and that it
+is not yet scheduled.
 
 **The layout stays incremental anyway, and that is the part worth understanding.** A re-read produces a
 fresh `CommitColumns`, but its prefix is the same commits in the same order, with the parents that were
@@ -247,8 +253,8 @@ measurements and not a third measurement.**
 **Where it stops being acceptable is a fact about presses, not about commits.** The *n*th press reads
 *n + 1* pages, so the total work over *n* presses is quadratic in *n* while each press stays linear in what
 is loaded. At the sizes this milestone is about — tens of pages — the fixed cost dominates and the numbers
-above are what a user meets. At a hundred presses it would not be, and the repair is an adapter that can
-skip, which is the finding this lane raised rather than built.
+above are what a user meets. At a hundred presses it would not be, and the repair is a reader that can
+start a page at an offset, which *What is not here* describes.
 
 ## The one number that is written twice
 
@@ -354,7 +360,12 @@ repository of any shape the committed generator knows into a directory of its ow
 - **Stash rows.** `RowFlag.Stash` is not set and no stash row is added; that is E01-M02.
 - **Settings, recent repositories, the repository dropdown, auto-refresh, keyboard shortcuts.**
 - **An adapter that can read a page at an offset**, which is what would make a press cost its own page
-  rather than everything before it. Raised in the audit; `src/adapters/` was outside this boundary.
+  rather than everything before it. It needs a `PageRequest` in `src/ports/` that can say where a page
+  starts and a git invocation in `src/adapters/` that skips the commits already read; both rings were
+  outside this boundary. It can wait because what it removes is quadratic in the number of presses, not in
+  commits: the five presses measured under *How a further page is read* did not cost measurably more at the
+  fifth than at the first. **It is not scheduled**: no milestone of `docs/PLAN.md` holds it at
+  `e6e1a3e`, and review round 15 left placing it to the owner.
 - **An append onto a history that has moved.** It was here until E01-M01-FIX-15; it is now refused. A
   Load More whose reading does not begin with the object names the block was laid out from is laid out
   whole, from a fresh block, as a Refresh is — `continuesBlock` in `src/core/page/` decides, and *How a
