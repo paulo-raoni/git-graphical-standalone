@@ -18,10 +18,14 @@ import type { RowBlock } from './row-block';
  * **What the shift costs, and why that is the right place to pay it.** It is one
  * copy of the block's nine columns per load — `2 + 1 + 1` bytes per row for the
  * lane, the colour and the flags, four more for the row's segment offset, and
- * `2 + 2 + 1` per segment — which at the 10 000 commits of the large fixture,
- * where the layout emits about four segments a row, is a few hundred kilobytes.
- * The page is copied once more anyway, by the structured clone that carries it
- * out of the utility process and again into the renderer
+ * `2 + 2 + 1` per segment. The 10 000-commit fixture is a straight chain, so its
+ * layout emits one segment a row: 10 000 rows and 10 000 segments, counted by
+ * review round 15 through the built application and by E01-M01-FIX-16 through
+ * this module in Node, which makes its copy 130 000 bytes. A braided history
+ * emits more segments a row; the S06 slice document, under *The page
+ * assembly*, gives the range and whose measurement it rests on. The page is
+ * copied once more anyway, by the structured clone that carries it out of the
+ * utility process and again into the renderer
  * (`docs/ADR-0002-architecture-and-performance.md` decision 2), so the shift is
  * one more copy of the same order as a copy the page already pays, on a path
  * that runs once per load and never once per frame. What it buys is that
