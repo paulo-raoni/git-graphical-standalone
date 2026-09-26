@@ -12,6 +12,7 @@ import type {
   OpenRepositoryResponse,
   RefreshRequest,
   RefreshResponse,
+  StartupRepositoryResponse,
 } from '../contracts/index';
 
 /**
@@ -28,6 +29,8 @@ async function request<TResponse>(channel: ChannelName, payload?: unknown): Prom
 }
 
 const bridge: GitGraphicalBridge = {
+  startupRepository: (): Promise<StartupRepositoryResponse> =>
+    request<StartupRepositoryResponse>(CHANNELS.startupRepository),
   openRepository: (openRequest: OpenRepositoryRequest): Promise<OpenRepositoryResponse> =>
     request<OpenRepositoryResponse>(CHANNELS.openRepository, openRequest),
   chooseFolder: (): Promise<ChooseFolderResponse> =>

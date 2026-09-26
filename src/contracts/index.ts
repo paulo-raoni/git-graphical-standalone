@@ -69,6 +69,8 @@ export type {
   OpenRepositoryResponse,
   RefreshRequest,
   RefreshResponse,
+  StartupRepository,
+  StartupRepositoryResponse,
 } from './ipc';
 
 export { RowFlag } from './layout';

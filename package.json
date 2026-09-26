@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "start": "run-s build start:electron",
+    "start": "npm run build && electron .",
     "start:electron": "electron .",
     "gates": "run-s gates:format gates:lint gates:boundaries gates:types gates:contract gates:unit gates:mutation gates:build gates:e2e gates:perf gates:size gates:licences gates:provenance gates:commits gates:placeholders",
     "gates:format": "prettier --check .",

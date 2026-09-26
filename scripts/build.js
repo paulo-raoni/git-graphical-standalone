@@ -29,13 +29,18 @@ const NODE_TARGET = 'node24';
 const CHROMIUM_TARGET = 'chrome152';
 
 /**
- * The three bundles.
+ * The four bundles.
  *
- * Main and preload are CommonJS: a sandboxed preload script is loaded by
- * Electron's own module system and cannot be an ES module, and keeping main the
- * same shape means both halves of the shell resolve `require('electron')` the
- * same way. Electron itself is external to both — it is provided by the runtime,
- * not by the bundle.
+ * Main, preload and the repository process are CommonJS: a sandboxed preload
+ * script is loaded by Electron's own module system and cannot be an ES module,
+ * and keeping the others the same shape means every half of the shell resolves
+ * `require` the same way. It also matters for the utility process specifically:
+ * `package.json` says `"type": "module"`, which is inherited by every `.js` file
+ * under the application directory, so a utility process built as `.js` would be
+ * loaded as an ES module by Node and a `.cjs` one is not — the extension is the
+ * whole of what decides it. Electron itself is external to all three; it is
+ * provided by the runtime, not by the bundle, and the repository process
+ * imports none of it.
  *
  * The renderer is an immediately invoked function rather than a module, because
  * a `type="module"` script is fetched under cross-origin rules that a document
@@ -46,6 +51,14 @@ const bundles = [
   {
     name: 'main.cjs',
     entryPoints: [join(sourceRoot, 'app', 'main.ts')],
+    platform: 'node',
+    format: 'cjs',
+    target: NODE_TARGET,
+    external: ['electron'],
+  },
+  {
+    name: 'repository.cjs',
+    entryPoints: [join(sourceRoot, 'app', 'repository-host.ts')],
     platform: 'node',
     format: 'cjs',
     target: NODE_TARGET,
@@ -90,7 +103,7 @@ function bundleOutput(metafile) {
 }
 
 /**
- * Build the three bundles and copy the two documents into `outputRoot`, and
+ * Build the four bundles and copy the two documents into `outputRoot`, and
  * return what esbuild says it produced.
  *
  * Production output drops the source maps and minifies; development output

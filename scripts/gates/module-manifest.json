@@ -32,8 +32,46 @@
     }
   },
   "bundles": {
-    "main.cjs": ["src/app/main.ts", "src/app/window.ts"],
+    "main.cjs": [
+      "src/app/handlers.ts",
+      "src/app/main.ts",
+      "src/app/repository-client.ts",
+      "src/app/startup.ts",
+      "src/app/window.ts",
+      "src/contracts/ipc.ts",
+      "src/contracts/result.ts"
+    ],
     "preload.cjs": ["src/contracts/bridge.ts", "src/contracts/ipc.ts", "src/preload/bridge.ts"],
+    "repository.cjs": [
+      "src/adapters/git-commands.ts",
+      "src/adapters/git-executable.ts",
+      "src/adapters/git-page.ts",
+      "src/adapters/git-process.ts",
+      "src/adapters/git-repository-reader.ts",
+      "src/app/repository-host.ts",
+      "src/contracts/column-read.ts",
+      "src/contracts/layout.ts",
+      "src/contracts/refs.ts",
+      "src/contracts/result.ts",
+      "src/core/layout/lane-layout.ts",
+      "src/core/layout/open-lanes.ts",
+      "src/core/layout/segment-buffer.ts",
+      "src/core/page/graph-page.ts",
+      "src/core/page/row-block.ts",
+      "src/core/parse/bytes.ts",
+      "src/core/parse/commit-log.ts",
+      "src/core/parse/commit-lookup.ts",
+      "src/core/parse/object-names.ts",
+      "src/core/parse/raw-date.ts",
+      "src/core/parse/records.ts",
+      "src/core/parse/reference-list.ts",
+      "src/core/parse/reference-records.ts",
+      "src/core/parse/working-tree-status.ts",
+      "src/core/store/commit-store.ts",
+      "src/core/store/growth.ts",
+      "src/core/store/hash-index.ts",
+      "src/core/store/pending-parents.ts"
+    ],
     "renderer.js": [
       "src/contracts/bridge.ts",
       "src/contracts/column-read.ts",
@@ -41,13 +79,16 @@
       "src/contracts/layout.ts",
       "src/contracts/ref-list.ts",
       "src/contracts/refs.ts",
+      "src/contracts/result.ts",
       "src/ui/geometry.ts",
       "src/ui/graph-canvas.ts",
       "src/ui/graph-table.ts",
       "src/ui/palette.ts",
       "src/ui/renderer.ts",
       "src/ui/row-element.ts",
-      "src/ui/row-model.ts"
+      "src/ui/row-model.ts",
+      "src/ui/shell.ts",
+      "src/ui/status-text.ts"
     ]
   }
 }

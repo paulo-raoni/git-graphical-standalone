@@ -51,6 +51,15 @@ const EMPTY_STATE_MESSAGE = 'No repository is open.';
 /** What the control below the last row says. */
 const LOAD_MORE_LABEL = 'Load More Commits';
 
+/**
+ * What it says while the load it started is running.
+ *
+ * The control that started a request is the one that reports it, so this belongs
+ * to the control and not to the bar: a person who pressed Load More is watching
+ * the foot of the table, not the top of the window.
+ */
+const LOADING_LABEL = 'Loading…';
+
 /** The five column headings, left to right. */
 const HEADINGS = ['Graph', 'Description', 'Date', 'Author', 'Commit'];
 
@@ -68,6 +77,17 @@ export interface GraphTableView {
   readonly showPage: (page: GraphPage) => void;
   /** Register the listener the Load More Commits control calls. */
   readonly onLoadMore: (listener: () => void) => void;
+  /**
+   * Disable the Load More Commits control and say a load is running, or put it
+   * back.
+   *
+   * The view still starts nothing and waits for nothing: S06 owns everything
+   * that loads, and this is how it reports one on the control that asked for it.
+   * It is here rather than in the caller because the element belongs to this
+   * module, and a caller reaching into the document for `.graph__more` would be
+   * a second place that knows how a row of this view is spelled.
+   */
+  readonly setLoadingMore: (loading: boolean) => void;
 }
 
 /** The elements the view is made of, found once so that no frame looks them up. */
@@ -312,6 +332,10 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     },
     onLoadMore: (listener: () => void): void => {
       state.listener = listener;
+    },
+    setLoadingMore: (loading: boolean): void => {
+      parts.more.disabled = loading;
+      parts.more.textContent = loading ? LOADING_LABEL : LOAD_MORE_LABEL;
     },
   };
 }
