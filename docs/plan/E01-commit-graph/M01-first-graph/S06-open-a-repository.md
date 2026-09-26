@@ -75,11 +75,14 @@ Refresh of the 10 000-commit fixture, overtaken by an Open of a three-commit one
 small repository's name and then fail the next Load More as if git had. A Refresh and a Load More of the
 *same* repository are not dropped for overtaking each other: each answers a whole page of the repository the
 state holds and leaves the state matching it, and the window draws the one that arrives last. Measured by
-FIX-14's executor on 2026-09-26, driving round 15's sequence through the built application with the large
-fixture grown to all 10 000 commits: with the host of `6356c68` the window showed 10 000 rows under the small
-repository's path in three runs of three; with the guard it showed the small repository's three rows in
-fifteen runs of fifteen, and over the bridge the host answered an overtaken Refresh `cancelled` in all
-fifteen and an overtaken Load More `cancelled` in the five that raced one.
+FIX-14's first executor session on 2026-09-26, driving round 15's sequence through the built application with
+the large fixture grown to all 10 000 commits: with the host of `6356c68` the window showed 10 000 rows under
+the small repository's path in three runs of three; with the guard it showed the small repository's three
+rows in fifteen runs of fifteen, and over the bridge the host answered an overtaken Refresh `cancelled` in
+all fifteen and an overtaken Load More `cancelled` in the five that raced one. That sequence is now
+`test/e2e/superseded-reply.spec.ts`, which requires the ordering to have occurred rather than assuming it.
+FIX-14's second session ran it as committed red in three runs of three with `6356c68`'s host planted back,
+and green in ten runs of ten without it.
 
 **What crosses, and in what form.** A `GraphPage` crosses twice, once by `MessagePort` from the utility
 process to main and once by `ipcRenderer.invoke` from main to the renderer. Both are structured clones, and
