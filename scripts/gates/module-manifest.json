@@ -56,6 +56,7 @@
       "src/core/layout/lane-layout.ts",
       "src/core/layout/open-lanes.ts",
       "src/core/layout/segment-buffer.ts",
+      "src/core/page/continues-block.ts",
       "src/core/page/graph-page.ts",
       "src/core/page/row-block.ts",
       "src/core/parse/bytes.ts",

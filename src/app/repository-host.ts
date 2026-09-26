@@ -3,7 +3,7 @@ import { FailureKind } from '../contracts/index';
 import type { GraphPage, Result } from '../contracts/index';
 import { createLayoutState, layoutPage } from '../core/layout/index';
 import type { LayoutState } from '../core/layout/index';
-import { addPage, createRowBlock, FIRST_PAGE_COMMITS } from '../core/page/index';
+import { addPage, continuesBlock, createRowBlock, FIRST_PAGE_COMMITS } from '../core/page/index';
 import type { RowBlock } from '../core/page/index';
 import type { ReaderDescription, RepositoryPage } from '../ports/index';
 
@@ -21,8 +21,9 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * file is that process's whole program. It imports no Electron module — a
  * utility process has none — and talks over `process.parentPort` alone.
  *
- * It owns exactly three things for as long as a repository is open: the reader,
- * the accumulated row block, and the layout state — and, for as long as it runs,
+ * It owns exactly four things for as long as a repository is open: the reader,
+ * the accumulated row block, the layout state, and the object names the block
+ * was laid out from — and, for as long as it runs,
  * a count of the opens asked for, which is how a late reply is recognised (see
  * *What can be in flight at once* below). The commit store is inside
  * the reader's answer and is rebuilt by every read; see *How a further page is
@@ -40,14 +41,24 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * looks worse than it is. It costs one walk of everything loaded so far per
  * press: the *n*th press reads *n + 1* pages of log, so the presses are linear
  * and the total is quadratic in the number of presses. What it buys is that the
- * layout stays **incremental anyway**. A re-read produces a fresh
- * `CommitColumns` whose prefix is the same commits in the same order, with the
- * parents that were `UNKNOWN_INDEX` now resolved — which is exactly the shape
- * `layoutPage` expects of an appended page, because the lanes it left open
- * remember the *entry of `parentIndices`* they are waiting on and re-read it
- * (S04's slice document, *Appending a page*). So a press lays out only its new
- * rows, and `src/core/page/` appends only those rows, however the commits
- * arrived.
+ * layout stays **incremental anyway**. A re-read of a repository that has not
+ * changed produces a fresh `CommitColumns` whose prefix is the same commits in
+ * the same order, with the parents that were `UNKNOWN_INDEX` now resolved —
+ * which is exactly the shape `layoutPage` expects of an appended page, because
+ * the lanes it left open remember the *entry of `parentIndices`* they are waiting
+ * on and re-read it (S04's slice document, *Appending a page*). So a press lays
+ * out only its new rows, and `src/core/page/` appends only those rows, however
+ * the commits arrived.
+ *
+ * **Only if the repository has not changed**, and nothing but the reading can
+ * say whether it has: a commit, a fetch, a new branch or a rebase between two
+ * reads moves the log. So every reading a Load More applies is first put to
+ * `continuesBlock`, against the object names the block was laid out from, which
+ * {@link OpenRepository.laidOutFrom} keeps; a reading that does not begin with
+ * them is laid out whole, from a fresh block and a fresh layout state, exactly
+ * as a Refresh lays out its own. The press then costs the layout of every row it
+ * returns rather than of its new rows alone, once, and the page it answers is
+ * the repository as it now is.
  *
  * The figures are in
  * `docs/plan/E01-commit-graph/M01-first-graph/S06-open-a-repository.md`.
@@ -61,19 +72,26 @@ const reader = createGitRepositoryReader();
  *
  * **Its identity is the repository's identity.** An open makes a new one and
  * nothing else does: a Refresh replaces the block and the layout *inside* it,
- * and a Load More appends to them. So `open` still being the object a request
- * captured before its read is exactly "nothing was opened meanwhile", which is
- * what *What can be in flight at once* below turns on.
+ * and a Load More appends to them or, when the repository has changed, replaces
+ * them too. So `open` still being the object a request captured before its read
+ * is exactly "nothing was opened meanwhile", which is what *What can be in flight
+ * at once* below turns on.
  */
 interface OpenRepository {
   /** The path the repository was opened by, which every later read repeats. */
   readonly path: string;
   /** Which open made this, counted in the order opens were asked for. */
   readonly ticket: number;
-  /** Every row laid out so far, appended to and never recomputed. */
+  /** Every row laid out so far, appended to while the history stays the same. */
   block: RowBlock;
   /** The open lanes the next page continues from. */
   layout: LayoutState;
+  /**
+   * The object names of the reading `block` was last laid out from — its
+   * `CommitColumns.hashes`, held rather than copied — which is what a further
+   * reading must begin with to be appended.
+   */
+  laidOutFrom: Uint8Array;
 }
 
 let open: OpenRepository | null = null;
@@ -119,10 +137,21 @@ function failed(kind: FailureKind, message: string): Result<never> {
   return { ok: false, kind, message };
 }
 
-/** Lay out the new rows of `read`, append them, and produce the page. */
+/**
+ * Lay out the new rows of `read`, append them, remember what they were laid out
+ * from, and produce the page.
+ */
 function assemble(repository: OpenRepository, read: RepositoryPage): Result<GraphPage> {
   const rows = layoutPage(repository.layout, read.commits, repository.block.rowCount);
-  return { ok: true, value: addPage(repository.block, rows, read) };
+  const page = addPage(repository.block, rows, read);
+  repository.laidOutFrom = read.commits.hashes;
+  return { ok: true, value: page };
+}
+
+/** Forget every row laid out, so that the next reading is laid out whole. */
+function startOver(repository: OpenRepository): void {
+  repository.block = createRowBlock();
+  repository.layout = createLayoutState();
 }
 
 /**
@@ -151,12 +180,22 @@ async function openRepository(path: string): Promise<Result<GraphPage>> {
     ticket,
     block: createRowBlock(),
     layout: createLayoutState(),
+    laidOutFrom: new Uint8Array(0),
   };
   open = repository;
   return assemble(repository, read.value);
 }
 
-/** Read `count` more commits of the open repository and append their rows. */
+/**
+ * Read `count` more commits of the open repository and append their rows — or,
+ * if the repository has changed since the block was laid out, lay out every row
+ * of the new reading instead.
+ *
+ * The reading is asked for at the size the block would grow to, so either way
+ * the page answered holds every commit read, which is at least as many as were
+ * asked for while the repository has them. What decides between the two is
+ * `continuesBlock` alone; see *How a further page is read* above.
+ */
 async function loadMore(count: number): Promise<Result<GraphPage>> {
   const repository = open;
   if (repository === null) {
@@ -169,6 +208,9 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
   }
   if (!read.ok) {
     return read;
+  }
+  if (!continuesBlock(repository.block, repository.laidOutFrom, read.value.commits)) {
+    startOver(repository);
   }
   return assemble(repository, read.value);
 }
@@ -200,8 +242,7 @@ async function refresh(): Promise<Result<GraphPage>> {
   if (!read.ok) {
     return read;
   }
-  repository.block = createRowBlock();
-  repository.layout = createLayoutState();
+  startOver(repository);
   return assemble(repository, read.value);
 }
 
