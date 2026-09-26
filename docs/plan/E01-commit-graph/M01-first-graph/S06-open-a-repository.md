@@ -313,6 +313,12 @@ disabled and says what it is doing — `Opening…`, `Refreshing…`, `Loading�
 so a failed request leaves a usable control rather than a dead one. Nothing polls and no timer is
 registered: every request starts from the document loading, a click, or the view's Load More intent.
 
+**An Open resets the scroll offset and nothing else does:** the reply to an Open — of another repository or
+of the one already open — is drawn by `GraphTableView.showOpenedPage(page)`, a member E01-M01-FIX-17 added
+beside `showPage(page)` that sets the table's `scrollTop` to 0, while the replies to Refresh and Load More go
+to `showPage`, which keeps the offset; `test/e2e/open-scroll.spec.ts` requires the reset for both kinds of
+Open and the kept offset for Refresh, and `test/e2e/open-repository.spec.ts` the kept offset for Load More.
+
 A dismissed folder chooser is `FailureKind.Cancelled` and shows nothing at all, because
 `src/contracts/result.ts` calls dismissal an outcome rather than an error.
 
