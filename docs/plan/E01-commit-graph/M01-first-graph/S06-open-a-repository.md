@@ -219,8 +219,9 @@ sequence and requires the Load More reply's layout to equal the following Refres
 - **Time per press.** The comparison over 9 700 loaded rows took **0.29 to 2.6 ms** in twenty runs; the
   read of 10 000 commits it sits beside took **369 to 411 ms** in the same runs.
 - **Time when it rebuilds.** Laying out all 10 000 rows took 0.5 to 3.5 ms in ten runs, against 0.1 to
-  0.5 ms for appending the last 300. That is the fixture's straight chain; S04 measured a braided shape
-  laying out slower, and this fix did not measure a rebuild over one.
+  0.5 ms for appending the last 300. That is the fixture's straight chain; S04 counted 17.06 units of
+  layout work a row on its braided shape against 5.00 on a chain, and this fix did not time a rebuild over
+  a braided history.
 
 **What it costs, measured.** `test/e2e/open-repository.spec.ts` presses Load More five times over the
 bridge on the 10 000-commit fixture, 300 commits a press, timing each round trip with `performance.now()`
