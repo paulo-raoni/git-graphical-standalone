@@ -38,9 +38,18 @@ import { defineConfig } from 'vitest/config';
  * condition exactly.
  *
  * **`testTimeout` was never set, so every test ran under the framework's default
- * of 5 000 ms, which nobody chose, and it fired.** Seven copies of a suite that
- * itself spreads 21 files over as many workers is some 147 runnable threads on
- * eight cores, and the scheduler's tail is long: over three batches of seven
+ * of 5 000 ms, which nobody chose, and it fired.** Each copy runs its files in
+ * vitest's own pool of workers, which vitest 5.0.0 sizes in a run, unless told
+ * otherwise, at `os.availableParallelism() - 1` (`resolveMaxWorkers` in
+ * `node_modules/vitest/dist/chunks/index.*.js`): seven here. So seven copies,
+ * each running its files seven at a time, were some 49 worker processes on
+ * eight cores. Review round 15 counted that pool, and E01-M01-FIX-16 counted it
+ * again at `e6e1a3e`, by sampling the process table every 100 ms through one
+ * run of `node node_modules/vitest/vitest.mjs run --reporter=dot`: at most seven
+ * children running `vitest/dist/workers/forks.js` with `--fileParallelism`, one
+ * with `--no-fileParallelism`. The suite had 21 files when S09 measured what
+ * follows and has 25 at `e6e1a3e`; the pool is seven either way. The
+ * scheduler's tail is long: over three batches of seven
  * copies the slowest *healthy* test took 4.30 s, 4.06 s and 3.88 s against an
  * idle 0.40 s, and **two of those 21 runs failed outright** on a test crossing
  * 5 000 ms — 5.11 s and 6.26 s. A run that fails for that reason exits non-zero,
@@ -56,7 +65,7 @@ import { defineConfig } from 'vitest/config';
  * unchanged at 26 s, because the machine was the bottleneck either way. Under a
  * deliberately tripled load (eight spinning processes beside the seven copies) it
  * was **1.92 s** over a further 14 runs. What it costs is this suite run alone,
- * where 21 workers do help: the gate's own command goes from 3.8–5.2 s to
+ * where seven workers do help: the gate's own command goes from 3.8–5.2 s to
  * 8.4–9.4 s, and `gates:unit:modules`, which adds coverage, from 6.3 s to
  * 11.3–14.0 s. That is about six seconds on a pipeline of an hour, paid so that
  * both ways of running this suite are the same run.

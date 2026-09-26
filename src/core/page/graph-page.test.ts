@@ -246,18 +246,29 @@ describe('the assembled page', () => {
  *
  * The first is that a page is worth drawing. The window opens at 800 pixels tall
  * and a row is 24 of them, so a first page shorter than 34 rows would open on a
- * view that is already asking for more. The 800 and the 24 are written here
- * rather than imported, because `src/core/` may not name `src/ui/`; they are
- * `src/ui/geometry.ts`'s `ROW_HEIGHT` and `src/app/window.ts`'s `INITIAL_HEIGHT`,
- * and if either moves this bound is what says so.
+ * view that is already asking for more. The 800 and the 24 are copies, written
+ * here as literals because a file in `src/core/` may import neither `src/ui/`
+ * nor `src/app/` (`.dependency-cruiser.cjs`): they copy `src/ui/geometry.ts`'s
+ * `ROW_HEIGHT` and `src/app/window.ts`'s `INITIAL_HEIGHT`, and nothing ties them
+ * to those sources. If either moves, this bound stays green and goes on testing
+ * the old numbers.
  *
  * The second is that the two sizes are equal, which is what makes the *n*th
  * press of Load More read *n + 1* pages under the re-read this slice chose.
  *
  * They are in this file rather than beside `./page-sizes.ts` because a test file
- * is not free: the mutation gate runs this suite once per mutant, this lane
- * measured four more files taking it from 3.8 to 6.2 seconds, and that showed up
- * in the gate's clock-share clause. Three assertions do not need a file.
+ * is not free: the mutation gate runs this suite once per mutant, so whatever a
+ * file costs is paid once per mutant too. The S06 lane measured it on
+ * 2026-09-19, as the message of commit `2020aee` records, with the suite still
+ * on vitest's default 5 000 ms test timeout and running its files in parallel,
+ * which is before E01-M01-S09 set `fileParallelism: false` and a 15 000 ms
+ * timeout: four more files took the gate's per-mutant command from 3.65–3.88 s
+ * to 6.08–7.07 s on an idle machine, the cost being transform and import rather
+ * than the tests, and the gate's clock-share clause read 25.2 per cent against
+ * its cap of 25. Those numbers belong to that condition. Under S09's settings
+ * the clause read 3.5 per cent at `6356c68`, with no kill carrying vitest's
+ * test timeout, over four full runs, three by the S06 lane and one by review
+ * round 15. Three assertions still do not need a file.
  */
 describe('the page sizes', () => {
   it('are whole numbers of commits', () => {

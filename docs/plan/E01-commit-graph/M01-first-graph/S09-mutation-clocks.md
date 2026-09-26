@@ -50,8 +50,15 @@ doing nothing but adding tests.
 ## The inner clock, and why the fix is not only a bigger number
 
 A bigger `testTimeout` alone would have raised the bar over a tail rather than removed what produces it. The
-tail is produced by nesting: the gate runs **seven** copies of a suite that itself spreads 21 files over as
-many workers, which is some 147 runnable threads on eight cores. So the first half of the fix is
+tail is produced by nesting: the gate runs **seven** copies of a suite that itself runs its files in a pool of
+workers, which vitest 5.0.0 sizes in a run, unless told otherwise, at `os.availableParallelism() - 1`
+(`resolveMaxWorkers` in `node_modules/vitest/dist/chunks/index.*.js`) — seven on this machine. Seven copies,
+each running seven files at a time, are some **49** worker processes on eight cores. Review round 15 counted
+that pool by sampling the process table every 100 ms through one run of
+`node node_modules/vitest/vitest.mjs run --reporter=dot`, and E01-M01-FIX-16 counted it again the same way at
+`e6e1a3e`: at most seven children running `vitest/dist/workers/forks.js` with `--fileParallelism`, one with
+`--no-fileParallelism`. The suite had 21 test files when this lane measured, which is the "21 files" of the
+tables below, and has 25 at `e6e1a3e`; the pool is seven either way. So the first half of the fix is
 `fileParallelism: false` — the mutation gate already saturates the machine, and the suite multiplying itself
 on top of that buys nothing and costs the tail.
 
@@ -59,7 +66,7 @@ Measured the same way, seven concurrent copies of the same command with the file
 
 | how the suite is scheduled | copies run | test observations | copies that failed | slowest test that passed |
 | --- | --- | --- | --- | --- |
-| 21 files in parallel (before) | 21, in 3 batches | 7 161 | **2** | 4.30 s |
+| 21 files, seven at a time (before) | 21, in 3 batches | 7 161 | **2** | 4.30 s |
 | one file at a time (after) | 57, in 8 batches | 19 437 | 0 | **1.07 s** |
 | one file at a time, machine deliberately loaded | 14, in 2 batches | 4 774 | 0 | **1.92 s** |
 
@@ -89,9 +96,9 @@ which is the concurrency divided by what one copy of the suite costs while that 
 
 | scheduling | concurrency | batch wall clock | mutants per second | slowest test that passed |
 | --- | --- | --- | --- | --- |
-| 21 files in parallel | 7 | 26.6 s (26.2–27.2) | 0.263 | 4.30 s |
-| 21 files in parallel | 4 | 14.7 s (14.2–15.2) | 0.272 | 2.62 s |
-| 21 files in parallel | 2 | 8.3 s | 0.241 | 0.70 s |
+| 21 files, seven at a time | 7 | 26.6 s (26.2–27.2) | 0.263 | 4.30 s |
+| 21 files, seven at a time | 4 | 14.7 s (14.2–15.2) | 0.272 | 2.62 s |
+| 21 files, seven at a time | 2 | 8.3 s | 0.241 | 0.70 s |
 | one file at a time | 7 | 26.9 s (25.1–29.8) | 0.260 | 1.07 s |
 
 **Throughput is flat from two concurrent suites to seven**, because the machine is saturated either way, so
