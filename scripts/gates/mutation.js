@@ -64,10 +64,15 @@ import { repositoryRoot, report } from './tree.js';
  *
  * There are two clocks over every mutant run and only one of them is Stryker's.
  * `stryker.config.json` sets `timeoutMS`, which bounds the whole per-mutant
- * command; `vitest.config.js` sets no `testTimeout`, so vitest's own default
- * applies to each test **inside** that command. The inner clock is much the
- * shorter of the two, so it fires first: the test fails, the suite exits
- * non-zero, and Stryker records `Killed` rather than `Timeout`.
+ * command; `vitest.config.js` sets `testTimeout`, which bounds each test
+ * **inside** that command. Both values were chosen by E01-M01-S09, and they and
+ * the measurements behind them are recorded in
+ * `docs/plan/E01-commit-graph/M01-first-graph/S09-mutation-clocks.md` rather
+ * than repeated here, so that there is one copy of each number. Before S09 the
+ * inner clock was vitest's own default, which nobody chose, and FIX-10's
+ * measurements below were taken under that default. The inner clock is much the
+ * shorter of the two, so when a clock fires it is that one: the test fails, the
+ * suite exits non-zero, and Stryker records `Killed` rather than `Timeout`.
  *
  * E01-M01-FIX-10 measured the gap on its own full run of the configured scope,
  * unnarrowed, at the commit this lane was cut from: of 1183 mutants, **44 were
@@ -117,11 +122,43 @@ import { repositoryRoot, report } from './tree.js';
  * says a run ran out of time. A killed mutant matching the broad reading and not
  * the narrow one **refuses the build** with the output quoted, so a vitest that
  * rewords its message turns this gate red and readable instead of turning the
- * share back down to Stryker's `Timeout` count alone. Measured for FIX-10: the
- * strings `timeout` and `timed out` appear nowhere in `src/`, `test/` or `perf/`,
- * so no test name or assertion message of this project can match the broad
- * reading; and across four full runs — 4540 kills, the first read offline and the
- * other three with this clause live — **none** matched broad without narrow.
+ * share back down to Stryker's `Timeout` count alone. Grepped by E01-M01-FIX-13
+ * on 2026-09-26, with `CLOCK_WORDS` itself as the pattern over `src/`, `test/` and
+ * `perf/`: exactly one match, `test/e2e/open-repository.spec.ts` line 343, a
+ * Playwright `{ timeout: 60_000 }` that E01-M01-S06 added. That file belongs to
+ * the end-to-end suite, and Stryker does not run it: the per-mutant command runs
+ * the suite `vitest.config.js` includes, `src/**` test files only, where the same
+ * grep found nothing. So no test name or assertion message of the suite this gate
+ * reads can match the broad reading. Measured for FIX-10, and not re-measured
+ * since: across four full runs — 4540 kills, the first read offline and the other
+ * three with this clause live — **none** matched broad without narrow.
+ *
+ * **Lines vitest's worker pool prints about its own workers are not read by the
+ * broad reading.** They begin `[vitest-pool]:`, sometimes after `Error: `, and say
+ * how a worker started, failed or took to stop — `Timeout terminating forks worker
+ * for test files …` among them — which is a statement about the machine and not
+ * about any test. Measured by E01-M01-S06 and by E01-M01's fifteenth review round,
+ * not by the lane that wrote this paragraph: five full runs of identical source,
+ * three refused by this clause on a different mutant each time, and in each
+ * refusal the line that matched was such a line, beside a failing test. So
+ * `POOL_LINE` removes those lines before `CLOCK_WORDS` is applied, and removes
+ * nothing else; the narrow reading, the failing-test counter and the excerpt
+ * still read the whole output, and a timeout sentence anywhere else, including
+ * the stack or cause printed under a pool error, still refuses. The failing-test
+ * counter is deliberately **not** the way out: a reworded test timeout fails its
+ * test too, so `Tests 1 failed` is exactly what the case this clause exists for
+ * looks like.
+ *
+ * What the exclusion gives up is a future pool line that does mean a test ran out
+ * of time: it would no longer refuse on its own wording. Read from the pinned
+ * vitest 5.0.0 by FIX-13, the pool has six such messages, all in one module of
+ * its node side; two of them carry a timeout word, and both are the pool's own
+ * clocks on starting and on stopping a worker. The per-test clock and its `timed
+ * out in <n>ms` live in the test runner, in a different module that runs inside
+ * the worker, and a test that crosses it reports through its own failure, not
+ * through the pool. A pool line that did one day mean a test ran out of time
+ * would still be read by what the rest of the run says: the narrow reading if
+ * the test's own message is there, and the no-failure count if nothing failed.
  *
  * ## A kill that names no failing test
  *
@@ -268,6 +305,13 @@ const VITEST_CLOCK = /\b(?:test|hook) timed out in \d+ ?ms\b/i;
 /** Any wording that says a run ran out of time: the broad reading. See the header. */
 const CLOCK_WORDS = /\btime[ds]?[ -]?outs?\b/i;
 
+/**
+ * A line vitest's worker pool prints about its own workers, never about a test:
+ * `[vitest-pool]:` at the start, sometimes after `Error: `. Removed from what the
+ * broad reading reads, and from nothing else. See the header.
+ */
+const POOL_LINE = /^[^\S\r\n]*(?:Error: )?\[vitest-pool\]:.*$/gm;
+
 /** Vitest's summary counter, which is where a run says a test actually failed. */
 const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
 
@@ -320,11 +364,16 @@ function nameOf(file, line, column, mutator, replacement) {
  *
  * `clock` and `unreadable` are the narrow and broad readings of the header's
  * predicate and are deliberately exclusive: a kill the narrow reading recognises
- * is counted, and one only the broad reading recognises refuses the build.
+ * is counted, and one only the broad reading recognises refuses the build. The
+ * broad reading skips the worker pool's own lines, and that skip is the line the
+ * refusal's honesty hinges on in both directions: widen `POOL_LINE` and a
+ * reworded test timeout passes as an assertion, drop it and a worker that was
+ * slow to stop refuses a correct run.
  */
 const READINGS = {
   clock: (reason) => VITEST_CLOCK.test(reason),
-  unreadable: (reason) => !VITEST_CLOCK.test(reason) && CLOCK_WORDS.test(reason),
+  unreadable: (reason) =>
+    !VITEST_CLOCK.test(reason) && CLOCK_WORDS.test(reason.replace(POOL_LINE, '')),
   noFailure: (reason) => !FAILING_TESTS.test(reason),
 };
 
