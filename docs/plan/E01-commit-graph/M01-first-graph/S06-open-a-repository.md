@@ -116,6 +116,7 @@ export function markHeadRow(block: RowBlock, row: number): void;
 export function layoutRowsOf(block: RowBlock, withUncommittedRow: boolean): LayoutRows;
 export function graphPageOf(block: RowBlock, read: RepositoryPage): GraphPage;
 export function addPage(block: RowBlock, rows: LayoutRows, read: RepositoryPage): GraphPage;
+export function continuesBlock(block: RowBlock, laidOutFrom: Uint8Array, reading: CommitColumns): boolean;
 ```
 
 It is in `core/` and not in the wiring because it holds three decisions, each of which can be wrong.
@@ -187,6 +188,39 @@ document, *Appending a page*). So a press lays out only its new rows and `src/co
 those rows, however the commits arrived. `src/core/page/row-block.test.ts` states that as a property: the
 same braided history laid out in one piece and in two halves produces a block whose seven columns are equal
 entry for entry, and the first half's entries are the ones the whole page has in those positions.
+
+**When a press lays out everything instead of appending.** The prefix is the same only while the repository
+is. A commit, a fetch, a new branch or a rebase between the read that built the block and the press moves
+the log, and an append would then put new rows under rows laid out for a history that is no longer the one
+on screen. Review round 15 measured that at `6356c68`: a branch cut at `main~100` of the 10 000-commit
+fixture and one commit on it, then Load More, answered the right 600 commits under a straight line in one
+lane, where a Refresh a moment later drew the new commit on its own lane. So every reading a Load More
+applies is first put to `continuesBlock`, in `src/core/page/continues-block.ts`, which is true when the first
+`block.rowCount` object names of `reading` are those of `laidOutFrom`, in order. `laidOutFrom` is the
+`CommitColumns.hashes` of the reading the block was last laid out from, which `src/app/repository-host.ts`
+keeps beside the block; the same object names in the same order are the same commits with the same parents,
+because a name is a digest of its commit. When it answers false the host starts from a fresh block and a
+fresh layout state and lays out the whole reading, which is what a Refresh does, so the page holds every
+commit read — as many as were asked for while the repository has them. The window draws that reply like any
+other: the scroll offset is kept in pixels, and **any row may change, the rows above the fold included**,
+because every row was laid out again. In round 15's sequence every row moved down one under the new commit,
+and the hundred commits of `main` above the fork moved to a second lane; driven through the built
+application by this fix's executor on 2026-09-26, the row at a 40-row offset read `commit 9960` before the
+press and `commit 9961` after it, at the same offset. `test/e2e/stale-load-more.spec.ts` drives round 15's
+sequence and requires the Load More reply's layout to equal the following Refresh's column for column.
+
+**What the check costs**, measured by this fix's executor on 2026-09-26 with a scratch script over
+`createGitRepositoryReader` and the 10 000-commit fixture, in Node 24 rather than inside the utility process:
+
+- **Memory.** Holding the `hashes` view keeps its whole buffer, which the store sizes to the page asked
+  for: 200 000 bytes with 10 000 commits loaded, and 206 000 when a press asks for 10 300 of a repository
+  that has 10 000. Holding the previous reading instead would keep 600 008 bytes of its ten columns and
+  217 788 bytes of subjects at the same size, for the sake of one column. Nothing is copied to keep it.
+- **Time per press.** The comparison over 9 700 loaded rows took **0.29 to 2.6 ms** in twenty runs; the
+  read of 10 000 commits it sits beside took **369 to 411 ms** in the same runs.
+- **Time when it rebuilds.** Laying out all 10 000 rows took 0.5 to 3.5 ms in ten runs, against 0.1 to
+  0.5 ms for appending the last 300. That is the fixture's straight chain; S04 measured a braided shape
+  laying out slower, and this fix did not measure a rebuild over one.
 
 **What it costs, measured.** `test/e2e/open-repository.spec.ts` presses Load More five times over the
 bridge on the 10 000-commit fixture, 300 commits a press, timing each round trip with `performance.now()`
@@ -320,8 +354,8 @@ repository of any shape the committed generator knows into a directory of its ow
 - **Settings, recent repositories, the repository dropdown, auto-refresh, keyboard shortcuts.**
 - **An adapter that can read a page at an offset**, which is what would make a press cost its own page
   rather than everything before it. Raised in the audit; `src/adapters/` was outside this boundary.
-- **A check that the prefix a re-read returns is the prefix the block was built from.** A commit made
-  between a press and the press before it moves the log, and the append would then be an append onto rows
-  that have shifted. Refresh is the remedy and it is one click; the finding is in the audit with what it
-  would cost to close.
+- **An append onto a history that has moved.** It was here until E01-M01-FIX-15; it is now refused. A
+  Load More whose reading does not begin with the object names the block was laid out from is laid out
+  whole, from a fresh block, as a Refresh is — `continuesBlock` in `src/core/page/` decides, and *How a
+  further page is read* above says what it costs and what the window shows.
 - **`perf/baselines.json`.** Measured and reported above; S07 lands the baselines.
