@@ -13,9 +13,17 @@ import type { Result } from '../contracts/index';
  *
  * Every request carries an `id` and every reply carries the `id` it answers,
  * because the port is one duplex channel and nothing about it says replies come
- * back in order. The renderer can have a refresh and a load in flight at once —
- * it disables the control that started each one, not the other's — and a reply
- * matched by arrival order would hand one request's answer to the other.
+ * back in order. An open, a refresh and a load can all be in flight at once — the
+ * renderer disables the control that started each one, not the others, and the
+ * bridge can be called with no control at all — and a reply matched by arrival
+ * order would hand one request's answer to another.
+ *
+ * Matching by `id` says which request a reply answers, not whether its answer
+ * still applies. That is the utility process's to decide, and it decides it in
+ * one place: a load or a refresh whose read returns after a different repository
+ * was opened, and an open overtaken by an open asked for after it, is answered
+ * with a `FailureKind.Cancelled` failure and changes nothing
+ * (`./repository-host.ts`, *What can be in flight at once*).
  */
 
 /** One question for the process that owns the reader, the store and the layout. */

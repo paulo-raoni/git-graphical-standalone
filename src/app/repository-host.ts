@@ -22,7 +22,9 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * utility process has none — and talks over `process.parentPort` alone.
  *
  * It owns exactly three things for as long as a repository is open: the reader,
- * the accumulated row block, and the layout state. The commit store is inside
+ * the accumulated row block, and the layout state — and, for as long as it runs,
+ * a count of the opens asked for, which is how a late reply is recognised (see
+ * *What can be in flight at once* below). The commit store is inside
  * the reader's answer and is rebuilt by every read; see *How a further page is
  * read* below.
  *
@@ -54,10 +56,20 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
 /** The git this process runs. Discovery is inside it, memoised on success. */
 const reader = createGitRepositoryReader();
 
-/** Everything one open repository needs between pages. */
+/**
+ * Everything one open repository needs between pages.
+ *
+ * **Its identity is the repository's identity.** An open makes a new one and
+ * nothing else does: a Refresh replaces the block and the layout *inside* it,
+ * and a Load More appends to them. So `open` still being the object a request
+ * captured before its read is exactly "nothing was opened meanwhile", which is
+ * what *What can be in flight at once* below turns on.
+ */
 interface OpenRepository {
   /** The path the repository was opened by, which every later read repeats. */
   readonly path: string;
+  /** Which open made this, counted in the order opens were asked for. */
+  readonly ticket: number;
   /** Every row laid out so far, appended to and never recomputed. */
   block: RowBlock;
   /** The open lanes the next page continues from. */
@@ -65,6 +77,42 @@ interface OpenRepository {
 }
 
 let open: OpenRepository | null = null;
+
+/** How many opens have been asked for, which is the ticket the next one takes. */
+let opensAsked = 0;
+
+/**
+ * ### What can be in flight at once
+ *
+ * **Anything.** This process answers every request as it arrives and awaits a
+ * read of git in each, so an Open, a Refresh and a Load More can all be reading
+ * at the same moment and their reads return in whatever order git finishes them.
+ * The renderer disables only the control that started a request, and the bridge
+ * can be called without any control at all, so nothing outside this file may be
+ * relied on to serialise them.
+ *
+ * What makes that safe is one rule: **a reading is applied only to the state it
+ * was read for.** A Load More or a Refresh captures the open repository before
+ * its read and, when the read returns, answers {@link FailureKind.Cancelled} and
+ * changes nothing if a different one is open by then — whether the read
+ * succeeded or failed, because a failure of the repository that was replaced
+ * shown over the one that replaced it is the same defect in another form. An
+ * Open takes a ticket before its read and is dropped the same way if an open
+ * asked for after it has already been applied.
+ *
+ * A Refresh and a Load More of the **same** repository are not dropped for
+ * overtaking each other, and do not need to be: both are a whole page of the
+ * repository the state holds, each leaves the state matching the page it
+ * answered, and the renderer draws the reply that arrives last — which is the
+ * one applied last, because between deciding a reply and posting it `handle`
+ * runs nothing but promise continuations, so no other read can land in between.
+ */
+function superseded(): Result<never> {
+  return failed(
+    FailureKind.Cancelled,
+    'Another repository was opened while this one was being read, so this reply was dropped.',
+  );
+}
 
 /** A failure of this process rather than of git, which the contract has no kind for. */
 function failed(kind: FailureKind, message: string): Result<never> {
@@ -83,14 +131,24 @@ function assemble(repository: OpenRepository, read: RepositoryPage): Result<Grap
  * The state is replaced only once the read has succeeded, so a failed open
  * leaves the repository that was open still open and still loaded — which is
  * what lets the window offer another folder without losing what it was showing.
+ *
+ * An open whose read returns after an open asked for **later** has been applied
+ * is dropped, succeeded or not: the window must end on the folder chosen last,
+ * and the reads of two folders finish in whatever order git finishes them.
  */
 async function openRepository(path: string): Promise<Result<GraphPage>> {
+  opensAsked += 1;
+  const ticket = opensAsked;
   const read = await reader.readPage({ repositoryPath: path, pageSize: FIRST_PAGE_COMMITS });
+  if (open !== null && open.ticket > ticket) {
+    return superseded();
+  }
   if (!read.ok) {
     return read;
   }
   const repository: OpenRepository = {
     path,
+    ticket,
     block: createRowBlock(),
     layout: createLayoutState(),
   };
@@ -100,15 +158,19 @@ async function openRepository(path: string): Promise<Result<GraphPage>> {
 
 /** Read `count` more commits of the open repository and append their rows. */
 async function loadMore(count: number): Promise<Result<GraphPage>> {
-  if (open === null) {
+  const repository = open;
+  if (repository === null) {
     return failed(FailureKind.Cancelled, 'No repository is open, so there is nothing to add to.');
   }
-  const pageSize = open.block.rowCount + count;
-  const read = await reader.readPage({ repositoryPath: open.path, pageSize });
+  const pageSize = repository.block.rowCount + count;
+  const read = await reader.readPage({ repositoryPath: repository.path, pageSize });
+  if (open !== repository) {
+    return superseded();
+  }
   if (!read.ok) {
     return read;
   }
-  return assemble(open, read.value);
+  return assemble(repository, read.value);
 }
 
 /**
@@ -126,17 +188,21 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
  * otherwise answer with five and hide the newest one behind a Load More.
  */
 async function refresh(): Promise<Result<GraphPage>> {
-  if (open === null) {
+  const repository = open;
+  if (repository === null) {
     return failed(FailureKind.Cancelled, 'No repository is open, so there is nothing to refresh.');
   }
-  const pageSize = Math.max(open.block.rowCount, FIRST_PAGE_COMMITS);
-  const read = await reader.readPage({ repositoryPath: open.path, pageSize });
+  const pageSize = Math.max(repository.block.rowCount, FIRST_PAGE_COMMITS);
+  const read = await reader.readPage({ repositoryPath: repository.path, pageSize });
+  if (open !== repository) {
+    return superseded();
+  }
   if (!read.ok) {
     return read;
   }
-  open.block = createRowBlock();
-  open.layout = createLayoutState();
-  return assemble(open, read.value);
+  repository.block = createRowBlock();
+  repository.layout = createLayoutState();
+  return assemble(repository, read.value);
 }
 
 /** The answer to one request, as a value; nothing here throws at the caller. */
