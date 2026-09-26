@@ -123,12 +123,20 @@ async function whileBusy(
   }
 }
 
-/** Draw a reply, or show why there is not one. */
+/**
+ * Draw a reply, or show why there is not one.
+ *
+ * `opened` is which request this answers, and nothing more: an Open's page is
+ * drawn from its first row, a Refresh's or a Load More's at the offset the table
+ * already has. The renderer knows which request it made; what each kind of page
+ * does to the offset is the view's.
+ */
 function receive(
   shell: Shell,
   view: GraphTableView,
   session: Session,
   reply: Result<GraphPage>,
+  opened = false,
 ): void {
   if (!reply.ok) {
     report(shell, reply);
@@ -137,7 +145,11 @@ function receive(
   shell.clearFailure();
   shell.showPath(session.path);
   shell.refresh.disabled = false;
-  view.showPage(reply.value);
+  if (opened) {
+    view.showOpenedPage(reply.value);
+  } else {
+    view.showPage(reply.value);
+  }
 }
 
 /**
@@ -179,7 +191,7 @@ async function open(
 ): Promise<void> {
   const reply = await window.gitGraphical.openRepository({ path });
   session.path = reply.ok ? path : session.path;
-  receive(shell, view, session, reply);
+  receive(shell, view, session, reply, true);
 }
 
 /** Wire every control to the bridge. Nothing here runs until something happens. */

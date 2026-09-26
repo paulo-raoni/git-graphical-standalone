@@ -73,8 +73,19 @@ const HEADINGS = ['Graph', 'Description', 'Date', 'Author', 'Commit'];
  * what it draws.
  */
 export interface GraphTableView {
-  /** Draw this page, replacing whatever is on screen. */
+  /**
+   * Draw this page, replacing whatever is on screen, at the scroll offset the
+   * table already has: a grown or re-read page of the same repository.
+   */
   readonly showPage: (page: GraphPage) => void;
+  /**
+   * Draw the first page of a repository just opened, from its first row.
+   *
+   * A second member rather than an argument to `showPage`, so that `showPage`
+   * keeps the promise S05's slice document made of it — it does not touch
+   * `scrollTop` — and the offset is reset by exactly one line of this module.
+   */
+  readonly showOpenedPage: (page: GraphPage) => void;
   /** Register the listener the Load More Commits control calls. */
   readonly onLoadMore: (listener: () => void) => void;
   /**
@@ -328,6 +339,14 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
   return {
     showPage: (page: GraphPage): void => {
       showPage(parts, state, page);
+      schedule();
+    },
+    showOpenedPage: (page: GraphPage): void => {
+      showPage(parts, state, page);
+      // After the spacer is sized for the new page. The scroll event this may
+      // fire calls `schedule` too, which asks for one frame however often it is
+      // called before that frame runs (invariant 2).
+      parts.scroll.scrollTop = 0;
       schedule();
     },
     onLoadMore: (listener: () => void): void => {
