@@ -1,7 +1,5 @@
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,7 +7,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import { ROW_HEIGHT } from '../../src/ui/geometry';
-import { generateRepository, readSpecification } from '../fixtures/generate';
+import { fixture } from './support/fixtures';
 
 /**
  * A repository opened in the window starts at its newest commit.
@@ -33,20 +31,15 @@ import { generateRepository, readSpecification } from '../fixtures/generate';
  * different name while keeping its ten thousand commits and their subjects, and
  * the check reads that name from git rather than assuming it.
  *
- * **Its own file, with its own copy of four helpers**, for the reason
+ * **Its own file, with its own copy of three helpers**, for the reason
  * `test/e2e/superseded-reply.spec.ts` gives: `open-repository.spec.ts` is at the
- * line limit the lint gate holds every module to. `fixture` builds into the same
- * directory as those two suites, so the three share one copy of the large
- * repository.
+ * line limit the lint gate holds every module to. The repositories come from
+ * `test/e2e/support/fixtures.ts`, so this suite shares one copy of the large
+ * repository with the other suites and every run on the machine; its fourth
+ * argument is the later clock. This suite writes into neither repository.
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const specificationPath = join(repositoryRoot, 'test', 'fixtures', 'specification.json');
-const recipe = createHash('sha256')
-  .update(readFileSync(specificationPath))
-  .digest('hex')
-  .slice(0, 12);
-const fixtureRoot = join(tmpdir(), `git-graphical-standalone-s06-${recipe}`);
 
 /** Long enough for a ten-thousand-commit fixture to be written and read. */
 const SLOW_TEST_MS = 240_000;
@@ -58,24 +51,6 @@ const MORE = '.graph__more';
 const OPEN = '.bar__open';
 const REFRESH = '.bar__refresh';
 const PATH = '.bar__path';
-
-/**
- * A ten-thousand-commit repository, built once. `laterBy` starts its clock that
- * many seconds after the specification's, which changes every object name.
- */
-function largeFixture(name: string, laterBy: number): string {
-  const directory = join(fixtureRoot, name);
-  if (!existsSync(join(directory, '.git'))) {
-    const specification = readSpecification(specificationPath);
-    mkdirSync(fixtureRoot, { recursive: true });
-    generateRepository(
-      directory,
-      { name, shape: 'large', commits: 10_000 },
-      { ...specification, firstSecond: specification.firstSecond + laterBy },
-    );
-  }
-  return directory;
-}
 
 /** The abbreviated name the Commit column shows for `HEAD` of `directory`, as git reports it. */
 function newestCommit(directory: string): string {
@@ -196,8 +171,8 @@ test.beforeAll(() => {
 
 test('opening another repository shows it from its newest commit', async () => {
   test.setTimeout(SLOW_TEST_MS);
-  const large = largeFixture('large', 0);
-  const other = largeFixture('large-a-second-later', 1);
+  const large = fixture('large', 'large', 10_000);
+  const other = fixture('large-a-second-later', 'large', 10_000, 1);
   const newest = newestCommit(other);
   expect(newest).not.toBe(newestCommit(large));
   await withWindow(large, async (page, application) => {
@@ -211,7 +186,7 @@ test('opening another repository shows it from its newest commit', async () => {
 
 test('opening the repository already open shows it from its newest commit', async () => {
   test.setTimeout(SLOW_TEST_MS);
-  const large = largeFixture('large', 0);
+  const large = fixture('large', 'large', 10_000);
   await withWindow(large, async (page, application) => {
     await expect(page.locator(MORE)).toBeVisible();
     await scrollDown(page);
@@ -223,7 +198,7 @@ test('opening the repository already open shows it from its newest commit', asyn
 
 test('a refresh keeps the scroll offset, so only an open resets it', async () => {
   test.setTimeout(SLOW_TEST_MS);
-  const large = largeFixture('large', 0);
+  const large = fixture('large', 'large', 10_000);
   await withWindow(large, async (page) => {
     await expect(page.locator(MORE)).toBeVisible();
     await scrollDown(page);

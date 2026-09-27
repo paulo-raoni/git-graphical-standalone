@@ -1,7 +1,5 @@
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,7 +9,7 @@ import type { Page } from '@playwright/test';
 import type { GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
-import { generateRepository, readSpecification } from '../fixtures/generate';
+import { fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
 
 /**
  * A Load More appends only onto the history its rows were laid out from.
@@ -26,35 +24,21 @@ import { generateRepository, readSpecification } from '../fixtures/generate';
  * sequence in the built application and requires the Load More reply's layout to
  * equal, column for column, the one a Refresh answers right after it.
  *
- * **Its own file, with its own copy of three helpers**, for the reason
+ * **Its own file, with its own copy of two helpers**, for the reason
  * `test/e2e/superseded-reply.spec.ts` gives: `test/e2e/open-repository.spec.ts`
- * is at the line limit the lint gate holds every module to. `fixture` builds into
- * the same directory as those two suites, so an unchanged repository is shared
- * with them; the one this suite writes a commit into is rebuilt on every run, as
- * that file's refresh case rebuilds its own.
+ * is at the line limit the lint gate holds every module to. The repositories
+ * come from `test/e2e/support/fixtures.ts`: the unchanged one is shared with the
+ * other suites and every run on the machine, and the one this suite writes a
+ * branch and a commit into is this run's own, built for the case and removed
+ * after it, as that file's refresh case does with its own.
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const specificationPath = join(repositoryRoot, 'test', 'fixtures', 'specification.json');
-const recipe = createHash('sha256')
-  .update(readFileSync(specificationPath))
-  .digest('hex')
-  .slice(0, 12);
-const fixtureRoot = join(tmpdir(), `git-graphical-standalone-s06-${recipe}`);
 
 /** Long enough for the ten-thousand-commit fixture to be written and read. */
 const SLOW_TEST_MS = 240_000;
 
 const MORE = '.graph__more';
-
-function fixture(name: string, shape: string, commits: number, fresh = false): string {
-  const directory = join(fixtureRoot, name);
-  if (fresh || !existsSync(join(directory, '.git'))) {
-    mkdirSync(fixtureRoot, { recursive: true });
-    generateRepository(directory, { name, shape, commits }, readSpecification(specificationPath));
-  }
-  return directory;
-}
 
 /** Run git in `repository` as a person at the keyboard would, while the window is open. */
 function git(repository: string, args: readonly string[]): string {
@@ -191,9 +175,11 @@ test.beforeAll(() => {
   }
 });
 
+test.afterEach(removeOwnFixtures);
+
 test('a load more after a commit on a new branch lays out the history as it now is', async () => {
   test.setTimeout(SLOW_TEST_MS);
-  const target = fixture('stale-load-more', 'large', 10_000, true);
+  const target = ownFixture('stale-load-more', 'large', 10_000);
   let head = '';
   const { more, again } = await pressAfter(target, () => {
     git(target, ['checkout', '--quiet', '-b', 'side', 'main~100']);
