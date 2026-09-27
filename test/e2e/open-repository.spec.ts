@@ -1,7 +1,5 @@
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,7 +13,7 @@ import type {
 } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
-import { generateRepository, readSpecification } from '../fixtures/generate';
+import { fixture, fixtureRoot, ownFixture, removeOwnFixtures } from './support/fixtures';
 
 /**
  * The whole application, against real repositories.
@@ -26,13 +24,14 @@ import { generateRepository, readSpecification } from '../fixtures/generate';
  * can tell a green wiring from a working one, which is what `AGENTS.md` §7
  * means by opening the actual thing.
  *
- * **The repositories are this suite's own.** `test/fixtures/repositories/` is
- * rebuilt in place by the generator's own test, and
- * `src/adapters/fixtures.spec-support.ts` builds a second copy for the adapter
- * suite; this builds a third, under a directory named after a digest of the
- * recipe, so a change to `specification.json` builds elsewhere rather than
- * leaving a stale one. The refresh case writes a commit into its repository, so
- * that one is rebuilt on every run and the others are reused.
+ * **The repositories are shared with three other suites, and with every run on
+ * the machine.** `test/fixtures/repositories/` is rebuilt in place by the
+ * generator's own test, and `src/adapters/fixtures.spec-support.ts` builds a
+ * second copy for the adapter suite; `test/e2e/support/fixtures.ts` builds a
+ * third for the four end-to-end suites that open repositories, and says when a
+ * shared repository counts as built and who builds it. The refresh case writes a
+ * commit into its repository, so that one is this run's own, built for the case
+ * and removed after it.
  *
  * **The missing-git case is a Windows case by construction**, and it fails
  * loudly rather than passing quietly anywhere else. `src/adapters/git-executable.ts`
@@ -47,12 +46,6 @@ import { generateRepository, readSpecification } from '../fixtures/generate';
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const specificationPath = join(repositoryRoot, 'test', 'fixtures', 'specification.json');
-const recipe = createHash('sha256')
-  .update(readFileSync(specificationPath))
-  .digest('hex')
-  .slice(0, 12);
-const fixtureRoot = join(tmpdir(), `git-graphical-standalone-s06-${recipe}`);
 
 /** Long enough for the ten-thousand-commit fixture to be written and read. */
 const SLOW_TEST_MS = 240_000;
@@ -62,15 +55,6 @@ const ROW = '.row';
 const MORE = '.graph__more';
 const FAILURE_HEADLINE = '.failure__headline';
 const FAILURE_MESSAGE = '.failure__message';
-
-function fixture(name: string, shape: string, commits: number, fresh = false): string {
-  const directory = join(fixtureRoot, name);
-  if (fresh || !existsSync(join(directory, '.git'))) {
-    mkdirSync(fixtureRoot, { recursive: true });
-    generateRepository(directory, { name, shape, commits }, readSpecification(specificationPath));
-  }
-  return directory;
-}
 
 /* --- What runs inside the page. `tsconfig.node.json` has no DOM library, so
    every element this touches is described here rather than borrowed. --- */
@@ -257,6 +241,8 @@ test.beforeAll(() => {
   }
 });
 
+test.afterEach(removeOwnFixtures);
+
 test('a repository named on the command line is open when the window appears', async () => {
   const tags = fixture('tags', 'tags', 3);
   await withWindow({ open: tags }, async (page) => {
@@ -305,7 +291,7 @@ test('the window says so when git cannot be found, and says where it looked', as
 });
 
 test('refresh shows a commit made since the repository was opened', async () => {
-  const target = fixture('refresh-target', 'linear', 5, true);
+  const target = ownFixture('refresh-target', 'linear', 5);
   await withWindow({ open: target }, async (page) => {
     await expect(page.locator(ROW).first()).toContainText('commit 5');
     execFileSync('git', ['-C', target, 'commit', '--allow-empty', '-m', 'made while open'], {

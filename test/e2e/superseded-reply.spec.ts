@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,7 +9,7 @@ import { FailureKind } from '../../src/contracts/index';
 import type { GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
-import { generateRepository, readSpecification } from '../fixtures/generate';
+import { fixture } from './support/fixtures';
 
 /**
  * A reply is applied only to the repository it was read for.
@@ -32,21 +30,15 @@ import { generateRepository, readSpecification } from '../fixtures/generate';
  * So a machine on which the stale request always wins reports red, not a pass
  * that tested nothing.
  *
- * **Its own file, with its own copy of three helpers.** It was meant to sit in
+ * **Its own file, with its own copy of two helpers.** It was meant to sit in
  * `test/e2e/open-repository.spec.ts`, which is at the line limit the lint gate
- * holds every module to; and moving that file's helpers out would move the lines
- * other committed files cite by number. So `fixture`, the table's row count and
- * `withWindow` are repeated here, the first building into the same directory so
- * the two suites share one copy of each repository.
+ * holds every module to. So the table's row count and `withWindow` are repeated
+ * here. The repositories come from `test/e2e/support/fixtures.ts`, which the
+ * suites that open repositories share, and which says when a shared repository
+ * counts as built; this suite writes into none of them.
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const specificationPath = join(repositoryRoot, 'test', 'fixtures', 'specification.json');
-const recipe = createHash('sha256')
-  .update(readFileSync(specificationPath))
-  .digest('hex')
-  .slice(0, 12);
-const fixtureRoot = join(tmpdir(), `git-graphical-standalone-s06-${recipe}`);
 
 /** Long enough for the ten-thousand-commit fixture to be written and read. */
 const SLOW_TEST_MS = 240_000;
@@ -70,15 +62,6 @@ const GROWN_ROWS = 10_000;
 const ROW = '.row';
 const MORE = '.graph__more';
 const FAILURE_HEADLINE = '.failure__headline';
-
-function fixture(name: string, shape: string, commits: number): string {
-  const directory = join(fixtureRoot, name);
-  if (!existsSync(join(directory, '.git'))) {
-    mkdirSync(fixtureRoot, { recursive: true });
-    generateRepository(directory, { name, shape, commits }, readSpecification(specificationPath));
-  }
-  return directory;
-}
 
 /* --- What runs inside the page. `tsconfig.node.json` has no DOM library, so
    every element this touches is described here rather than borrowed. --- */
