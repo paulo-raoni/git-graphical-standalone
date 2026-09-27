@@ -31,11 +31,12 @@ import { fixture } from './support/fixtures';
  * that tested nothing.
  *
  * **Its own file, with its own copy of two helpers.** It was meant to sit in
- * `test/e2e/open-repository.spec.ts`, which is at the line limit the lint gate
- * holds every module to. So the table's row count and `withWindow` are repeated
- * here. The repositories come from `test/e2e/support/fixtures.ts`, which the
- * suites that open repositories share, and which says when a shared repository
- * counts as built; this suite writes into none of them.
+ * `test/e2e/open-repository.spec.ts`, which was at the line limit the lint gate
+ * holds every module to when this suite was written. So the table's row count
+ * and `withWindow` are repeated here. The repositories come from
+ * `test/e2e/support/fixtures.ts`, which the suites that open repositories
+ * share, and which says when a shared repository counts as built; this suite
+ * writes into none of them.
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');

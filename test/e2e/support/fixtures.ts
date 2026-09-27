@@ -47,10 +47,12 @@ import { generateRepository, readSpecification } from '../../fixtures/generate';
  * another process holds a file or its working directory open fail with the
  * same `EPERM`, and a rename of a directory that is itself another process's
  * working directory fails with `EBUSY`; the target exists after the first and
- * not after the others (measured by E01-M01-FIX-18, and again by
- * E01-M01-FIX-23 with `renameSync` on Node 24.18 and Windows 11). A refusal
- * with the shared name still absent is retried for
- * {@link PUBLISH_PATIENCE_MS}, then thrown.
+ * not after the others (all of it measured by E01-M01-FIX-23 with `renameSync`
+ * on Node 24.18 and Windows 11; E01-M01-FIX-18 had measured two of those cases
+ * before it, a rename onto an existing directory and a rename of a directory
+ * inside which a file is open, each failing with `EPERM`). A refusal with the
+ * shared name still absent is retried for {@link PUBLISH_PATIENCE_MS}, then
+ * thrown.
  *
  * The next run that builds removes every staging directory whose process no
  * longer runs. Only the process a staging directory names writes into it or

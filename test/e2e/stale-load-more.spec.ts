@@ -26,11 +26,12 @@ import { fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
  *
  * **Its own file, with its own copy of two helpers**, for the reason
  * `test/e2e/superseded-reply.spec.ts` gives: `test/e2e/open-repository.spec.ts`
- * is at the line limit the lint gate holds every module to. The repositories
- * come from `test/e2e/support/fixtures.ts`: the unchanged one is shared with the
- * other suites and every run on the machine, and the one this suite writes a
- * branch and a commit into is this run's own, built for the case and removed
- * after it, as that file's refresh case does with its own.
+ * was at the line limit the lint gate holds every module to when this suite was
+ * written. The repositories come from `test/e2e/support/fixtures.ts`: the
+ * unchanged one is shared with the other suites and every run on the machine,
+ * and the one this suite writes a branch and a commit into is this run's own,
+ * built for the case and removed after it, as that file's refresh case does
+ * with its own.
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
