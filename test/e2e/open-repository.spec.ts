@@ -30,9 +30,8 @@ import { fixture, fixtureRoot, ownFixture, removeOwnFixtures } from './support/f
  * builds a second copy for the adapter suite; `test/e2e/support/fixtures.ts`
  * builds a third for the end-to-end suites that open repositories, names them
  * in its own header, and says when a shared repository counts as built and who
- * builds it. The refresh case writes a
- * commit into its repository, so that one is this run's own, built for the case
- * and removed after it.
+ * builds it. The refresh case writes a commit into its repository, so that one
+ * is this run's own, built for the case and removed after it.
  *
  * **The missing-git case is a Windows case by construction**, and it fails
  * loudly rather than passing quietly anywhere else. `src/adapters/git-executable.ts`
