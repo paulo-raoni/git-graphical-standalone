@@ -32,8 +32,9 @@ import { fixture } from './support/fixtures';
  * the check reads that name from git rather than assuming it.
  *
  * **Its own file, with its own copy of three helpers**, for the reason
- * `test/e2e/superseded-reply.spec.ts` gives: `open-repository.spec.ts` is at the
- * line limit the lint gate holds every module to. The repositories come from
+ * `test/e2e/superseded-reply.spec.ts` gives: `open-repository.spec.ts` was at the
+ * line limit the lint gate holds every module to when this suite was written.
+ * The repositories come from
  * `test/e2e/support/fixtures.ts`, so this suite shares one copy of the large
  * repository with the other suites and every run on the machine; its fourth
  * argument is the later clock. This suite writes into neither repository.
