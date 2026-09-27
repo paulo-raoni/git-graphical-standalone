@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,7 +31,6 @@ import type { RepositoryFingerprint } from './generate';
  */
 
 const specification = readSpecification();
-const scratch = join(tmpdir(), 'git-graphical-fixture-determinism');
 
 describe('the fixture repositories', () => {
   let generated: Record<string, RepositoryFingerprint>;
@@ -67,6 +66,17 @@ describe('the fixture repositories', () => {
 });
 
 describe('generating the same repository twice', () => {
+  let scratch: string;
+
+  // A directory no other run can name. A fixed name under the temporary
+  // directory is shared by every run on the machine, and runs that meet here
+  // write into and remove each other's repositories: E01-M01-FIX-25 started two
+  // runs of this describe together three times at its base, under a private
+  // temporary directory, and five of the six runs failed.
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), 'git-graphical-fixture-determinism-'));
+  });
+
   afterAll(() => {
     rmSync(scratch, { recursive: true, force: true });
   });
