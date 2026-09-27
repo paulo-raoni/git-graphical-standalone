@@ -274,11 +274,14 @@ two counters to put in the gate, and did not add them.
 
 ## What this lane could not do
 
-**The unit tests for `src/ui/` are not colocated with it, and cannot be.** `ui-only-contracts` in
-`.dependency-cruiser.cjs` lets `src/ui/` name `src/contracts/` and `src/ui/` and nothing else, with **no
+**This lane could not colocate the unit tests for `src/ui/` with it.** `ui-only-contracts` in
+`.dependency-cruiser.cjs` then let `src/ui/` name `src/contracts/` and `src/ui/` and nothing else, with **no
 carve-out for a colocated test** of the kind `core/` and `contracts/` each acquired when they needed one. A
-`src/ui/geometry.test.ts` that imports `vitest` therefore fails `gates:boundaries` — measured in this lane,
-one error, planted and watched red and green — and that rule's file was outside this task's boundary.
+`src/ui/geometry.test.ts` that imported `vitest` therefore failed `gates:boundaries` — measured in this lane,
+one error, planted and watched red and green — and that rule's file was outside this task's boundary. That
+has since changed, as the last paragraph of this section says: such a file now passes the gate, which
+E01-M01-FIX-19 measured at `52b7247` (102 modules, no violation) and E01-M01-FIX-22 measured again at
+`b1ac533`, with the same result.
 
 So the pure tests live in `test/e2e/graph-geometry.spec.ts` and `test/e2e/graph-table.spec.ts`, on
 Playwright's runner, against the same modules and with no browser anywhere near them. That works because

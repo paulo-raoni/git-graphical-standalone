@@ -113,12 +113,14 @@ type Settled = { name: string; ms: number };
  * Click the bar's controls in the order given, in one turn of the page, and
  * record the order in which they finish the requests they started.
  *
- * Read off the **label** and not off `disabled`, because `receive` in
- * `src/ui/renderer.ts` re-enables Refresh on every successful reply — so Refresh
- * is enabled again the moment an Open's reply is drawn, while its own request is
- * still reading. The label is put back only in `whileBusy`'s `finally`, which
- * runs when that control's own reply has arrived, and the host posts its replies
- * in the order it decided them, so this order is the host's.
+ * Read off the **label**, because in `src/ui/renderer.ts` a bar control's label
+ * is written only by `whileBusy`: set to its busy text on the click, and put
+ * back only in `finally`, which runs when that control's own reply has arrived.
+ * The host posts its replies in the order it decided them, so this order is the
+ * host's. `disabled` has a second writer, `receive`, which on every successful
+ * reply sets Refresh's to whether a Refresh is still unanswered; before
+ * E01-M01-FIX-20 it enabled Refresh outright, so an Open's reply re-enabled it
+ * while its own request was still reading.
  */
 function clickAndRecord(controls: WatchedControl[]): void {
   const scope = globalThis as unknown as PageScope;
