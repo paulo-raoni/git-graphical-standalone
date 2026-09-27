@@ -11,10 +11,10 @@ import type { LayoutRows } from '../contracts/index';
  * tests are there, on Playwright's runner, because E01-M01-S05 could not put
  * them beside it: `.dependency-cruiser.cjs` then had no carve-out for a
  * colocated test under `src/ui/`, and S05's lane measured one
- * `gates:boundaries` error for such a file. E01-M01-S06 added that carve-out, `ui-tests-only-the-runner`, and a
- * `src/ui/*.test.ts` that imports `vitest` now passes the gate; moving these
- * tests home is scheduled in `docs/PLAN.md`'s table *Gate work deferred past
- * the first milestone*.
+ * `gates:boundaries` error for such a file. E01-M01-S06 added that carve-out,
+ * `ui-tests-only-the-runner`, and a `src/ui/*.test.ts` that imports `vitest`
+ * now passes the gate; moving these tests home is scheduled in
+ * `docs/PLAN.md`'s table *Gate work deferred past the first milestone*.
  *
  * The cost model these numbers exist to keep is
  * `docs/ADR-0002-architecture-and-performance.md` decision 5: **what is drawn is

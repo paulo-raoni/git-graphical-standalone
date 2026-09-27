@@ -334,7 +334,8 @@ added the pair `src/contracts/` and `src/core/` each already had: `pathNot: TEST
 `ui-only-contracts`, and `ui-tests-only-the-runner` beside it, so a renderer test may name the renderer, the
 contract and `vitest` and nothing else. This slice's lane probed both directions and watched each red and
 green; the message of commit `aa5ebb4` records the two probes — a renderer test naming `node:fs` fails, and a
-renderer product file naming the test runner still fails. Moving S05's two suites is scheduled separately and is not this lane's.
+renderer product file naming the test runner still fails. Moving S05's two suites is scheduled separately and
+is not this lane's.
 
 ## What S07 should measure
 
