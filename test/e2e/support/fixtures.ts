@@ -176,8 +176,8 @@ function publish(staging: string, directory: string): void {
 }
 
 /**
- * A repository shared by every run on the machine, built once. **Never write
- * into it**: use {@link ownFixture} for a case that does. `laterBy` starts its
+ * A repository shared by every run on the machine, published once. **Never
+ * write into it**: use {@link ownFixture} for a case that does. `laterBy` starts its
  * clock that many seconds after the specification's, which changes every
  * object name and keeps every subject. The directory's name carries a digest of
  * the shape, the size and `laterBy`, so a call that asks for a different
