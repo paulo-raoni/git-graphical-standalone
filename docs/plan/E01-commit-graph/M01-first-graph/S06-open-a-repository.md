@@ -358,8 +358,9 @@ This lane measured what it needed to argue its own decisions and deliberately la
 does. From the page, `window.gitGraphical.openRepository({ path })` returns the first page and
 `window.gitGraphical.loadMoreCommits({ count })` returns the whole page again, grown — both as
 `Result<GraphPage>`, both answered by the utility process. `window.gitGraphicalView.showPage(page)` draws
-one without asking for it. `test/e2e/open-repository.spec.ts` does all three, and its `fixture()` builds a
-repository of any shape the committed generator knows into a directory of its own.
+one without asking for it. `test/e2e/open-repository.spec.ts` does all three, with repositories of any shape
+the committed generator knows from `test/e2e/support/fixtures.ts`: `fixture()` for one shared by every run on
+the machine and never written into, `ownFixture()` for one a case writes into, which is that run's alone.
 
 ## What is not here
 
