@@ -314,9 +314,11 @@ answered, and is then restored in a `finally` to a resting label given as a valu
 element, so a failed request leaves a usable control rather than a dead one. A reply to another request no
 longer re-enables Refresh while a Refresh is unanswered: before E01-M01-FIX-20 it did, and a second press then
 read `Refreshing…` as the resting label and left it there for good (finding F-37 of review round 16).
-`test/e2e/refresh-control.spec.ts` holds this: it presses Load More and, 150 ms later, Refresh, requires the
-Load More to be answered while the Refresh is not, and requires Refresh never to be enabled before its own
-reply and to end enabled and saying `Refresh`. Nothing polls and no timer is registered: every request starts
+`test/e2e/refresh-control.spec.ts` holds this in two cases: one presses Load More and, 150 ms later, Refresh,
+requires the Load More to be answered while the Refresh is not, and requires Refresh never to be enabled
+before its own reply and to end enabled and saying `Refresh`; the other, added by E01-M01-FIX-21 for finding
+F-38 of review round 17, answers a Refresh, then a Load More, then an Open of the same repository, one at a
+time, and requires Refresh enabled and saying `Refresh` after each of those replies has been drawn. Nothing polls and no timer is registered: every request starts
 from the document loading, a click, or the view's Load More intent.
 
 **An Open resets the scroll offset and nothing else does:** the reply to an Open — of another repository or
