@@ -344,7 +344,9 @@ reference extension observed, or is new product scope, and placing it is the own
 (`AGENTS.md` §2).
 
 - **Read a page at an offset.** `RepositoryReader.readPage` takes no offset, so the *n*th Load More re-reads
-  *n + 1* pages (S06). S06 timed the second and fifth press on the 10 000-commit fixture at 344 to 415 ms.
+  *n + 1* pages (S06). S06's slice document tables four runs of five presses on the 10 000-commit fixture,
+  2026-09-19: the fifth press, reading three times the commits of the first, took 420 to 652 ms against 451 to
+  551 ms, so no growth was measurable at that size.
 - **A `FailureKind` for a defect of the application itself.** Today such a failure is reported as a git
   failure. Adding one changes the frozen contract (S06, review rounds 15 and 16).
 - **What Refresh keeps in place.** Refresh keeps the scroll offset in pixels, not the commit at the top
