@@ -335,6 +335,22 @@ remembers. Each is scheduled into the milestone that follows E01-M01 and is not 
 | --- | --- | --- |
 | **Give `src/ui/` colocated unit tests, and move the two pure suites home.** S05 had to put the renderer's pure tests on the end-to-end runner because the dependency rule had no carve-out for a test file beside the renderer. S06 adds the carve-out; moving the two existing suites is separate work. | The suites work where they are, so nothing is wrong today. What it costs is that they sit outside the unit gate's coverage report and run in the slowest gate instead of the fastest. | Two files, `test/e2e/graph-geometry.spec.ts` and the pure half of `test/e2e/graph-table.spec.ts`, as listed by review round 14. |
 | **Taken up as E01-M01-S09, no longer deferred.** Decide the two clocks the mutation gate runs under. The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | Detections resting on a clock rather than an assertion were **73, 82, 88 and 100 across four runs of the configured scope on identical source**, against a runner timeout count that sat at 44 to 46 in the same four. The quantity moves with machine load and the single figure of 83 that an earlier draft of this row carried was one draw from that range, not the value. |
+| **Run the unit suite with `isolate: false` under the mutation gate.** S09 measured it and did not take it. | It shares one module registry across every test file, so it changes what a test sees; taking it needs evidence that no file depends on another's module state. | S09's measurement, recorded in its slice document: seven concurrent copies of the gate's command in 5.7 s with it against 25–30 s without, about four times the throughput, which would take `gates:mutation` from about an hour to about a quarter of one. |
+
+### Raised during E01-M01, placement open for the owner
+
+Recorded so none of these is lost. None is scheduled: each either changes the frozen contract, needs the
+reference extension observed, or is new product scope, and placing it is the owner's decision
+(`AGENTS.md` §2).
+
+- **Read a page at an offset.** `RepositoryReader.readPage` takes no offset, so the *n*th Load More re-reads
+  *n + 1* pages (S06). S06 timed the second and fifth press on the 10 000-commit fixture at 344 to 415 ms.
+- **A `FailureKind` for a defect of the application itself.** Today such a failure is reported as a git
+  failure. Adding one changes the frozen contract (S06, review rounds 15 and 16).
+- **What Refresh keeps in place.** Refresh keeps the scroll offset in pixels, not the commit at the top
+  (FIX-17). Which of the two is right needs the reference extension observed.
+- **A test for one Open overtaking another.** The guard exists (FIX-14) and is correct by reading; driving
+  the ordering reliably needs a fixture whose `git status` is slow (review round 16).
 
 ### What shapes the plan rather than the code
 
