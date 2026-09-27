@@ -266,8 +266,10 @@ async function answer(request: RepositoryRequest): Promise<Result<GraphPage | Re
  * A throw here would end the process and leave the window with a request that
  * never comes back, so everything is turned into the failure value the contract
  * already has for "git did not produce a page". That kind is not quite right —
- * `src/contracts/result.ts` has no kind for a defect of this application — and
- * the audit says so; what it must not do is go missing.
+ * `src/contracts/result.ts` has no kind for a defect of this application, and
+ * adding one would be a change to the frozen contract, raised by E01-M01-S06,
+ * unscheduled and the owner's to decide. What the failure must not do is go
+ * missing.
  */
 async function handle(port: Electron.ParentPort, request: RepositoryRequest): Promise<void> {
   let result: Result<unknown>;

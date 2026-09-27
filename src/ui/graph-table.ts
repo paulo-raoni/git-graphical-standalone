@@ -66,7 +66,7 @@ const HEADINGS = ['Graph', 'Description', 'Date', 'Author', 'Commit'];
 /**
  * What this module hands S06.
  *
- * Deliberately two functions and no state of the caller's: S06 owns the page,
+ * Deliberately functions only, and no state of the caller's: S06 owns the page,
  * asks for it to be drawn, and is told when the user wants more. The view
  * answers no question about a repository and reaches for nothing — it holds no
  * bridge, no channel and no loader — which is what lets this slice be judged on
