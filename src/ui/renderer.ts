@@ -3,7 +3,7 @@ import type { Failure, GraphPage, Result } from '../contracts/index';
 
 import { mountGraphTable } from './graph-table';
 import type { GraphTableView } from './graph-table';
-import { mountShell } from './shell';
+import { mountShell, OPEN_LABEL, REFRESH_LABEL } from './shell';
 import type { Shell } from './shell';
 
 /**
@@ -43,9 +43,12 @@ const VIEW_GLOBAL_NAME = 'gitGraphicalView';
  */
 const LOAD_MORE_COMMITS = 300;
 
-/** What the bar's controls say while the request they started is running. */
-const OPENING_LABEL = 'Opening…';
-const REFRESHING_LABEL = 'Refreshing…';
+/**
+ * What the bar's controls say at rest, and while the request they started is
+ * running. The resting spellings are `./shell.ts`'s, which builds the controls.
+ */
+const OPEN_LABELS: Labels = { resting: OPEN_LABEL, busy: 'Opening…' };
+const REFRESH_LABELS: Labels = { resting: REFRESH_LABEL, busy: 'Refreshing…' };
 
 /**
  * The view, as everything outside this ring sees it.
@@ -95,31 +98,46 @@ function assertBridgeIsPresent(): void {
   }
 }
 
-/** What the window is looking at, which is the whole of the renderer's state. */
+/**
+ * What the window is looking at, and which of its controls are waiting for an
+ * answer, which is the whole of the renderer's state.
+ */
 interface Session {
   path: string | null;
+  /** The bar's controls whose own request is unanswered. */
+  readonly busy: Set<HTMLButtonElement>;
+}
+
+/** What a bar control says at rest, and while the request it started runs. */
+interface Labels {
+  readonly resting: string;
+  readonly busy: string;
 }
 
 /**
- * Run `work` with `button` disabled and saying what it is doing.
+ * Run `work` with `button` disabled and saying what it is doing, until its own
+ * request is answered.
  *
- * The resting label is read off the element rather than passed in, so there is
- * one spelling of it and it is the one the user is looking at. `finally` is what
- * makes a failed request leave a usable control behind rather than a dead one.
+ * The resting label is passed in, not read off the element: the element shows
+ * whatever it was last given, and a label read while it said `busy` would be put
+ * back as the resting one for good. `finally` is what makes a failed request
+ * leave a usable control behind rather than a dead one.
  */
 async function whileBusy(
+  session: Session,
   button: HTMLButtonElement,
-  label: string,
+  labels: Labels,
   work: () => Promise<void>,
 ): Promise<void> {
-  const resting = button.textContent;
+  session.busy.add(button);
   button.disabled = true;
-  button.textContent = label;
+  button.textContent = labels.busy;
   try {
     await work();
   } finally {
+    session.busy.delete(button);
     button.disabled = false;
-    button.textContent = resting;
+    button.textContent = labels.resting;
   }
 }
 
@@ -144,7 +162,9 @@ function receive(
   }
   shell.clearFailure();
   shell.showPath(session.path);
-  shell.refresh.disabled = false;
+  // A repository is shown, so Refresh is usable, unless a Refresh is still
+  // reading: this may be another request's reply, and only its own answers it.
+  shell.refresh.disabled = session.busy.has(shell.refresh);
   if (opened) {
     view.showOpenedPage(reply.value);
   } else {
@@ -199,7 +219,7 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
   shell.open.addEventListener('click', () => {
     run(
       shell,
-      whileBusy(shell.open, OPENING_LABEL, async () => {
+      whileBusy(session, shell.open, OPEN_LABELS, async () => {
         const chosen = await window.gitGraphical.chooseFolder();
         if (!chosen.ok) {
           report(shell, chosen);
@@ -213,7 +233,7 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
   shell.refresh.addEventListener('click', () => {
     run(
       shell,
-      whileBusy(shell.refresh, REFRESHING_LABEL, async () => {
+      whileBusy(session, shell.refresh, REFRESH_LABELS, async () => {
         receive(shell, view, session, await window.gitGraphical.refresh({}));
       }),
     );
@@ -260,7 +280,7 @@ function start(): void {
     showPage: view.showPage,
     onLoadMore: view.onLoadMore,
   };
-  const session: Session = { path: null };
+  const session: Session = { path: null, busy: new Set() };
   connect(shell, view, session);
   run(shell, begin(shell, view, session));
 }
