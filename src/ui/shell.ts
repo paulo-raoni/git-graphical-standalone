@@ -20,9 +20,13 @@ import { failureHeadline, repositoryLabel } from './status-text';
  * markup — the same rule `./row-element.ts` follows for a commit subject.
  */
 
-/** What the two controls say when they are resting. */
-const OPEN_LABEL = 'Open Repository';
-const REFRESH_LABEL = 'Refresh';
+/**
+ * What the two controls say when they are resting. Exported because
+ * `./renderer.ts` puts them back after a request, and a label read off the
+ * element there would be whatever the element happened to show.
+ */
+export const OPEN_LABEL = 'Open Repository';
+export const REFRESH_LABEL = 'Refresh';
 
 /** What the shell hands `./renderer.ts` to drive it with. */
 export interface Shell {
