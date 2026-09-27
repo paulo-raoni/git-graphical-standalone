@@ -23,14 +23,17 @@ import { laneColour, LANE_COLOUR_COUNT } from '../../src/ui/palette';
  * The arithmetic the view is made of, with no window anywhere near it.
  *
  * **Why these are here and not beside the code they test.** They belong in
- * `src/ui/*.test.ts`, which is what E01-M01-S05's task asks for.
- * `.dependency-cruiser.cjs` forbids it: `ui-only-contracts` lets `src/ui/` name
+ * `src/ui/*.test.ts`, which is what E01-M01-S05's task asked for, and S05
+ * could not put them there: `.dependency-cruiser.cjs` then let `src/ui/` name
  * `src/contracts/` and `src/ui/` and nothing else, with no carve-out for a
- * colocated test of the kind `core/` and `contracts/` each have, so a
- * `src/ui/geometry.test.ts` importing `vitest` fails `gates:boundaries` —
- * measured in this lane, one error, and that rule's file is outside the task's
- * boundary. `AUDIT-S05-graph-table-renderer.md` raises it. They run on
- * Playwright's runner instead, against the same modules, and need no browser:
+ * colocated test of the kind `core/` and `contracts/` each had, so a
+ * `src/ui/geometry.test.ts` importing `vitest` failed `gates:boundaries` —
+ * measured by S05's lane, one error — and that rule's file was outside S05's
+ * boundary. E01-M01-S06 has since added the carve-out,
+ * `ui-tests-only-the-runner`, so such a file now passes the gate, and moving
+ * these suites home is scheduled in `docs/PLAN.md`'s table *Gate work deferred
+ * past the first milestone*. Until then they run on Playwright's runner,
+ * against the same modules, and need no browser:
  * `src/ui/geometry.ts` and `src/ui/palette.ts` hold no DOM reference, which is
  * the property that makes this possible and is stated in both files.
  */

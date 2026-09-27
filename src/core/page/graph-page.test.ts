@@ -260,15 +260,16 @@ describe('the assembled page', () => {
  * is not free: the mutation gate runs this suite once per mutant, so whatever a
  * file costs is paid once per mutant too. The S06 lane measured it on
  * 2026-09-19, as the message of commit `2020aee` records, with the suite still
- * on vitest's default 5 000 ms test timeout and running its files in parallel,
- * which is before E01-M01-S09 set `fileParallelism: false` and a 15 000 ms
- * timeout: four more files took the gate's per-mutant command from 3.65–3.88 s
- * to 6.08–7.07 s on an idle machine, the cost being transform and import rather
- * than the tests, and the gate's clock-share clause read 25.2 per cent against
- * its cap of 25. Those numbers belong to that condition. Under S09's settings
- * the clause read 3.5 per cent at `6356c68`, with no kill carrying vitest's
- * test timeout, over four full runs, three by the S06 lane and one by review
- * round 15. Three assertions still do not need a file.
+ * on vitest's default per-test time limit of 5 000 ms and running its files in
+ * parallel, which is before E01-M01-S09 set `fileParallelism: false` and a
+ * per-test time limit of 15 000 ms: four more files took the gate's per-mutant
+ * command from 3.65–3.88 s to 6.08–7.07 s on an idle machine, the cost being
+ * transform and import rather than the tests, and the gate's clock-share clause
+ * read 25.2 per cent against its cap of 25. Those numbers belong to that
+ * condition. Under S09's settings the clause read 3.5 per cent at `6356c68`,
+ * with no kill carrying vitest's message for a test that ran past its time
+ * limit, over four full runs, three by the S06 lane and one by review round 15.
+ * Three assertions still do not need a file.
  */
 describe('the page sizes', () => {
   it('are whole numbers of commits', () => {

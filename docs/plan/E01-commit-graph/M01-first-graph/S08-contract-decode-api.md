@@ -108,8 +108,9 @@ asymmetry below is the reason the boundary rule now has the shape it has.
 - **The decoders left the mutation gate's scope, and had no coverage floor.** `stryker.config.json` mutated
   `src/core/**` only, so the six decoders and `entryAt` — held to that gate in S02 — were mutated by nothing,
   and `vitest.config.js` thresholded `src/core/**` only, so the 100 per cent the two files read was recorded
-  and not enforced. Their unit tests ran and failed when a decoder was broken (measured in
-  `AUDIT-S08-contract-decode-api.md`), and that was the whole of the floor. FIX-06 added
+  and not enforced. Their unit tests ran and failed when a decoder was broken — measured by this
+  lane, which broke two decoders on purpose and saw 3 of the 20 tests of `commit-columns.test.ts` and 2 of
+  `column-read.test.ts` fail — and that was the whole of the floor. FIX-06 added
   `src/contracts/**/*.ts` to `mutate` and a `src/contracts/**` coverage threshold at 100 per cent of
   statements, branches, functions and lines.
 - **The two test files could not follow the code, and now have.** `contracts-depends-on-nothing` forbade the

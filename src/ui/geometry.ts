@@ -7,11 +7,14 @@ import type { LayoutRows } from '../contracts/index';
  *
  * This module holds **no DOM reference of any kind**, and that is load-bearing
  * twice over. It is what makes the recycling scheme testable without a window,
- * and it is what lets `test/e2e/` import it into a plain Node test: the renderer
- * ring may not name the test runner (`ui-only-contracts` in
- * `.dependency-cruiser.cjs`), so a colocated `*.test.ts` under `src/ui/` fails
- * `gates:boundaries` — measured in this lane, one error, and the rule's file is
- * outside this task's boundary. `AUDIT-S05-graph-table-renderer.md` raises it.
+ * and it is what lets `test/e2e/` import it into a plain Node test. Its pure
+ * tests are there, on Playwright's runner, because E01-M01-S05 could not put
+ * them beside it: `.dependency-cruiser.cjs` then had no carve-out for a
+ * colocated test under `src/ui/`, and S05's lane measured one
+ * `gates:boundaries` error for such a file. E01-M01-S06 added that carve-out,
+ * `ui-tests-only-the-runner`, and a `src/ui/*.test.ts` that imports `vitest`
+ * now passes the gate; moving these tests home is scheduled in
+ * `docs/PLAN.md`'s table *Gate work deferred past the first milestone*.
  *
  * The cost model these numbers exist to keep is
  * `docs/ADR-0002-architecture-and-performance.md` decision 5: **what is drawn is
