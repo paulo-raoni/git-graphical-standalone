@@ -118,20 +118,48 @@ import { repositoryRoot, report } from './tree.js';
  *
  * **The predicate is the line this clause hinges on**, so it is written to fail
  * loudly rather than quietly. `VITEST_CLOCK` is the narrow reading — vitest's own
- * `timed out in <n>ms` — and `CLOCK_WORDS` is the broad one, any wording that
- * says a run ran out of time. A killed mutant matching the broad reading and not
- * the narrow one **refuses the build** with the output quoted, so a vitest that
- * rewords its message turns this gate red and readable instead of turning the
- * share back down to Stryker's `Timeout` count alone. Grepped by E01-M01-FIX-13
- * on 2026-09-26, with `CLOCK_WORDS` itself as the pattern over `src/`, `test/` and
- * `perf/`: exactly one match, `test/e2e/open-repository.spec.ts` line 343, a
- * Playwright `{ timeout: 60_000 }` that E01-M01-S06 added. That file belongs to
+ * `timed out in <n>ms` — and `CLOCK_WORDS` is the broad one: the word `timeout`
+ * and its near spellings (`timeouts`, `time-out`, `time out`, `timed out`,
+ * `times out`), as a whole word and in any case. A killed mutant matching the
+ * broad reading and not the narrow one **refuses the build** with the output
+ * quoted, so a vitest that rewords its message into another of those spellings
+ * turns this gate red and readable instead of turning the share back down to
+ * Stryker's `Timeout` count alone. **A wording without one of them is not read
+ * at all.** Measured by E01-M01-FIX-19 on the report of its own full run, and by
+ * E01-M01's sixteenth review round before it: a copy of the report in which one
+ * honest kill's recorded output also carries `Error: Test exceeded its time
+ * limit of 5000 ms`, beside its `Tests  1 failed`, replays through
+ * `--check-report` to **exit 0**, that kill counted as an assertion; the same
+ * copy carrying `timeout of 5000 ms` instead replays to exit 1. What bounds the
+ * risk is that `vitest` is pinned to an exact version in `package.json`, so a
+ * new wording can arrive only with a change to that pin, which is a commit a
+ * reviewer reads.
+ *
+ * **Why a clock word in a test file's comment matters.** A kill's recorded
+ * output is not only what vitest says: for a failing assertion it prints a code
+ * frame of the test file, the line that failed and two lines either side, as
+ * the file spells them, comments included. Measured by E01-M01-FIX-19 on the
+ * report of its own full run, at `f5a95df`: 1100 of the 1303 killed mutants'
+ * outputs carry at least one frame of a `*.test.ts` file, and all 7414 such
+ * frames show exactly two lines before and two after the line they point at.
+ * So a comment holding a clock word within two lines of an assertion prints
+ * into a kill's output, and the broad reading refuses an honest run for it.
+ *
+ * Grepped by E01-M01-FIX-19 on 2026-09-27 at `f5a95df`, with `CLOCK_WORDS` itself
+ * as the pattern, read out of this file, over every tracked file of `src/`,
+ * `test/` and `perf/`: exactly one match, in `test/e2e/open-repository.spec.ts`,
+ * a Playwright `{ timeout: 60_000 }` that E01-M01-S06 added. That file belongs to
  * the end-to-end suite, and Stryker does not run it: the per-mutant command runs
  * the suite `vitest.config.js` includes, `src/**` test files only, where the same
- * grep found nothing. So no test name or assertion message of the suite this gate
- * reads can match the broad reading. Measured for FIX-10, and not re-measured
- * since: across four full runs — 4540 kills, the first read offline and the other
- * three with this clause live — **none** matched broad without narrow.
+ * grep found nothing. At `52b7247`, the commit FIX-19 was cut from, it found
+ * three more, all in the doc comment above the page sizes suite of
+ * `src/core/page/graph-page.test.ts`, which E01-M01-FIX-16 wrote: inside the
+ * suite Stryker runs, and three lines short of the nearest assertion's frame.
+ * FIX-19 reworded them. So no test name, assertion message or comment of the
+ * suite this gate reads can match the broad reading. Measured for FIX-10: across
+ * four full runs — 4540 kills, the first read offline and the other three with
+ * this clause live — **none** matched broad without narrow; FIX-19's own run,
+ * 1303 kills, found none either.
  *
  * **Lines vitest's worker pool prints about its own workers are not read by the
  * broad reading.** They begin `[vitest-pool]:`, sometimes after `Error: `, and say
@@ -302,7 +330,11 @@ const STATUSES =
 /** Vitest's own test timeout, the inner clock: the narrow reading of a stopwatch. */
 const VITEST_CLOCK = /\b(?:test|hook) timed out in \d+ ?ms\b/i;
 
-/** Any wording that says a run ran out of time: the broad reading. See the header. */
+/**
+ * The broad reading: `timeout` and its near spellings as a whole word, in any
+ * case. Not every wording that says a run ran out of time — `time limit` is
+ * not read — as the header measures. See the header.
+ */
 const CLOCK_WORDS = /\btime[ds]?[ -]?outs?\b/i;
 
 /**
