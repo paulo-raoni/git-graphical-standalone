@@ -285,5 +285,6 @@ Playwright's runner, against the same modules and with no browser anywhere near 
 those modules hold no DOM reference, and it costs two things worth naming: they are outside `gates:unit`'s
 coverage report, and they run in the slowest gate rather than the fastest. The repair is the same pair of
 rules S08 needed for `contracts/` — a `pathNot: TEST_FILES` on `ui-only-contracts` and a
-`ui-tests-only-the-runner` beside it — and it is raised in `AUDIT-S05-graph-table-renderer.md` rather than
-made here.
+`ui-tests-only-the-runner` beside it — and this slice's lane raised it rather than made it here. E01-M01-S06
+then added that pair, and moving the two suites home is an item of `docs/PLAN.md`'s table *Gate work deferred
+past the first milestone*.

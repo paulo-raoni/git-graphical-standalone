@@ -14,9 +14,12 @@ Read against this repository — which at the time of writing had five local bra
 branches, one annotated tag, five merges and two histories joined at a root — the adapter's answers were
 identical to what `git log`, `git for-each-ref` and `git status` printed directly: the same object names in the
 same order, the same reference names, the same counts of merges and roots, and the same working tree. It was
-compared twice, before the work was committed and again at the commit that landed it. What was compared, and
-the figures, are in `AUDIT-S03-git-read-adapter.md`; they are not repeated here because a count of this
-repository's own commits is a number that is wrong by the next merge.
+compared twice, by this slice's lane, at `c1c4178` and again at `66987e9`, the commit that landed it. At
+`66987e9`, as the lane recorded it and not re-measured since: every object name of the page, and its order,
+matched `git log --format=%H --branches --tags --remotes --ignore-missing HEAD --`; the eight references
+matched `git for-each-ref`; and the merges, the roots, `HEAD` and the working tree matched git's own output.
+The count of commits compared is not repeated here because a count of this repository's own commits is a
+number that is wrong by the next merge.
 
 ## The rings, and what is in each
 
@@ -217,7 +220,7 @@ allocation on the path is one chunk**, which at its worst was one part in 65 of 
 size are the pipe's scheduling rather than anything this code chooses, which is why they are a range and the
 total is not. `git-process.spec.ts` asserts that more than one chunk arrives and that the largest is strictly
 smaller than the total, which is the mechanical form of the claim and the assertion that fails if anybody
-replaces the stream with a buffer. The audit carries the four readings and how they were taken.
+replaces the stream with a buffer. The four readings above were taken by this slice's lane.
 
 ## Where the failure types come from
 
@@ -249,8 +252,8 @@ release. The next highest requirement is `git status --porcelain=v2`, from 2.11.
 
 **That floor is derived from git's documented history of each option and was not measured.** No git older than
 2.51 is installed on this machine and installing one is a machine-level change outside this lane. The floor
-`docs/ADR-0001-stack.md` assumes — 2.25 — is therefore **not raised** by this slice, and is met with margin;
-the orchestrator records it in `docs/SETUP.md` from the audit.
+`docs/ADR-0001-stack.md` assumes — 2.25 — is therefore **not raised** by this slice, and is met with margin.
+This section is the slice's record of that floor.
 
 ## What the user's configuration keeps doing
 
@@ -363,7 +366,8 @@ leaving a stale one.
 - Lane layout, drawing, and the wiring to the renderer. S04, S05, S06.
 - Branch filtering, ordering options, `.mailmap`, reflogs, first-parent walks and avatars. Later milestones.
 - Any write to a repository. This milestone reads, and `--no-optional-locks` is what makes that exact.
-- `perf/baselines.json`. Parse throughput is measured and reported in the audit; S07 lands the baselines.
+- `perf/baselines.json`. This slice's lane measured parse throughput; the baselines file is S07's.
 - A **bare** repository. `git status` refuses to run in one, so `readPage` returns `GitFailed` with git's own
   words. `WorkingTree` has no way to say "there is no working tree", and inventing one would be a change to a
-  frozen contract that two other lanes are writing against this wave. It is raised in the audit, not built.
+  frozen contract that two other lanes are writing against this wave. This slice's lane raised it rather than
+  building it, and it is not scheduled.

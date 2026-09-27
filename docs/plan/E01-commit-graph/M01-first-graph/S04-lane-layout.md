@@ -226,7 +226,7 @@ fixture in `lane-layout-pages.test.ts` showing the one below a root. Emitting no
 replaces it with a half-row **gap** between the dot and the line, which is worse, and emitting the arrival and
 the departure as two segments does not help, because both are spelled `(V, V)`.
 
-It raised the gap in `AUDIT-S04-lane-layout.md` and emitted the stub rather than inventing a channel for it,
+It raised the gap for the orchestrator and emitted the stub rather than inventing a channel for it,
 because `src/contracts/` was outside its boundary and was being edited by another lane of the same wave. The
 gap then cost a review finding and a repair lane before the renderer could be specified at all, and that
 review added the half of it this note had missed: that a true root and a page whose last commit has an
