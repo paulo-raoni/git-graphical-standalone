@@ -349,6 +349,8 @@ reference extension observed, or is new product scope, and placing it is the own
   failure. Adding one changes the frozen contract (S06, review rounds 15 and 16).
 - **What Refresh keeps in place.** Refresh keeps the scroll offset in pixels, not the commit at the top
   (FIX-17). Which of the two is right needs the reference extension observed.
+- **Open a bare repository.** `git status` refuses to run in one, so opening one fails with git's own words;
+  `WorkingTree` cannot say "there is no working tree", and adding that changes the frozen contract (S03).
 - **A test for one Open overtaking another.** The guard exists (FIX-14) and is correct by reading; driving
   the ordering reliably needs a fixture whose `git status` is slow (review round 16).
 
