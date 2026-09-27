@@ -24,12 +24,13 @@ import { fixture, fixtureRoot, ownFixture, removeOwnFixtures } from './support/f
  * can tell a green wiring from a working one, which is what `AGENTS.md` §7
  * means by opening the actual thing.
  *
- * **The repositories are shared with three other suites, and with every run on
- * the machine.** `test/fixtures/repositories/` is rebuilt in place by the
- * generator's own test, and `src/adapters/fixtures.spec-support.ts` builds a
- * second copy for the adapter suite; `test/e2e/support/fixtures.ts` builds a
- * third for the four end-to-end suites that open repositories, and says when a
- * shared repository counts as built and who builds it. The refresh case writes a
+ * **The repositories are shared with the other suites that open them, and with
+ * every run on the machine.** `test/fixtures/repositories/` is rebuilt in place
+ * by the generator's own test, and `src/adapters/fixtures.spec-support.ts`
+ * builds a second copy for the adapter suite; `test/e2e/support/fixtures.ts`
+ * builds a third for the end-to-end suites that open repositories, names them
+ * in its own header, and says when a shared repository counts as built and who
+ * builds it. The refresh case writes a
  * commit into its repository, so that one is this run's own, built for the case
  * and removed after it.
  *
