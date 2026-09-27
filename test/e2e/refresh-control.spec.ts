@@ -6,7 +6,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import type { GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
-import { FIRST_PAGE_COMMITS } from '../../src/core/page/index';
+import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
 import { fixture } from './support/fixtures';
 
@@ -191,6 +191,23 @@ function raceState(): (Race & { refresh: string; more: string; settled: boolean 
   };
 }
 
+/**
+ * What the control at `selector` shows, whether it is enabled and its label,
+ * after pressing it first when `press` says so. The click handler runs inside
+ * `click()`, so a press that started a request reads disabled and busy here,
+ * before any reply can have been drawn.
+ */
+function shownAt(input: { selector: string; press: boolean }): string {
+  const control = (globalThis as unknown as PageScope).document.querySelector(input.selector);
+  if (control === null) {
+    throw new Error(`the window has no ${input.selector}`);
+  }
+  if (input.press) {
+    control.click();
+  }
+  return `${control.disabled ? 'disabled' : 'enabled'} ${String(control.textContent)}`;
+}
+
 /* --- Driving the built application. --- */
 
 /**
@@ -248,6 +265,32 @@ async function loadMoreThenRefresh(page: Page, large: string): Promise<boolean |
   return race?.overlapped ?? null;
 }
 
+/** How long one reply on the ten-thousand-commit fixture is waited for. */
+const REPLY_MS = 60_000;
+
+/**
+ * Press the control at `selector`, require that the press started a request,
+ * and wait on that same control until its own request is answered: its resting
+ * label is written in a `finally`, after the reply has been drawn.
+ */
+async function pressAndAwait(
+  page: Page,
+  selector: string,
+  labels: { busy: string; resting: string },
+): Promise<void> {
+  expect(await page.evaluate(shownAt, { selector, press: true })).toBe(`disabled ${labels.busy}`);
+  await expect(page.locator(selector)).toHaveText(labels.resting, { timeout: REPLY_MS });
+}
+
+/**
+ * Read Refresh once, now, and require it usable: a repository is shown and no
+ * Refresh of its own is unanswered. Read once rather than waited on, so a later
+ * write cannot make a wrong state pass.
+ */
+async function expectRefreshUsable(page: Page): Promise<void> {
+  expect(await page.evaluate(shownAt, { selector: REFRESH, press: false })).toBe('enabled Refresh');
+}
+
 test.beforeAll(() => {
   if (!existsSync(join(repositoryRoot, 'dist', 'main.cjs'))) {
     throw new Error('run `npm run build` before the end-to-end gate');
@@ -270,5 +313,34 @@ test('refresh stays disabled until its own reply, whatever is answered meanwhile
     // The ordering this case exists for: the Load More was answered while the
     // Refresh was still reading.
     expect(overlaps.at(-1)).toBe(true);
+  });
+});
+
+/*
+ * Review round 17 of E01-M01 (finding F-38) removed the line that takes Refresh
+ * out of the renderer's busy set once its own request is answered, and every
+ * gate stayed green, while the window's Refresh ended dead after the first
+ * Refresh followed by a Load More: each later reply disables it again. This
+ * case answers one request at a time, so no ordering is left to chance, and
+ * reads Refresh after each reply has been drawn.
+ */
+test('refresh is usable again after its own reply, whatever is answered after it', async () => {
+  test.setTimeout(SLOW_TEST_MS);
+  const large = fixture('large', 'large', 10_000);
+  await withWindow(large, async (page, application) => {
+    await expect(page.locator('.bar__path')).toHaveText(large);
+    await expect(page.locator(REFRESH)).toBeEnabled();
+    await pressAndAwait(page, REFRESH, { busy: 'Refreshing…', resting: 'Refresh' });
+    await expectRefreshUsable(page);
+    const rows = await page.evaluate(tableRows, ROW_HEIGHT);
+    await pressAndAwait(page, MORE, { busy: 'Loading…', resting: 'Load More Commits' });
+    expect(await page.evaluate(tableRows, ROW_HEIGHT)).toBe(rows + FURTHER_PAGE_COMMITS);
+    // A Load More answered after the Refresh leaves Refresh usable.
+    await expectRefreshUsable(page);
+    await answerTheDialog(application, large);
+    await pressAndAwait(page, '.bar__open', { busy: 'Opening…', resting: 'Open Repository' });
+    expect(await page.evaluate(tableRows, ROW_HEIGHT)).toBe(FIRST_PAGE_COMMITS);
+    // So does an Open answered after both.
+    await expectRefreshUsable(page);
   });
 });
