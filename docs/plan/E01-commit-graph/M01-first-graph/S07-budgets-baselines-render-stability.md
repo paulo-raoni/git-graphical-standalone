@@ -25,13 +25,13 @@ control and did not measure.
 | Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
 | Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
-| Resident memory, all processes, 50 000 commits | ≤ 400 MB | **467 034 112 bytes** (445.4 MiB) | three runs, 441.7 to 445.4 MiB | **does not meet** |
-| Resident memory growth over 5 minutes idle | ≤ 2 % | **−6.9 %** (ratio 0.931) | three five-minute runs: 0.923 to 0.947 | meets |
+| Resident memory, all processes, 50 000 commits | ≤ 400 MB | **467 034 112 bytes** (445.4 MiB) | five runs, 441.7 to 455.2 MiB | **does not meet** |
+| Resident memory growth over 5 minutes idle | ≤ 2 % | **−6.9 %** (ratio 0.931) | five five-minute runs: 0.923 to 0.947 | meets |
 | Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
-| CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | three five-minute runs: 0.063, 0.063 and 0.453 % | meets |
+| CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | five five-minute runs: 0.063 to 0.453 % | meets |
 
-What each row measured and how follows. The memory and idle rows are three runs rather than five, because each
+What each row measured and how follows. The memory and idle rows are five runs of one case, not five runs inside one, because each
 reading takes five real minutes and the gate itself runs it once; that is said beside each.
 
 ### Cold start, empty repository
@@ -100,9 +100,10 @@ identifier, and reads every process descended from it out of Windows' process ta
 GPU process, the network service, the renderer and the utility process. The process Playwright spawns is a
 `cmd.exe` shim above the main process and is not counted.
 
-**It is over the budget.** Three readings on 2026-09-28 with nothing planted that changes memory — one while
-this lane explored, the gate's first run, and a probe run whose only plant changed what happens after the
-window closes — were 441.7, 445.4 and 442.0 MiB, that is 463 to 467 MB against 400. The budget is left where
+**It is over the budget.** Five readings on 2026-09-28 with nothing planted that changes memory — one while
+this lane explored, the case's first run, a probe run whose only plant changed what happens after the window
+closes, the full `npm run gates` run and the case's last run — were 441.7, 445.4, 442.0, 443.8 and 455.2
+MiB, that is 463 to 477 MB against 400. The budget is left where
 it is.
 
 What the reading is, so that the finding is not misread in either direction: a working set counts a page
@@ -126,27 +127,28 @@ seconds later, 227.8 MiB of them, and the gate failed.
 ### Five idle minutes after the load
 
 Five real minutes, with the case's own timeout set to fit them. **Memory:** the working sets at the end were
-0.931 of what they were at the start, down by 6.9 %, at 413.7 MiB; two more five-minute runs, whose plants did
-not touch the idle window, read 0.947 and 0.923. The collections the load left behind finishing is the likely
+0.931 of what they were at the start, down by 6.9 %, at 413.7 MiB; four more five-minute runs, none with a plant
+that touched the idle window, read 0.947, 0.923, 0.939 and 0.933. The collections the load left behind finishing is the likely
 cause, and that is an inference. **CPU:** the five processes used 187 ms of processor time in 300 s,
 **0.063 % of one core**, read from Windows' per-process kernel and user times; the second run read 0.063 % as
-well, and the third **0.453 %**, of which 1 110 ms was the main process alone — while the main-process count
-below saw no Node callback at all in that run, so the time went to something in Chromium's side of the main
-process that this gate cannot name. **Wakeups:** none. In the page,
+well, the third **0.453 %**, the fourth 0.099 % and the fifth 0.156 %. Of the third run's time, 1 110 ms was
+the main process alone, while the main-process count below saw no Node callback at all in that run, so the
+time went to something in Chromium's side of the main process that this gate cannot name. **Wakeups:** none. In the page,
 the init scripts count every callback of `setTimeout`, `setInterval`, `requestAnimationFrame` and
 `requestIdleCallback`, wrapped before `renderer.js` runs, and none ran; nor did the canvas redraw. In the main
 process an `async_hooks` hook counts every callback Node runs — a timer, an immediate, a socket, a message —
-and none ran either, once the two reads of the count itself are subtracted.
+and none ran either, once the two reads of the count itself are subtracted. That held in all five runs.
 
 What these cannot see is work Chromium schedules for itself outside JavaScript, such as a garbage collection
 or a compositor task, and the utility process, where nothing of the gate's can run; the processor times cover
 both.
 
 "≈ 0 %" is not a number, so the gate needs one. It holds the figure to **0.5 % of one core** — below it, the
-figure rounds to zero per cent — and the wakeups to exactly zero. Its tolerance is 8, so that the strict limit
-is the ceiling and not eight times 0.063, because the third run shows the figure moving by seven times between
-runs of an unchanged product. **The third run's 0.453 % is close enough to 0.5 that this gate may flap**, and a
-flapping gate is a defect of the gate; the audit raises it.
+figure rounds to zero per cent — and the wakeups to exactly zero. Its tolerance is 8, which puts the baseline's
+own limit at 0.504, just above the ceiling, so that the strict limit is the ceiling: the five runs show the
+figure moving by seven times between runs of an unchanged product, and a tolerance sized to 0.063 would fail
+the third. **The third run's 0.453 % is close enough to 0.5 that this gate may flap**, and a flapping gate is
+a defect of the gate; it is raised with the owner rather than widened here.
 
 ### Main-thread work per frame while scrolling
 

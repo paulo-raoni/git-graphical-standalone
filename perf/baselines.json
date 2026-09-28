@@ -140,25 +140,25 @@
     "baseline": 467034112,
     "ceiling": 400000000,
     "tolerance": 1.05,
-    "unit": "bytes resident, the sum of the working sets of every process of the application, 50000 commits loaded and painted and ten seconds settled, read from the operating system: one run, 2026-09-28; the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, and this measurement is over it"
+    "unit": "bytes resident, the sum of the working sets of every process of the application, 50000 commits loaded and painted and ten seconds settled, read from the operating system: the first of five runs on 2026-09-28, which read 441.7 to 455.2 MiB; the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, and every run is over it"
   },
   "privateBytesAt50000": {
     "baseline": 201416704,
     "tolerance": 1.1,
-    "unit": "bytes committed privately by the same processes at the same moment, the reading that counts no shared page twice: one run, 2026-09-28"
+    "unit": "bytes committed privately by the same processes at the same moment, the reading that counts no shared page twice: the first of five runs on 2026-09-28, which read 186.1 to 192.1 MiB"
   },
   "idleResidentRatio": {
     "baseline": 0.931,
     "ceiling": 1.02,
     "tolerance": 1.1,
-    "unit": "times the resident memory at the start of five real idle minutes after the 50000-commit load, at their end: one run, 2026-09-28"
+    "unit": "times the resident memory at the start of five real idle minutes after the 50000-commit load, at their end: the first of five runs on 2026-09-28, which read 0.923 to 0.947"
   },
   "idleCpuPerCent": {
     "baseline": 0.063,
     "ceiling": 0.5,
     "tolerance": 8,
     "ciTolerance": 4,
-    "unit": "per cent of one core used by every process of the application over five idle minutes after the 50000-commit load, from the operating system's processor times: three runs on 2026-09-28 read 0.063, 0.063 and 0.453, the last with the main process alone using 1110 ms, none of it in a Node callback; the tolerance leaves the ceiling as the strict limit, which reads ADR-0002 decision 6's approximately zero as a figure that rounds to zero per cent"
+    "unit": "per cent of one core used by every process of the application over five idle minutes after the 50000-commit load, from the operating system's processor times: five runs on 2026-09-28 read 0.063, 0.063, 0.453, 0.099 and 0.156, the third with the main process alone using 1110 ms, none of it in a Node callback; the tolerance leaves the ceiling as the strict limit, which reads ADR-0002 decision 6's approximately zero as a figure that rounds to zero per cent"
   },
   "idlePageWakeups": {
     "baseline": 0,
