@@ -225,7 +225,7 @@ function idleVerdicts(reading: IdleReading): boolean[] {
  * when it does not, so that what is still running is read either way.
  */
 async function closeTheWindow(budgeted: Budgeted): Promise<void> {
-  const child = budgeted.application.process();
+  const child = budgeted.launched;
   const exited = new Promise<boolean>((resolve) => {
     if (child.exitCode !== null) resolve(true);
     child.once('exit', () => {

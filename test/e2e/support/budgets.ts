@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { _electron as electron, expect } from '@playwright/test';
+import type { ChildProcess } from 'node:child_process';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import { compareInRegime, readBaselines } from '../../../perf/baselines';
@@ -42,6 +43,11 @@ export interface Budgeted {
   readonly page: Page;
   /** `Date.now()` just before `electron.launch` was called. */
   readonly launchedAt: number;
+  /**
+   * The process Playwright started, taken at launch: once the application has
+   * ended by itself, `application.process()` can no longer be asked.
+   */
+  readonly launched: ChildProcess;
 }
 
 /** What to launch with: a folder, an environment, and Chromium switches. */
@@ -89,13 +95,18 @@ export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budge
   const page = await application.firstWindow();
   const installed = await page.evaluate(readProbe);
   expect(installed.beforeRenderer).toEqual([true, true, true, true, true]);
-  return { application, page, launchedAt };
+  return { application, page, launchedAt, launched: application.process() };
 }
 
-/** Close the application and require its main process to have exited. */
+/**
+ * Close the application, unless it has already ended by itself, and require the
+ * process Playwright started to have exited.
+ */
 export async function closeBudgeted(budgeted: Budgeted): Promise<void> {
-  const child = budgeted.application.process();
-  await budgeted.application.close();
+  const child = budgeted.launched;
+  if (child.exitCode === null) {
+    await budgeted.application.close();
+  }
   expect(child.exitCode === null && !child.killed).toBe(false);
 }
 
