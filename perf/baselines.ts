@@ -35,6 +35,13 @@ export interface Baseline {
   readonly tolerance?: number;
   /** What the number means, for a reader of the file. */
   readonly unit: string;
+  /**
+   * How much wider **every** limit of this entry is in the CI regime, as a
+   * factor: the ceiling, and the baseline's own tolerance. Present only for
+   * wall-clock figures, beside a `tolerance`; a counter has neither, because a
+   * counter reads the same on every machine. See {@link regimeOf}.
+   */
+  readonly ciTolerance?: number;
 }
 
 export interface Baselines {
@@ -108,4 +115,66 @@ export function compareWithBaseline(
       ? `${name} improved to ${String(round(measured))} ${baseline.unit}: commit that as the baseline in perf/baselines.json, replacing ${String(baseline.baseline)}.`
       : `${name} is ${String(round(measured))} ${baseline.unit}, against a baseline of ${String(baseline.baseline)}.`,
   };
+}
+
+/**
+ * Which limits a run is held to: `strict` on the development machine, `ci` on a
+ * continuous-integration runner.
+ *
+ * `docs/ADR-0003-quality-gates-and-ci.md` decision 4 checks the wall-clock
+ * budgets strictly where an executor and a reviewer run them and with a wide
+ * tolerance on a shared runner, so that only an order-of-magnitude regression
+ * fails there. **The run is told which by the `CI` variable**, which GitHub
+ * Actions sets to `true` in every job, and which nothing on the development
+ * machine sets. It is read rather than a flag of this project's own because it
+ * is the runner declaring itself: a gate that needed the workflow file to pass a
+ * flag would be a gate whose CI behaviour lived in the workflow, which
+ * `AGENTS.md` §11 forbids.
+ *
+ * The failure it can have is one-sided and loud. A runner that does not set the
+ * variable is held to the strict limits and goes red, which is seen; a
+ * development shell that sets it is held to the wide ones and stays green,
+ * which would not be — so every message {@link compareInRegime} prints begins
+ * with the regime it was held to, and the transcript says which a run was.
+ * `CI` empty, `0` or `false` is the strict regime, as it is for the tools that
+ * read the same variable.
+ */
+export type Regime = 'strict' | 'ci';
+
+export function regimeOf(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Regime {
+  const flag = (environment['CI'] ?? '').trim().toLowerCase();
+  return flag === '' || flag === '0' || flag === 'false' ? 'strict' : 'ci';
+}
+
+/**
+ * The entry with its limits as `regime` sets them.
+ *
+ * The CI regime **widens** — the ceiling and the tolerance, both by the entry's
+ * `ciTolerance` — and removes nothing: every assertion a strict run makes, a CI
+ * run makes too, against a larger number. An entry without `ciTolerance` is the
+ * same in both regimes, which is every counter.
+ */
+export function limitsIn(baseline: Baseline, regime: Regime): Baseline {
+  const widen = regime === 'ci' ? (baseline.ciTolerance ?? 1) : 1;
+  if (widen === 1) {
+    return baseline;
+  }
+  return {
+    ...baseline,
+    tolerance: (baseline.tolerance ?? 1) * widen,
+    ...(baseline.ceiling === undefined ? {} : { ceiling: baseline.ceiling * widen }),
+  };
+}
+
+/** {@link compareWithBaseline}, under the limits of `regime`, saying which regime it was. */
+export function compareInRegime(
+  name: string,
+  measured: number,
+  baseline: Baseline,
+  regime: Regime = regimeOf(),
+): Comparison {
+  const comparison = compareWithBaseline(name, measured, limitsIn(baseline, regime));
+  return { ...comparison, message: `[${regime} regime] ${comparison.message}` };
 }
