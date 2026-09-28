@@ -214,6 +214,34 @@ function idleVerdicts(reading: IdleReading): boolean[] {
   ];
 }
 
+/**
+ * Close the window the way a person does, and wait for the application to end.
+ *
+ * Not `ElectronApplication.close`, which calls `app.quit` itself and would
+ * measure Playwright's way of ending the application rather than this one's:
+ * closing the last window is what reaches `window-all-closed` in
+ * `src/app/main.ts`, which stops the utility process and quits. Waits up to
+ * thirty seconds for the main process to exit, and reports rather than throws
+ * when it does not, so that what is still running is read either way.
+ */
+async function closeTheWindow(budgeted: Budgeted): Promise<void> {
+  const child = budgeted.application.process();
+  const exited = new Promise<boolean>((resolve) => {
+    if (child.exitCode !== null) resolve(true);
+    child.once('exit', () => {
+      resolve(true);
+    });
+    setTimeout(() => {
+      resolve(false);
+    }, 30_000);
+  });
+  await budgeted.application.evaluate(({ BrowserWindow }) => {
+    for (const window of BrowserWindow.getAllWindows()) window.close();
+  });
+  const ended = (await exited) ? 'exited' : 'was still running 30 s';
+  process.stdout.write(`  the main process ${ended} after the window closed\n`);
+}
+
 /** Hold what is still resident of `loaded` once the window has closed. */
 function closedVerdicts(loaded: readonly ProcessReading[]): boolean[] {
   const left = stillRunning(loaded);
@@ -245,9 +273,10 @@ test('fifty thousand commits: memory, five idle minutes, and what closing gives 
     held.loaded = processTree(main);
     held.verdicts.push(...memoryVerdicts(held.loaded));
     held.verdicts.push(...idleVerdicts(await idle(budgeted, main)));
+    await closeTheWindow(budgeted);
+    held.verdicts.push(...closedVerdicts(held.loaded));
   } finally {
     await closeBudgeted(budgeted);
   }
-  held.verdicts.push(...closedVerdicts(held.loaded));
   expect(held.verdicts).toEqual(held.verdicts.map(() => false));
 });
