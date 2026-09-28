@@ -57,7 +57,6 @@ test('live row elements: a function of the window, not of the commits loaded', a
       `  row elements: ${String(atFirstPage)} with 300 loaded, ${String(atAll)} with ${String(LARGE)} ` +
         `after scrolling, against viewport rows plus twice the overscan, ${String(bound)}\n`,
     );
-    expect(atAll).toBeLessThanOrEqual(bound);
     const verdicts = [
       holdToBaseline('liveRowElements', 'live row elements, 10000 commits loaded', atAll).failed,
       holdToBaseline(
@@ -67,6 +66,7 @@ test('live row elements: a function of the window, not of the commits loaded', a
       ).failed,
     ];
     expect(verdicts).toEqual([false, false]);
+    expect(atAll).toBeLessThanOrEqual(bound);
   });
 });
 
