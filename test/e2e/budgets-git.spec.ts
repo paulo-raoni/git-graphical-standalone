@@ -119,13 +119,10 @@ test('git processes per request, and what a Load More reads as pages accumulate'
       const costs = await measureRequests(page, repository, trace);
       process.stdout.write(
         `  open: ${String(costs.opened.length)} git processes (${costs.opened.join(', ')}); ` +
-          `refresh: ${String(costs.refreshed.length)} (${costs.refreshed.join(', ')})
-` +
+          `refresh: ${String(costs.refreshed.length)} (${costs.refreshed.join(', ')})\n` +
           `  five Load Mores: ${costs.perPress.join(', ')} git processes; ` +
-          `commits stored ${costs.stored.join(', ')}; ${described(costs.times)} ms
-`,
+          `commits stored ${costs.stored.join(', ')}; ${described(costs.times)} ms\n`,
       );
-      expect(costs.stored).toEqual([600, 900, 1200, 1500, 1800]);
       const growth = (costs.stored[4] ?? 0) / (costs.stored[0] ?? 1);
       const verdicts = [
         holdToBaseline(
@@ -150,6 +147,7 @@ test('git processes per request, and what a Load More reads as pages accumulate'
         ).failed,
       ];
       expect(verdicts).toEqual([false, false, false, false]);
+      expect(costs.stored).toEqual([600, 900, 1200, 1500, 1800]);
     });
   } finally {
     rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });

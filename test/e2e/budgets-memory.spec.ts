@@ -219,8 +219,7 @@ function closedVerdicts(loaded: readonly ProcessReading[]): boolean[] {
   const left = stillRunning(loaded);
   process.stdout.write(
     `  after the window closed: ${String(left.length)} of the ${String(loaded.length)} processes ` +
-      `still running, ${mebibytes(total(left, 'workingSet'))} still resident
-`,
+      `still running, ${mebibytes(total(left, 'workingSet'))} still resident\n`,
   );
   return [
     holdToBaseline(
