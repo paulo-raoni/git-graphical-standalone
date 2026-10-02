@@ -29,6 +29,7 @@ It also lays the ground every later milestone stands on: the four rings and the 
 | S06 | open a repository | 5 | The composition root: open by argument or folder dialog, initial load, Load More, refresh, and the error page when git is missing. |
 | S09 | the mutation gate's two clocks | 5 | Choose the test runner's inner timeout, which was never set, and make it coherent with the mutation runner's budget, so the same source gets the same verdict at any machine load. |
 | S07 | budgets, baselines and render stability | 6 | The assembled application measured against every budget of ADR-0002, the baselines committed, and the golden-image question settled. |
+| S10 | fit fifty thousand commits in the memory budget | 6 | The assembled application at 50 000 loaded commits inside the resident-memory budget of ADR-0002 decision 6, which S07 measured it over; or the measurements showing which recorded decision stands in the way. |
 
 Scope and boundary of each slice live **only** in its task file (`AGENTS.md` §3).
 

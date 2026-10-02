@@ -121,6 +121,7 @@ depends on both.
 | E01-M01-S06 | open a repository | 5 | The composition root: open by argument or folder dialog, initial load, Load More, refresh, and the error page when git is missing. |
 | E01-M01-S09 | the mutation gate's two clocks | 5 | Choose the test runner's inner timeout and make it coherent with the mutation runner's budget, so the gate stops measuring the machine. |
 | E01-M01-S07 | budgets, baselines and render stability | 6 | Measure the assembled application against every budget of ADR-0002, commit the baselines, and settle whether a render is byte-stable enough for golden images on this machine. |
+| E01-M01-S10 | fit fifty thousand commits in the memory budget | 6 | Bring the assembled application at 50 000 loaded commits inside the resident-memory budget that S07 measured it over, or show by measurement which recorded decision stands in the way. |
 
 Later milestones are sliced when they come in flight.
 
