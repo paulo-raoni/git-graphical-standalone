@@ -69,6 +69,16 @@ only when all ten met the load; a regression of the product moves every reading,
 cannot see is a regression that slows some launches and not others, which the median of five would have seen
 when it slowed three; that is the price, the same one the benchmarks in `perf/` pay.
 
+**What it does not survive.** Ten runs of the spec as it is now, on 2026-10-03 between 08:35 and 08:50: the
+eight taken at a sampled load of 17 to 99 per cent were green in all three cases (fastest of ten: empty 968 to
+1106 ms, with the fixture 1000 to 1334, load 414.2 to 429). The two that ran into four and a half minutes at 76
+to 100 per cent, free memory 2.64 to 3.49 GB, were red: the first on the load alone, fastest of ten 792.4 ms with
+single Refreshes up to 2069; the second in all three cases, empty 1736, with the fixture 2557, load 1323. At the
+end of those minutes another project's mutation run had seven workers at a whole core each, beside the
+antivirus at under one core. When every logical processor is busy for longer than the readings take, every reading
+is the product's real time on that machine, and it is over the budget; no statistic of the readings changes
+that, and whether the strict regime is meant to hold then is the owner's question, raised by E01-M01-FIX-27.
+
 **Where a slow cold start spends its time**, measured with git's own trace (`GIT_TRACE2_EVENT`), the
 processes' creation times from Windows' process table and the page's paint marks, in fourteen launches on
 2026-10-03 at two loads (git's trace itself costs time, so these launches read slower than the gate's). At 28
