@@ -474,3 +474,18 @@ budgets — **moves in the improving direction only**. Loosening one is a commit
 diff the reviewer reads. An executor that cannot meet a baseline raises it as a blocker in its audit; it
 never edits the target to match its result. A gate that flaps is a defect of the gate, fixed as one, and
 never a reason to relax a threshold.
+
+### Wall-clock gates on a shared machine
+
+The development machine is shared with other projects' agents, and a mutation run of another project can hold
+every core for minutes. Measured by E01-M01-FIX-27 on 2026-10-03: under its first two methods, every start and
+load run that met such a stretch went red on an unchanged product; under its final method the same cases were
+green in ten of ten full runs at 10 to 100 % sampled load. **The owner ruled on 2026-10-03 that the machine when
+free decides.**
+
+- The strict limits stand. Nothing is widened for load.
+- A wall-clock case that goes red while another project's test, mutation or build run is in the process table is
+  re-run, that case alone, once that run has ended. The record (audit or review file) carries both readings, the
+  load sampled during each, and what was running.
+- A red on a machine with no such run is red. A case that goes red on a free machine is a defect of the product
+  or of the gate, and never a reason to re-run until green.

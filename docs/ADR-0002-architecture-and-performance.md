@@ -156,7 +156,7 @@ raises it as a blocker; it does not quietly relax it.
 | Resident memory growth over 5 minutes idle after a load | ≤ 2 % | end-to-end run |
 | Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | end-to-end run |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan, independent of commits loaded | end-to-end run |
-| CPU while idle, window visible, no input | ≈ 0 %, no timer wakeups | end-to-end run |
+| CPU while idle, window visible, no input | ≈ 0 %, held as ≤ 0.5 % of one core; no timer wakeups | end-to-end run |
 
 The three that drive the design are **96 bytes per commit**, which forces the columnar store, **8 ms per
 frame**, which forces row recycling and coalesced redraws, and **no timer wakeups when idle**, which forbids
@@ -173,6 +173,11 @@ polling.
 > commits loaded. The limit, 400 MB in SI megabytes, is unchanged. The idle-growth row still reads the working
 > sets: it compares the same processes with themselves five minutes apart, and S07 measured its ratio at 0.923
 > to 0.947.
+
+> **Amended 2026-10-03, by the owner's ruling.** "≈ 0 %" for the idle processor needed a number a gate can
+> hold. E01-M01-S07 chose **0.5 % of one core**, read from the processes' kernel and user time over five idle
+> minutes; review round 20 counted twelve such readings with a highest of 0.453 %. The owner ratified 0.5 % as
+> the meaning of the row.
 
 ## Decision 7 · Clean code, as rules a machine can check
 
