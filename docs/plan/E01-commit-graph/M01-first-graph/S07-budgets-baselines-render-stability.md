@@ -26,8 +26,8 @@ cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day 
 
 | budget | limit | measured | runs, range | verdict |
 | --- | --- | --- | --- | --- |
-| Cold start to a painted window, empty repository | ≤ 1500 ms | median **1068 ms** | five launches, 994 to 1156 | meets |
-| Load 10 000 commits, to rows painted | ≤ 800 ms | median **437.7 ms** | five loads, 416 to 476 | meets |
+| Cold start to a painted window, empty repository | ≤ 1500 ms | fastest of ten launches, **991 ms** (median of five runs) | five runs on 2026-10-03: fastest 958 to 1096 | meets |
+| Load 10 000 commits, to rows painted | ≤ 800 ms | fastest of ten Refreshes, **423.5 ms** (median of five runs) | five runs on 2026-10-03: fastest 418.4 to 539.4 | meets |
 | Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
 | Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
@@ -44,15 +44,43 @@ reading takes five real minutes and the gate itself runs it once; that is said b
 
 **What:** the time from the operating system creating the application's main process to the window painted
 over a repository with no commits, named on the command line. **How:** `test/e2e/budgets-start.spec.ts`
-makes the repository with `git init`, launches the built application with it five times, and reads the
+makes the repository with `git init`, launches the built application with it ten times, and reads the
 process's creation time from Windows' own process table; the end is the first paint mark (below) showing that
-repository's path in the bar and the empty table. **Runs:** 1033, 994, 1070, 1068 and 1156 ms. Measured from
-the call to `electron.launch` instead, which also pays for Playwright's own connection, the same five read
-1072 to 1191 ms.
+repository's path in the bar and the empty table. **The fastest of the ten is what is compared.** **Runs**,
+measured again by E01-M01-FIX-27 on 2026-10-03 between 08:20 and 08:26, five runs of the spec with the
+processor load sampled every five seconds at 15 to 80 per cent and free memory at 4.28 to 5.01 GB: the fastest
+of ten read 999, 958, 991, 972 and 1096 ms, and the baseline is their median, 991. Single launches in those
+runs read 958 to 2196 ms.
 
 Beside it, the case a person actually starts on — S06's first item — with the ten-thousand-commit fixture on
-the command line and its first page of 300 painted: 1221, 1469, 1105, 969 and 988 ms, median 1105. That one
-has no budget of its own, so it has a baseline and no ceiling.
+the command line and its first page of 300 painted, the same five runs: fastest of ten 1031, 1014, 1100, 1040
+and 1045 ms, baseline 1040; single launches 1014 to 2273. That one has no budget of its own, so it has a
+baseline and no ceiling.
+
+**Why the fastest of ten, and not the median of five** that S07 held on 2026-09-28 (empty 994 to 1156, median
+1068; with the fixture 969 to 1469, median 1105). The machine is shared with other agents, and on 2026-10-03,
+between 07:50 and 07:58, ten runs of the spec as it then was went red **seven times** on a product nothing had
+changed: the empty median read 1081 to 1719 against a limit of 1500 (red six times), the fixture's 1120 to
+1745 against 1657.5 (red twice), and the load's 435 to 731.6 against 656.6 (red once), with the processor load
+sampled at 17 to 100 per cent and free memory at 3.69 to 5.44 GB during the last eight runs (the sampler of the
+first two did not start). Load from other programs only ever adds to a reading, and it comes in bursts of
+seconds, which move several readings of five together and the median with them. The fastest of ten is moved
+only when all ten met the load; a regression of the product moves every reading, the fastest included. What it
+cannot see is a regression that slows some launches and not others, which the median of five would have seen
+when it slowed three; that is the price, the same one the benchmarks in `perf/` pay.
+
+**Where a slow cold start spends its time**, measured with git's own trace (`GIT_TRACE2_EVENT`), the
+processes' creation times from Windows' process table and the page's paint marks, in fourteen launches on
+2026-10-03 at two loads (git's trace itself costs time, so these launches read slower than the gate's). At 28
+to 73 per cent, 1300 to 1687 ms: Electron's own start to the window's shell painted took 421 to 605 ms; the open
+is six git processes run one after another, from the first one's start to the last one's exit 722 to 1044 ms,
+of which git's own traced run was 198 to 275 ms and the rest the gaps between them; the last exit to the
+painted mark took 43 to 57 ms. At 23 to 100 per cent, 1548 to 3813 ms: the shell 488 to 1019, the six git
+processes 828 to 2243 (inside git 297 to 588, gaps 531 to 1656), the last 17 to 61. So the time a busy machine
+adds goes mostly into starting the git processes and some into Electron's start. What a gap consists of —
+the utility process's turn-around, Windows creating the process, git's start before its trace begins — the
+instruments used here cannot separate, and in some launches a gap was about 105 ms longer than its neighbours
+at any load; that is not attributed.
 
 ### Ten thousand commits, one load, to rows painted
 
@@ -64,12 +92,35 @@ layout state. So the case grows the utility process's state to 10 000 commits wi
 bridge, **without drawing it**, and then presses Refresh. What that leaves out of a real first open is finding
 git and starting the utility process, both paid once and both inside the cold-start figures. The clock runs
 from the press to the first mark showing 10 000 rows, `commit 10000` at the top, ink on the canvas and the
-control back at rest. **Runs:** 438, 452, 416, 417 and 476 ms.
+control back at rest. Ten Refreshes, each after a second's pause so that they do not all fall in one burst of
+load, and **the fastest is what is compared**, for the reason given under the cold start. **Runs**, the same
+five runs of 2026-10-03 (load 15 to 80 per cent): fastest of ten 418.4, 539.4, 423.5, 420 and 424.4 ms,
+baseline 423.5; single Refreshes 418 to 576. S07's median of five on 2026-09-28 read 416 to 476, median 437.7.
+
+**Two speeds, not one.** The fifty single Refreshes of those runs fell at 418 to 457 ms or at 521 to 576, none between; in one of
+the five runs all ten fell near 550. The trace below shows the same thing as a gap between two git
+processes that is about 105 ms longer than its neighbours, once or more in some Refreshes and in none of
+others, at loads of 10 to 39 per cent as much as at higher ones. It is not attributed. Both speeds are inside
+the budget.
+
+**Where a slow Refresh spends its time.** Timed with git's own trace, the processes' CPU time from Windows'
+process table before and after each press, and the page's marks, eight Refreshes in one window on 2026-10-03 at a processor
+load of 23 to 100 per cent (the trace itself adds about 25 ms to each git process): a Refresh is five git
+processes run one after another. The three that took 615 to 723 ms spent 253 to 312 ms inside git's traced
+runs, the log 117 to 151 of it, 268 to 309 in the gaps between the processes, and 68 to 75 from the press to the
+first one; the five that took 871 to 1813 spent 300 to 779 inside git, the log 141 to 460, 455 to 746 in the
+gaps, and 81 to 244 before the first. From the last git's exit to the rows painted — the layout of 10 000 rows,
+two structured clones and the paint — took 23 to 53 ms in all eight. The slow ones spent what the fast ones did
+not in starting and running git. Review round 20's 1.1 to 1.55 s Refreshes were not traced; that they spent it
+the same way is an inference from these eight. Two things these instruments cannot
+separate: the log's window holds the utility process's parse of git's output as it streams, so git's share
+and the parser's are one figure; and a gap holds the utility's turn-around, Windows creating the process and
+git's own start before its trace begins.
 
 S06 measured the nearest thing it had, a Load More of 9 700 over the bridge without the paint, at 822 to 954 ms
-on 2026-09-19. The same round trip measured 481 ms here on 2026-09-28. This slice changed no product code, so
-the difference is the machine or its condition on the two days; that is an inference, and neither day's
-condition was measured.
+on 2026-09-19. The same round trip measured 481 ms on 2026-09-28. S07 changed no product code, so the
+difference is the machine or its condition on the two days; that is an inference, and neither day's condition
+was measured.
 
 ### Parse and layout throughput
 
@@ -286,9 +337,11 @@ it was held to.
 
 **How wide.** An entry with a `ciTolerance` has every limit multiplied by it in CI — the ceiling and the
 baseline's own tolerance — and nothing removed. Every wall-clock entry carries a tolerance of 1.5, applied to a
-median of five or to the fastest of five, never to one run; the widest spread of single runs any of them
-showed here was the cold start with a repository, 969 to 1469 ms, and its median sat at 1105. Each also
-carries a `ciTolerance` of 4, so that in CI a
+median of five, to the fastest of five or to the fastest of ten, never to one run. The two cold starts and the
+load are the fastest of ten since E01-M01-FIX-27 (2026-10-03), because their median of five went red in seven
+runs of ten on an unchanged product on a shared machine (under *Cold start, empty repository*); in those
+ten runs single cold starts read 968 to 3351 ms, and in the five runs that set today's baselines the fastest
+of ten sat 958 to 1100. Each also carries a `ciTolerance` of 4, so that in CI a
 figure may be six times its baseline, or four times its budget, whichever is less. Six because it has to be
 **under ten**, or a regression of an order of magnitude would pass on the runner, with room for a fast run to
 still fail at ten; and as far above one as that allows, because the runner is a different machine: no run of
@@ -306,6 +359,13 @@ start of the renderer, in the utility process's Refresh, in the renderer's `pain
 layout pass, which read 7.2 to 10.8 times each figure's baseline — failed every wall-clock gate in both
 regimes. A regression planted at about three times — 2.7 to 3.1 times — failed every one in the strict regime
 and passed every one in the CI regime. Removing the plants turned every one green in both.
+
+E01-M01-FIX-27 planted again, on 2026-10-03, against the fastest of ten and the re-measured baselines. A
+busy-wait of 850 ms in the utility process's Refresh made the fastest Refresh 1249.9 ms (2.95 times the
+baseline of 423.5): red in the strict regime, past the 800 ms budget, and 1374.5 ms and green in the CI regime,
+whose limit is 2541. One of 3900 ms made it 4530.3 strict and 4309.4 CI: red in both, past 800 and past 3200.
+A busy-wait of 700 ms at the start of the renderer made the fastest of ten empty cold starts 1685 ms: red, past
+1500. Removing each plant and rebuilding turned it green.
 
 ## The size budgets, calibrated
 
@@ -345,13 +405,21 @@ and the repair is the owner's choice between a per-platform image and a toleranc
 
 ## How each reading could be wrong, and how that was checked
 
-- **A "painted" mark earlier than the paint.** A mark is taken in the second of two nested animation-frame
-  callbacks asked for after each batch of changes, which cannot run until a rendering update after the change
-  has painted. Recording both callbacks' frame times showed the gap from the change at between 1.6 and 34 ms;
-  and every cold start holds its first mark to be no earlier than Chromium's own `paintTime` for the first
-  contentful paint, which it was in every run, with the frame reaching the screen 50 to 92 ms after that paint.
-  The mark is therefore after the main thread painted and may be before the compositor presented, by up to
-  about one frame once the window is showing.
+- **A "painted" mark earlier than the paint.** It happened, and the mark was corrected by E01-M01-FIX-27. As
+  S07 built it, a mark read the window and took the time in the second of two nested animation-frame
+  callbacks, which cannot run until the update after the change has painted — but the window it read could
+  hold a change made after that paint. On 2026-10-03, in 140 cold starts of that probe at a processor load of
+  37 to 100 per cent, three first marks came before Chromium's `paintTime` for the first contentful paint: two
+  by about 29 ms, where the first mark showed the page before the renderer had mounted anything, whose paint
+  is Chromium's *first* paint, and one by 1.9 ms, where the renderer mounted its bar between the two callbacks
+  and the mark showed the bar before it was painted. Review round 20 met one of these, by 1.7 ms. **A mark now
+  reads the window in the first callback**, in the update whose paint draws what it read, and takes the time in
+  the second; and every cold start holds its first mark to be no earlier than Chromium's first paint and its
+  first mark showing the bar to be no earlier than the first contentful paint. In 120 cold starts on 2026-10-03
+  (load 11 to 80 per cent) that mark came 1.6 to 43.4 ms after Chromium's paint of the bar, and the frame
+  reached the screen 36 to 132 ms after that paint. Planted, a mark taking the time in the first callback failed
+  the first-paint check in the first launch, and with that check removed the bar check failed alone. The mark
+  is therefore after the main thread painted what it shows and may be before the compositor presented it.
 - **A probe installed too late.** Each init script records whether the renderer's view already existed; every
   launch requires all five to say no.
 - **A memory reading that misses a process.** The tree is read from the operating system, rooted at the pid the

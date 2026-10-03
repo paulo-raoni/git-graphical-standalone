@@ -69,24 +69,24 @@
     "unit": "typed-array bytes allocated per row by the same layout: its output columns and segment buffer, 130.490225 in five processes"
   },
   "coldStartEmptyMilliseconds": {
-    "baseline": 1068,
+    "baseline": 991,
     "ceiling": 1500,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds from the operating system creating the main process to the window painted over an empty repository named on the command line: median of five launches, which read 994 to 1156, test/e2e/budgets-start.spec.ts, 2026-09-28"
+    "unit": "milliseconds from the operating system creating the main process to the window painted over an empty repository named on the command line: the fastest of ten launches, test/e2e/budgets-start.spec.ts; the baseline is the median of that figure over five runs on 2026-10-03, which read 958 to 1096, with the processor load sampled at 15 to 80 per cent"
   },
   "coldStartOpenMilliseconds": {
-    "baseline": 1105,
+    "baseline": 1040,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds from the main process's creation to the first page of 300 painted, the 10000-commit fixture named on the command line: median of five launches, which read 969 to 1469, 2026-09-28"
+    "unit": "milliseconds from the main process's creation to the first page of 300 painted, the 10000-commit fixture named on the command line: the fastest of ten launches; the baseline is the median of that figure over five runs on 2026-10-03, which read 1014 to 1100, with the processor load sampled at 15 to 80 per cent"
   },
   "load10000Milliseconds": {
-    "baseline": 437.7,
+    "baseline": 423.5,
     "ceiling": 800,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, median of five, which read 416 to 476, 2026-09-28"
+    "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, the fastest of ten Refreshes a second apart; the baseline is the median of that figure over five runs on 2026-10-03, which read 418.4 to 539.4, with the processor load sampled at 15 to 80 per cent"
   },
   "scrollFrameMeanMilliseconds": {
     "baseline": 5.24,
