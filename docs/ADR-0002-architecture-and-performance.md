@@ -152,7 +152,7 @@ raises it as a blocker; it does not quietly relax it.
 | Parse throughput, streamed log | ≥ 20 000 commits / s | benchmark |
 | Lane layout throughput | ≥ 200 000 commits / s | benchmark |
 | Structural memory per loaded commit, message text excluded | ≤ 96 bytes | benchmark over the store |
-| Resident memory, all processes, 50 000 commits loaded | ≤ 400 MB | end-to-end run |
+| Memory, all processes, 50 000 commits loaded: the sum of their private bytes | ≤ 400 MB | end-to-end run |
 | Resident memory growth over 5 minutes idle after a load | ≤ 2 % | end-to-end run |
 | Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | end-to-end run |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan, independent of commits loaded | end-to-end run |
@@ -161,6 +161,18 @@ raises it as a blocker; it does not quietly relax it.
 The three that drive the design are **96 bytes per commit**, which forces the columnar store, **8 ms per
 frame**, which forces row recycling and coalesced redraws, and **no timer wakeups when idle**, which forbids
 polling.
+
+> **Amended 2026-10-03, by the owner's ruling.** The memory row counted the **resident** memory of all
+> processes, which on Windows is the sum of their working sets. That sum counts a page shared by several
+> processes once for each, and Electron's own code is mapped into all five processes this application runs.
+> Measured by E01-M01-S10 on 2026-10-02, five runs each: a window open on an empty repository, before a single
+> commit is held, already read **406.0 to 409.4 MB**, so no implementation inside decisions 2 and 3 could meet
+> the row as written; with 50 000 commits loaded the same sum read 451.3 to 456.8 MB, and E01-M01-S07 had read
+> 463 to 477 MB on 2026-09-28. The owner ruled that the budget counts the **sum of the private bytes** of every
+> process of the application, which counts nothing twice; S10 measured it at **182.9 to 191.4 MB** with 50 000
+> commits loaded. The limit, 400 MB in SI megabytes, is unchanged. The idle-growth row still reads the working
+> sets: it compares the same processes with themselves five minutes apart, and S07 measured its ratio at 0.923
+> to 0.947.
 
 ## Decision 7 · Clean code, as rules a machine can check
 
