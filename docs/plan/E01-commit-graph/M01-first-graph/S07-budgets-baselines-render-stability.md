@@ -16,6 +16,12 @@ gate or test was running during any measurement, and each run of the end-to-end 
 application at a time; the owner's desktop session was otherwise as it was left, which this lane did not
 control and did not measure.
 
+**The memory row was measured again on 2026-10-03**, after the owner's ruling (below), by a second executor
+context on the same machine and the same Electron, between 02:15 and 02:44 local time. That time the machine
+was not quiet: another project's mutation run and other agent sessions were running, which this slice did not
+start and did not stop. The processor load sampled from `Win32_Processor` before each run read 29 to 100 per
+cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day says so.
+
 ## The ten budgets, measured
 
 | budget | limit | measured | runs, range | verdict |
@@ -25,7 +31,7 @@ control and did not measure.
 | Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
 | Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
-| Resident memory, all processes, 50 000 commits | ≤ 400 MB | **467 034 112 bytes** (445.4 MiB) | five runs, 441.7 to 455.2 MiB | **does not meet** |
+| Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **190 316 544 bytes** (181.5 MiB) | five runs on 2026-10-03, 175.6 to 184.3 MiB | meets |
 | Resident memory growth over 5 minutes idle | ≤ 2 % | **−6.9 %** (ratio 0.931) | five five-minute runs: 0.923 to 0.947 | meets |
 | Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
@@ -91,28 +97,49 @@ Not re-derived, as the task asked. `perf/store.perf.test.ts` ran unchanged at th
 85.519, 79.828 and 76.416 bytes a commit at 12 502, 20 000 and 80 000 commits, each equal to its committed
 baseline.
 
-### Resident memory at 50 000 commits, and what closing gives back
+### Memory at 50 000 commits, and what closing gives back
 
-**What:** the sum of the working sets of every process of the application with 50 000 commits loaded and
-painted and ten seconds settled. **How:** `test/e2e/budgets-memory.spec.ts` opens a 50 000-commit fixture
-built by the committed generator, loads all of it over the bridge, asks the main process for its own process
-identifier, and reads every process descended from it out of Windows' process table: the main process, the
-GPU process, the network service, the renderer and the utility process. The process Playwright spawns is a
-`cmd.exe` shim above the main process and is not counted.
+**What the budget counts.** Decision 6 first budgeted the *resident* memory of all processes, which on Windows
+is the sum of their working sets. **The owner ruled on 2026-10-03 that it counts the sum of the private bytes
+of every process of the application**, and the ruling is recorded in
+`docs/ADR-0002-architecture-and-performance.md` decision 6, amended that day. The limit is unchanged: 400 MB in
+SI megabytes, 400 000 000 bytes.
 
-**It is over the budget.** Five readings on 2026-09-28 with nothing planted that changes memory — one while
-this lane explored, the case's first run, a probe run whose only plant changed what happens after the window
-closes, the full `npm run gates` run and the case's last run — were 441.7, 445.4, 442.0, 443.8 and 455.2
-MiB, that is 463 to 477 MB against 400. The budget is left where
-it is.
+**How:** `test/e2e/budgets-memory.spec.ts` opens a 50 000-commit fixture built by the committed generator,
+loads all of it over the bridge, waits for the rows to be painted, asks the main process for its own process
+identifier, waits ten seconds, and reads every process descended from it out of Windows' process table
+(`Win32_Process`): the main process, the GPU process, the network service, the renderer and the utility
+process. Their `PrivatePageCount` fields are summed and held to the entry `privateBytesAt50000`. The process
+Playwright spawns is a `cmd.exe` shim above the main process and is not counted.
 
-What the reading is, so that the finding is not misread in either direction: a working set counts a page
-shared by several processes once for each, and Electron's own code is mapped into all five. The private bytes
-of the same processes at the same moment were **201 416 704 bytes (192.1 MiB)**, which counts nothing twice
-and misses what is shared; the memory the application really occupies lies between the two. And most of it is
-not the commits: the same window with **no repository open**, four processes, read **312.7 MiB** of working
-sets and 117.7 MiB private. So Electron with an empty window is already 328 MB of the 400. The utility process
-with 50 000 commits held about 100 MiB of working set and 44 MiB private.
+**It meets the budget, by more than half.** Five runs of the case on 2026-10-03 read 190 316 544, 184 172 544,
+188 182 528, 193 290 240 and 190 734 336 bytes — 175.6 to 184.3 MiB, median 181.5 — with between 0.66 and 5.17
+GB of physical memory free when each began. The baseline is that median, with a tolerance of 1.1, so a run
+fails above 209.3 MB or above the 400 MB ceiling. The same sum read 186.1 to 192.1 MiB on 2026-09-28, under
+the limit of 209.3 MB too. **The ten seconds of settling matter to it**: one further launch on 2026-10-03,
+read the moment the 50 000 rows were painted with no settling, summed 210 583 552 bytes, which is over the
+baseline's limit; that the load's own garbage, collected within the ten seconds, is the difference is an
+inference.
+
+**The sum of the working sets is printed and held to nothing.** The same five runs read 432.0 to 442.5 MiB of
+working sets, 453 to 464 MB, over 400; on 2026-09-28 it read 441.7 to 455.2 MiB, and E01-M01-S10 read 430.4
+to 435.6 MiB on 2026-10-02. It was kept out of `perf/baselines.json`, not given a tolerance, for this reason: a
+working set is what the operating system has left resident, so it moves with how hard every other program on
+the machine presses for memory. S10 read one window 33 to 36 MiB under its own series with 0.4 GB free, and
+on 2026-10-03 the idle ratio below fell to 0.869 in the run that began with the least memory free. A tolerance
+that held every reading of an unchanged product, whatever moment its baseline was taken at, would have to cover
+at least the 455.2-over-430.4 spread of the three days, 1.06, and with S10's pressed reading taken off the
+lowest, 455.2 over about 397, some 1.15: about 58 MiB, more than the 42 to 51 MB the whole 50 000-commit load
+adds over an empty repository by S10's measurement. A limit that loose catches nothing the load could regress
+by, and a tighter one fails on the machine's mood. The private bytes do not depend on what is resident, so they
+are what is held; across the same five runs they moved from 175.6 to 184.3 MiB, 5 %, against 2.4 % for the
+working sets, and that is inside their tolerance of 1.1 from either end.
+
+**Shown failing at the ceiling.** With 250 MiB filled and held in the utility process as it starts — a plant
+in the working tree, rebuilt, never committed — the case read 457 728 000 bytes on 2026-10-03 and failed as
+*past the budget of 400000000*, the ceiling's own message rather than the baseline's; with the plant removed
+and the build redone, the next run read 190 582 784 and passed. The entry has no `ciTolerance`, so the CI regime
+holds it to the same two limits.
 
 **After the window closed**, none of the five processes was still running, so nothing was still resident; the
 utility process's memory went back to the operating system with the process, which is the claim S06 made and
@@ -138,6 +165,12 @@ the init scripts count every callback of `setTimeout`, `setInterval`, `requestAn
 `requestIdleCallback`, wrapped before `renderer.js` runs, and none ran; nor did the canvas redraw. In the main
 process an `async_hooks` hook counts every callback Node runs — a timer, an immediate, a socket, a message —
 and none ran either, once the two reads of the count itself are subtracted. That held in all five runs.
+
+The five runs of the case on 2026-10-03, on the loaded machine described at the top, read idle ratios of 0.869,
+0.952, 0.942, 0.922 and 0.924, processor time of 0.099, 0.104, 0.156, 0.094 and 0.115 % of one core, and zero
+wakeups in the page and the main process in every run. The 0.869 came from the run that began with 1.17 GB free
+and ended with 0.79: a working set trimmed by the operating system is what that looks like, an inference the
+ratio cannot itself confirm.
 
 What these cannot see is work Chromium schedules for itself outside JavaScript, such as a garbage collection
 or a compositor task, and the utility process, where nothing of the gate's can run; the processor times cover
@@ -227,7 +260,7 @@ the frame budget is what holds that path.
 Every figure above is an entry of `perf/baselines.json`, in the shape the file already had — `baseline`, an
 optional `ceiling`, an optional `tolerance`, a `unit` that says what was measured and how — plus one new
 optional field, `ciTolerance` (next section). Every ceiling is decision 6's budget, unchanged; every baseline
-is what was measured on 2026-09-28, not a round target.
+is what was measured on 2026-09-28 — the private memory at 50 000 commits on 2026-10-03 — not a round target.
 
 | gate | files | entries | the line that reaches `compareWithBaseline` |
 | --- | --- | --- | --- |
@@ -325,14 +358,18 @@ and the repair is the owner's choice between a per-platform image and a toleranc
   main process reports, and must hold at least four processes; it held five in every run.
 - **An idle window whose wakeups the count cannot see.** Chromium's own work and the utility process are out of
   the counters' reach; the processor times of all five processes are what cover them.
-- **A ceiling nobody can reach.** Every gate was watched failing on a planted regression (above), and the
-  resident-memory gate fails without one.
+- **A memory reading that reads the wrong field.** The sum held is `PrivatePageCount`, which Windows' process
+  table gives in bytes; a planted 250 MiB held in one process raised it by 252.2 to 260.9 MiB against the five
+  unplanted runs, which is that allocation and the bytes the plant itself costs to run, so the field counts
+  what a process commits for itself.
+- **A ceiling nobody can reach.** Every gate was watched failing on a planted regression (above), the memory
+  ceiling of 400 MB included.
 
 ## What is not here
 
-- **The resident-memory budget is not met**, and the gate that holds it is red. The budget stays at 400 MB. What
-  the application should do about it — or whether decision 6 means the sum of working sets, which is what
-  "resident" and "all processes" say — is the owner's to decide, and it is not this slice's.
+- **A gate on the sum of the working sets.** It is printed by the memory case and held to nothing, for the
+  reason given under *Memory at 50 000 commits*; it read 451 to 477 MB across three days, over 400, and
+  decision 6 as amended does not hold it.
 - **Shipping renderer.css without its comments**, which would lower its budget by a kibibyte, is a build change
   for a later task.
 - **A braided history in the frame and memory readings.** The fixtures are a straight chain; the committed
