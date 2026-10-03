@@ -137,16 +137,16 @@
     "unit": "times the commits the first Load More of 300 read, read by the fifth: 1800 over 600, because each press reads every page again"
   },
   "privateBytesAt50000": {
-    "baseline": 190316544,
+    "baseline": 157372416,
     "ceiling": 400000000,
     "tolerance": 1.1,
-    "unit": "bytes, the sum of the private bytes of every process of the application, 50000 commits loaded and painted and ten seconds settled, read from the operating system's process table: the median of five runs on 2026-10-03, which read 184172544 to 193290240 (175.6 to 184.3 MiB); the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, counted in private bytes by the owner's ruling of 2026-10-03"
+    "unit": "bytes, the sum of the private bytes of every process of the application, 50000 commits loaded and painted, read from the operating system's process table once that sum has not fallen by 1 MB over 40 seconds with the same processes throughout, which was 97 to 124 seconds after the paint: the median of five runs on 2026-10-03, which read 154775552 to 161611776 (147.6 to 154.1 MiB); with four runs of a second session that day the nine readings span the same range, the largest 1.029 times their median, beside a tolerance of 1.1; the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, counted in private bytes by the owner's ruling of 2026-10-03"
   },
   "idleResidentRatio": {
-    "baseline": 0.931,
+    "baseline": 1.002,
     "ceiling": 1.02,
     "tolerance": 1.1,
-    "unit": "times the resident memory at the start of five real idle minutes after the 50000-commit load, at their end: the first of five runs on 2026-09-28, which read 0.923 to 0.947"
+    "unit": "times the resident memory at the reading that met the settling rule of privateBytesAt50000, five real idle minutes after it: the median of five runs on 2026-10-03, which read 0.853 to 1.006, the lowest where the operating system trimmed 58.7 MiB of working sets while the private bytes stayed; the ceiling is the strict limit, as it was"
   },
   "idleCpuPerCent": {
     "baseline": 0.063,
