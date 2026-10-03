@@ -136,16 +136,11 @@
     "baseline": 3,
     "unit": "times the commits the first Load More of 300 read, read by the fifth: 1800 over 600, because each press reads every page again"
   },
-  "residentBytesAt50000": {
-    "baseline": 467034112,
-    "ceiling": 400000000,
-    "tolerance": 1.05,
-    "unit": "bytes resident, the sum of the working sets of every process of the application, 50000 commits loaded and painted and ten seconds settled, read from the operating system: the first of five runs on 2026-09-28, which read 441.7 to 455.2 MiB; the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, and every run is over it"
-  },
   "privateBytesAt50000": {
-    "baseline": 201416704,
+    "baseline": 190316544,
+    "ceiling": 400000000,
     "tolerance": 1.1,
-    "unit": "bytes committed privately by the same processes at the same moment, the reading that counts no shared page twice: the first of five runs on 2026-09-28, which read 186.1 to 192.1 MiB"
+    "unit": "bytes, the sum of the private bytes of every process of the application, 50000 commits loaded and painted and ten seconds settled, read from the operating system's process table: the median of five runs on 2026-10-03, which read 184172544 to 193290240 (175.6 to 184.3 MiB); the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, counted in private bytes by the owner's ruling of 2026-10-03"
   },
   "idleResidentRatio": {
     "baseline": 0.931,

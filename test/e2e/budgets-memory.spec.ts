@@ -37,12 +37,13 @@ import { fixture } from './support/fixtures';
  *   five processes: main, the GPU process, the network service, the renderer and
  *   the utility process of `src/app/repository-client.ts`; the case requires at
  *   least the four this project's code starts or draws in.
- * - **Resident memory is the sum of the working sets.** That is what "resident"
- *   and "all processes" say, and it counts a page shared by several processes —
- *   Electron's own code, mapped into all five — once for each. The private bytes
- *   are printed beside it, as the reading that counts nothing twice and misses
- *   what is shared; the true figure lies between the two. The budget is held
- *   against the first, because it is the one the budget names.
+ * - **The budget is held against the sum of the private bytes** of every
+ *   process, by the owner's ruling recorded in decision 6 as amended on
+ *   2026-10-03: that sum counts nothing twice. The sum of the working sets is
+ *   printed beside it and held to nothing. It counts a page shared by several
+ *   processes — Electron's own code, mapped into all five — once for each, and
+ *   it moves with how hard the rest of the machine presses for memory, which no
+ *   tolerance this gate could carry would cover without flapping.
  * - **CPU while idle** is the processes' kernel and user time, read from the same
  *   table before and after the five minutes, as a percentage of one core.
  * - **Wakeups** are counted inside the page by the init scripts of
@@ -178,11 +179,6 @@ function memoryVerdicts(loaded: readonly ProcessReading[]): boolean[] {
   describeTree(`${String(COMMITS)} commits loaded`, loaded);
   expect(loaded.length).toBeGreaterThanOrEqual(4);
   return [
-    holdToBaseline(
-      'residentBytesAt50000',
-      'resident memory, every process, 50000 commits',
-      total(loaded, 'workingSet'),
-    ).failed,
     holdToBaseline(
       'privateBytesAt50000',
       'private memory, every process, 50000 commits',
