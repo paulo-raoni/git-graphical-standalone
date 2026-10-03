@@ -108,10 +108,10 @@ five runs of 2026-10-03 (load 15 to 80 per cent): fastest of ten 418.4, 539.4, 4
 baseline 423.5; single Refreshes 418 to 576. S07's median of five on 2026-09-28 read 416 to 476, median 437.7.
 
 **Two speeds, not one.** The fifty single Refreshes of those runs fell at 418 to 457 ms or at 521 to 576, none between; in one of
-the five runs all ten fell near 550. The trace below shows the same thing as a gap between two git
-processes that is about 105 ms longer than its neighbours, once or more in some Refreshes and in none of
-others, at loads of 10 to 39 per cent as much as at higher ones. It is not attributed. Both speeds are inside
-the budget.
+the five runs all ten fell near 550. With git's trace on (below), at loads of 10 to 39 per
+cent as at higher ones, a gap between two git processes ran about 105 ms longer than its neighbours up to three
+times in a Refresh and not at all in others; that this is the second speed is an inference. It is not
+attributed. Both speeds are inside the budget.
 
 **Where a slow Refresh spends its time.** Timed with git's own trace, the processes' CPU time from Windows'
 process table before and after each press, and the page's marks, eight Refreshes in one window on 2026-10-03 at a processor
