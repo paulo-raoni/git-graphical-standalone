@@ -45,12 +45,12 @@ import { fixture } from './support/fixtures';
  * does not see is a regression that slows some readings and not others; that is
  * the price, and the benchmarks in `perf/` pay it for the same reason.
  *
- * What it does not survive is load that lasts longer than the readings: of ten
- * runs on 2026-10-03, the eight taken at a sampled load of 17 to 99 per cent were
- * green, and the two that ran into four and a half minutes at 76 to 100 per cent
- * were red; at the end of those minutes another project's mutation run had seven
- * workers at a whole core each. That is how long the product takes on a machine
- * that busy, not a reading this gate got wrong.
+ * What it does not survive is load that lasts longer than the readings. On
+ * 2026-10-03 ten runs of this file as it is, at a sampled load of 10 to 100 per
+ * cent, were all green; every run that met minutes on end at 76 to 100 per cent
+ * was red, and twice the load was seen to be another project's mutation run with
+ * seven workers at a whole core each. That is how long the product takes on a
+ * machine that busy, not a reading this gate got wrong.
  *
  * "Painted" is a mark of `./support/budgets-page.ts`: the state is read in an
  * animation frame after the change, and the time in the frame after that, which

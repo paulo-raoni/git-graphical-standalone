@@ -69,15 +69,20 @@ only when all ten met the load; a regression of the product moves every reading,
 cannot see is a regression that slows some launches and not others, which the median of five would have seen
 when it slowed three; that is the price, the same one the benchmarks in `perf/` pay.
 
-**What it does not survive.** Ten runs of the spec as it is now, on 2026-10-03 between 08:35 and 08:50: the
-eight taken at a sampled load of 17 to 99 per cent were green in all three cases (fastest of ten: empty 968 to
-1106 ms, with the fixture 1000 to 1334, load 414.2 to 429). The two that ran into four and a half minutes at 76
-to 100 per cent, free memory 2.64 to 3.49 GB, were red: the first on the load alone, fastest of ten 792.4 ms with
-single Refreshes up to 2069; the second in all three cases, empty 1736, with the fixture 2557, load 1323. At the
-end of those minutes another project's mutation run had seven workers at a whole core each, beside the
-antivirus at under one core. When every logical processor is busy for longer than the readings take, every reading
-is the product's real time on that machine, and it is over the budget; no statistic of the readings changes
-that, and whether the strict regime is meant to hold then is the owner's question, raised by E01-M01-FIX-27.
+**What it does not survive.** Thirty runs of the spec on 2026-10-03, load sampled every five seconds. With
+the ten Refreshes in one window, between 08:35 and 08:50 and between 10:47 and 11:01: sixteen of twenty green. One
+red run had a window whose ten Refreshes all ran slow (under *Ten thousand commits*), which is why they are now
+shared between two windows. The other three met minutes on end at 76 to 100 per cent: one red on the load
+alone, fastest of ten 792.4 ms with single Refreshes up to 2069; one red in all three cases, empty 1736, with the
+fixture 2557, load 1323, free memory 2.64 to 3.49 GB; one red on the fixture and the load, 1578 and 2159.3. As
+the spec is now, between 11:33 and 11:48, at 10 to 100 per cent and free memory 0.45 to 5.91 GB: **ten of ten
+green**, fastest of ten empty 1001 to 1379 ms, with the fixture 998 to 1518, load 419.8 to 500.5. And five
+runs of the load case alone, between 11:05 and 11:12, with the load at 100 per cent nearly throughout: all red,
+fastest of ten 1203.2 to 1830. Twice in those minutes the load was seen to be another project's mutation run,
+with seven workers at a whole core each beside the antivirus at under one. When every logical processor is
+busy for longer than the readings take, every reading is the product's real time on that machine, and it is
+over the budget; no statistic of the readings changes that, and whether the strict regime is meant to hold
+then is the owner's question, raised by E01-M01-FIX-27.
 
 **Where a slow cold start spends its time**, measured with git's own trace (`GIT_TRACE2_EVENT`), the
 processes' creation times from Windows' process table and the page's paint marks, in fourteen launches on
@@ -380,9 +385,11 @@ regimes. A regression planted at about three times — 2.7 to 3.1 times — fail
 and passed every one in the CI regime. Removing the plants turned every one green in both.
 
 E01-M01-FIX-27 planted again, on 2026-10-03, against the fastest of ten and the re-measured baselines. A
-busy-wait of 850 ms in the utility process's Refresh made the fastest Refresh 1249.9 ms (2.95 times the
-baseline of 423.5): red in the strict regime, past the 800 ms budget, and 1374.5 ms and green in the CI regime,
-whose limit is 2541. One of 3900 ms made it 4530.3 strict and 4309.4 CI: red in both, past 800 and past 3200.
+busy-wait of 850 ms in the utility process's Refresh made the fastest of ten Refreshes, five in each of two
+windows, 1262.1 ms (2.98 times the baseline of 423.5): red in the strict regime, past the 800 ms budget, and
+1258.8 ms and green in the CI regime, whose limit is 2541. One of 3900 ms made it 4311.6 strict and 4308.2 CI:
+red in both, past 800 and past 3200. With all ten in one window the same plants read 1249.9 and 1374.5, and
+4530.3 and 4309.4, with the same verdicts.
 A busy-wait of 700 ms at the start of the renderer made the fastest of ten empty cold starts 1685 ms: red, past
 1500. Removing each plant and rebuilding turned it green.
 
