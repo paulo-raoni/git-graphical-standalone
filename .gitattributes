@@ -1,0 +1,2 @@
+# Golden images are compared byte for byte, so git must never rewrite them.
+test/e2e/golden/** binary
