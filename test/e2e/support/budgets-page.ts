@@ -23,28 +23,38 @@ import type { GitGraphicalBridge, GraphPage } from '../../../src/contracts/index
  * animation-frame callback (`src/ui/graph-table.ts`, `paint`), and changes the
  * bar and the failure view in the task that received a reply. A mutation
  * observer sees each batch of changes to the document; for every batch it asks
- * for an animation frame and, inside that, for **another** one. The second
- * callback takes the mark: `performance.now()`, the wall clock, and a reading of
- * what the window then shows, canvas pixels included.
+ * for an animation frame and, inside that, for **another** one. The first
+ * callback reads what the window shows, canvas pixels included; the second
+ * takes the time: `performance.now()` and the wall clock.
  *
  * Animation-frame callbacks run at the start of a rendering update, and style,
  * layout and paint run after them in the same update; that is the order the HTML
  * event loop gives the steps, and a callback asked for while callbacks are
- * running waits for the next update. The first callback runs in an update that
- * begins after the change was made — the change was made in a task, or in an
- * earlier callback of the same run — so that update paints the change. The
- * second runs in a later update, which cannot begin until that paint is done.
- * **So a mark is never earlier than the paint of the change it follows.** It is
- * late by what is left of one update and a second one: measured on this machine
- * on 2026-09-28 by recording both callbacks' frame times, between 1.6 ms, when
- * the first update started late behind a busy task and the second followed on
- * the next vsync, and 34 ms, two whole 60 Hz frames.
+ * running waits for the next update. So everything the first callback reads was
+ * in the document before that update's paint, and that paint draws it. The
+ * second callback runs in a later update, which cannot begin until that paint is
+ * done. **So a mark is never earlier than the paint of the state it shows.** It
+ * is late by what is left of one update and a second one, and by a third when
+ * the change that completed the state was made by a callback of the first
+ * update that ran after the reading. Against Chromium's own clock, the first
+ * mark showing the bar came 1.6 to 43.4 ms after the paint of it, in 120 cold
+ * starts on 2026-10-03 (six runs of `budgets-start.spec.ts`, processor load 11
+ * to 80 per cent).
+ *
+ * **The state is read in the first callback, not the second**, because the
+ * second can see a change made after the first update's paint, which nothing has
+ * painted yet. That happened: in one cold start of 80 measured on 2026-10-03
+ * (processor load 44 to 100 per cent), the document's first update painted the
+ * empty page, the renderer had mounted its bar 3.5 ms after that paint, and a mark
+ * read in the second callback showed the bar 1.9 ms before Chromium's
+ * `paintTime` for the first contentful paint, which was the paint of the bar.
  *
  * What a mark does not see is the compositor putting the frame on the screen.
- * Chromium times that only for the first contentful paint, and
- * `budgets-start.spec.ts` holds the first mark of every cold start to be no
- * earlier than that paint's own `paintTime`, which is the one check of this
- * argument against Chromium's own clock.
+ * Chromium times that only for the first paint and the first contentful paint,
+ * and `budgets-start.spec.ts` holds every cold start's first mark to be no
+ * earlier than the first paint's `paintTime`, and its first mark showing the bar
+ * to be no earlier than the first contentful paint's, which are the checks of
+ * this argument against Chromium's own clock.
  */
 
 /** What the window shows at a mark. */
@@ -197,9 +207,10 @@ export function installPaintMarks(): void {
     if (!probe.marking) return;
     const changedAt = scope.performance.now();
     probe.frame(() => {
+      const state = probe.read();
       probe.frame(() => {
         const paintedAt = scope.performance.now();
-        probe.marks.push({ changedAt, paintedAt, wall: Date.now(), state: probe.read() });
+        probe.marks.push({ changedAt, paintedAt, wall: Date.now(), state });
       });
     });
   });
