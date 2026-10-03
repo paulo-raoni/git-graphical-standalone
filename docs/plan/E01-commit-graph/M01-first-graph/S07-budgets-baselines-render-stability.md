@@ -102,16 +102,25 @@ layout state. So the case grows the utility process's state to 10 000 commits wi
 bridge, **without drawing it**, and then presses Refresh. What that leaves out of a real first open is finding
 git and starting the utility process, both paid once and both inside the cold-start figures. The clock runs
 from the press to the first mark showing 10 000 rows, `commit 10000` at the top, ink on the canvas and the
-control back at rest. Ten Refreshes, each after a second's pause so that they do not all fall in one burst of
-load, and **the fastest is what is compared**, for the reason given under the cold start. **Runs**, the same
-five runs of 2026-10-03 (load 15 to 80 per cent): fastest of ten 418.4, 539.4, 423.5, 420 and 424.4 ms,
-baseline 423.5; single Refreshes 418 to 576. S07's median of five on 2026-09-28 read 416 to 476, median 437.7.
+control back at rest. Ten Refreshes, five in each of two windows, each after a second's pause so that they do
+not all fall in one burst of load, and **the fastest is what is compared**, for the reason given under the
+cold start. **Runs:** first with all ten in one window, in the same five runs of 2026-10-03 (load 15 to 80 per
+cent): fastest of ten 418.4, 539.4, 423.5, 420 and 424.4 ms, and the baseline is their median, 423.5; single
+Refreshes 418 to 576. Then with two windows, five runs between 11:26 and 11:29 (load 12 to 100 per cent, free
+memory 4.85 to 6.1 GB): 418.7, 428.5, 426.3, 560.8 and 499.3, median 428.5, the last two as the load rose. The
+baseline stays 423.5: a baseline moves down only, and the two statistics read the same Refresh. S07's median of
+five on 2026-09-28 read 416 to 476, median 437.7.
 
 **Two speeds, not one.** The fifty single Refreshes of those runs fell at 418 to 457 ms or at 521 to 576, none between; in one of
 the five runs all ten fell near 550. With git's trace on (below), at loads of 10 to 39 per
 cent as at higher ones, a gap between two git processes ran about 105 ms longer than its neighbours up to three
 times in a Refresh and not at all in others; that this is the second speed is an inference. It is not
 attributed. Both speeds are inside the budget.
+
+**Why two windows.** The fastest of ten in one window cannot get past a window whose every Refresh runs at
+the slower speed. In ten runs at the one-window head on 2026-10-03 (10:47 to 11:01), one window's ten read 642
+to 789 ms at a sampled load of 17 to 65 per cent, so its fastest, 641.8, was over the limit of 635.25 and
+red. Two windows of five need both to be slow.
 
 **Where a slow Refresh spends its time.** Timed with git's own trace, the processes' CPU time from Windows'
 process table before and after each press, and the page's marks, eight Refreshes in one window on 2026-10-03 at a processor

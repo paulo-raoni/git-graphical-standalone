@@ -63,6 +63,9 @@ const READINGS = 10;
 /** A pause before each Refresh, so that ten Refreshes do not all fall in one burst of load. */
 const REFRESH_SPACING_MILLISECONDS = 1_000;
 
+/** Windows the ten Refreshes are shared between, because a slow window stays slow. */
+const REFRESH_WINDOWS = 2;
+
 /** A cold start, in milliseconds from the operating system creating the process. */
 interface ColdStart {
   readonly fromCreation: number;
@@ -205,10 +208,10 @@ function refreshedTenThousand(state: PaintState): boolean {
   );
 }
 
-/** Press Refresh {@link READINGS} times, a pause before each, and time each to its rows painted. */
-async function timedRefreshes(page: Page): Promise<readonly number[]> {
+/** Press Refresh `count` times, a pause before each, and time each to its rows painted. */
+async function timedRefreshes(page: Page, count: number): Promise<readonly number[]> {
   const runs: number[] = [];
-  for (let run = 0; run < READINGS; run += 1) {
+  for (let run = 0; run < count; run += 1) {
     await page.waitForTimeout(REFRESH_SPACING_MILLISECONDS);
     await page.evaluate(setMarking, true);
     const pressed = await page.evaluate(pressRefresh);
@@ -235,13 +238,17 @@ async function timedRefreshes(page: Page): Promise<readonly number[]> {
  * client does on the first request. Both are paid inside the cold-start figures
  * above, and neither grows with the commits.
  *
- * Ten Refreshes in one window, each after a second's pause: the first draws
- * 10 000 rows over 300, the next nine draw 10 000 over 10 000, and each one's
- * mark is the first after its press to show the control back at rest over a
- * painted page of 10 000.
+ * Five Refreshes in each of two windows, each after a second's pause: the
+ * first in a window draws 10 000 rows over 300, the next four draw 10 000 over
+ * 10 000, and each one's mark is the first after its press to show the control
+ * back at rest over a painted page of 10 000. Two windows, because a Refresh runs
+ * at one of two speeds about 120 ms apart, and in some windows every Refresh ran
+ * at the slower (the slice document, *Two speeds, not one*); the fastest of one
+ * window's ten could not get past that: on 2026-10-03 one window's ten read 642
+ * to 789 ms at a sampled load of 17 to 65 per cent, and went red.
  */
-test('ten thousand commits, one load, to rows painted', async () => {
-  const large = fixture('large', 'large', 10_000);
+async function refreshesInOneWindow(large: string, count: number): Promise<readonly number[]> {
+  let runs: readonly number[] = [];
   await withBudgeted({ open: large }, async ({ page }) => {
     await paintedState(page, (state) => state.path === large && state.rows === 300);
     await page.evaluate(() => {
@@ -250,13 +257,22 @@ test('ten thousand commits, one load, to rows painted', async () => {
       };
       return scope.gitGraphical.loadMoreCommits({ count: 9_700 });
     });
-    const runs = await timedRefreshes(page);
-    process.stdout.write(`  Refresh of 10000 to rows painted: ${described(runs)} ms\n`);
-    const comparison = holdToBaseline(
-      'load10000Milliseconds',
-      'ten thousand commits read, laid out and painted, fastest of ten',
-      fastest(runs),
-    );
-    expect(comparison.failed).toBe(false);
+    runs = await timedRefreshes(page, count);
   });
+  return runs;
+}
+
+test('ten thousand commits, one load, to rows painted', async () => {
+  const large = fixture('large', 'large', 10_000);
+  const runs: number[] = [];
+  for (let window = 0; window < REFRESH_WINDOWS; window += 1) {
+    runs.push(...(await refreshesInOneWindow(large, READINGS / REFRESH_WINDOWS)));
+  }
+  process.stdout.write(`  Refresh of 10000 to rows painted: ${described(runs)} ms\n`);
+  const comparison = holdToBaseline(
+    'load10000Milliseconds',
+    'ten thousand commits read, laid out and painted, fastest of ten',
+    fastest(runs),
+  );
+  expect(comparison.failed).toBe(false);
 });
