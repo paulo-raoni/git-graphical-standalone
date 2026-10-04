@@ -31,8 +31,8 @@ cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day 
 | Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
 | Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
-| Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **190 316 544 bytes** (181.5 MiB) | five runs on 2026-10-03, 175.6 to 184.3 MiB | meets |
-| Resident memory growth over 5 minutes idle | ≤ 2 % | **−6.9 %** (ratio 0.931) | five five-minute runs: 0.923 to 0.947 | meets |
+| Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **157 372 416 bytes** (150.1 MiB), read once the load's memory has come back | five runs on 2026-10-03, 147.6 to 154.1 MiB | meets |
+| Resident memory growth over 5 minutes idle | ≤ 2 % | **+0.2 %** (ratio 1.002), from the settled reading | five five-minute runs on 2026-10-03: 0.853 to 1.006 | meets |
 | Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
 | CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | five five-minute runs: 0.063 to 0.453 % | meets |
@@ -182,21 +182,100 @@ SI megabytes, 400 000 000 bytes.
 
 **How:** `test/e2e/budgets-memory.spec.ts` opens a 50 000-commit fixture built by the committed generator,
 loads all of it over the bridge, waits for the rows to be painted, asks the main process for its own process
-identifier, waits ten seconds, and reads every process descended from it out of Windows' process table
-(`Win32_Process`): the main process, the GPU process, the network service, the renderer and the utility
-process. Their `PrivatePageCount` fields are summed and held to the entry `privateBytesAt50000`. The process
-Playwright spawns is a `cmd.exe` shim above the main process and is not counted.
+identifier, and then reads every process descended from it out of Windows' process table (`Win32_Process`)
+every few seconds until the load's memory has been given back (below): the main process, the GPU process, the
+network service, the renderer and the utility process. The `PrivatePageCount` fields of the reading that meets
+the rule are summed and held to the entry `privateBytesAt50000`. The process Playwright spawns is a `cmd.exe`
+shim above the main process and is not counted.
 
-**It meets the budget, by more than half.** Five runs of the case on 2026-10-03 read 190 316 544, 184 172 544,
-188 182 528, 193 290 240 and 190 734 336 bytes — 175.6 to 184.3 MiB, median 181.5 — with between 0.66 and 5.17
-GB of physical memory free when each began. The baseline is that median, with a tolerance of 1.1, so a run
-fails above 209.3 MB or above the 400 MB ceiling. The same sum read 186.1 to 192.1 MiB on 2026-09-28, under
-the limit of 209.3 MB too. **The ten seconds of settling matter to it**: one further launch on 2026-10-03,
-read the moment the 50 000 rows were painted with no settling, summed 210 583 552 bytes, which is over the
-baseline's limit; that the load's own garbage, collected within the ten seconds, is the difference is an
-inference.
+**The load's memory comes back in steps, over about a minute.** As S07 built it the case waited ten seconds and
+read. Review round 20 found the sum still falling then, in eight launches read to sixty seconds. E01-M01-FIX-28
+measured it again on 2026-10-03 between 15:50 and 16:03, at the lane's base, with a driver outside the
+repository that loads the fixture as the case does and reads the tree, with each process's command line, every
+3.1 to 3.6 s for 120 s after the paint. Five launches, the processor load read with every reading at 13 to
+100 per cent and free memory at 3.0 to 3.9 GB:
 
-**The sum of the working sets is printed and held to nothing.** The same five runs read 432.0 to 442.5 MiB of
+| process | private bytes given back | when, after the 50 000 rows were painted |
+| --- | --- | --- |
+| GPU | 9.3 to 10.1 MB, in two steps | by 10.6 s |
+| renderer | 6.2 to 7.6 MB | between 23.1 and 30.4 s |
+| utility (`repository.cjs`) | 15.3 to 16.6 MB | between 25.5 and 30.8 s |
+| GPU, a third step | 4.6 MB | between 30.1 and 36.8 s |
+| main | 1.5 to 1.8 MB | between 50.6 and 58.4 s |
+
+The sum read 199.9 to 204.2 MB at the paint, 190.2 to 194.6 at ten seconds, 167.3 to 172.6 at thirty, 158.7 to
+163.9 at sixty and 158.0 to 163.2 at 120; nothing moved by 1 MB between the main process's step and 120 s. The
+review's three steps are in these five launches too, the renderer's and the utility's later and closer together
+than the review's eight showed them, and the GPU's third and the main process's are steps its table does not
+have. A reading at ten seconds is therefore a reading about a quarter of the way down, and the 31 to 32 MB
+still to come is more than the 19 MB its tolerance allowed.
+
+**The rule: read when the sum has stopped falling.** The case takes the first reading for which a reading at
+least 40 s older exists, no reading since that older one is 1 MB or more below one before it, and every one of
+them holds the same processes. Past 180 s after the paint it fails rather than reads. The window is 40 s
+because the longest still stretch between two steps, the GPU's third to the main process's, was 15 to 20 s by
+the nearest readings and at most 26 s between them, so the rule is not met inside one; 1 MB is under the
+smallest step. A rise does not hold the rule back, so a leak reaches the budgets instead of the cap. Applied to
+the five curves above, the rule is met 96.6 to 99.3 s after the paint, within 0.11 MB of the reading at 120 s.
+A fixed wait of a hundred seconds would have read the same on these five; the rule was preferred because it
+waits longer when a step comes late, which a clock cannot, and one run below did (124.4 s). A collection forced
+through an instrument was not used: nothing of the test's reaches the utility or the GPU process.
+
+**What the rule does not catch** is a step more than 40 s after the one before it. In 22 runs of the case on
+2026-10-03 (eleven before the rule asked for the same processes; processor load 8 to 100 per cent, free memory
+0.08 to 5.9 GB), the rule was met 68.7 to 124.4 s after the paint. In 20 the private sum then moved by −1.0 to
++0.5 MiB over the five idle minutes that follow. In two, both with a plant in the utility process and the
+processor at 52 to 100 per cent, the GPU process gave back 3.1 and 4.3 MiB during those minutes. And the steps
+do not all come in every launch: in the 18 unplanted runs among them the main process, the first of the tree,
+read 38.2 to 39.5 MiB at the reading taken in thirteen and 40.7 to 41.4 in five, and in those five it stayed
+there through the idle minutes. That is part of the spread the tolerance covers.
+
+**It meets the budget, by more than half.** Five runs of the case on 2026-10-03, between 18:57 and 19:35, read
+156 663 808, 154 775 552, 158 007 296, 161 611 776 and 157 372 416 bytes — 147.6 to 154.1 MiB, median 150.1 —
+with the rule met 100.5, 124.4, 107.5, 97.0 and 109.5 s after the paint. The baseline is that median, with a
+tolerance of 1.1, so a run fails above 173.1 MB or above the 400 MB ceiling. Four more in a second session,
+between 20:14 and 20:42, read 156 360 704, 159 985 664, 157 081 600 and 156 618 752, met at 110.2, 99.4, 98.2
+and 100.8 s. **The largest of the nine is 1.029 times their median**, 1.027 times the baseline. Nine earlier
+runs that day, before the rule asked for the same processes, read 155 619 328 to 162 095 104. The machine was
+not quiet for any of them: another project's gate and mutation runs were in the process table throughout, the
+processor load sampled every five seconds read 28 to 100 per cent in the first session and 8 to 100 in the
+second, and free memory 0.08 to 5.4 GB. The tolerance stays at 1.1 and is not tightened to the spread, for one
+observed reason: in a run of a first version of the rule, the GPU process read 48.3 MiB at one reading and 39.9
+a second later, and since a rise does not hold the rule back, such a reading can be the one taken. Added to
+the largest reading that is 170.4 MB, which 1.1 holds and 1.05 would not; that it would happen so is an
+inference from one sighting.
+
+The baseline fell from 190 316 544, read at ten seconds, to 157 372 416: the limit a run is held to fell from
+209.3 to 173.1 MB with it. At ten seconds the same sum read 175.6 to 184.3 MiB in five runs on 2026-10-03 and
+186.1 to 192.1 on 2026-09-28.
+
+**Which processes are counted.** Two things were found in the tree that are not the loaded application.
+
+*A second GPU process, for a second or two.* 120 s after its GPU process starts, the main process starts
+another: `electron.exe --type=gpu-process --disable-gpu-sandbox --use-gl=disabled` with the graphics card's
+vendor, device and driver identifiers on its command line. Watched on 2026-10-03 from outside the application,
+polling Windows' process table about every 1.3 s through 26 launches of the case: it was seen in 18, created
+119.92 to 120.02 s after the first GPU process, with a working set of 13.8 to 100.2 MiB and 4.1 to 25.4 MiB of
+private bytes at the poll that saw it, and gone at most 1.0 to 5.0 s after it was created; no other process
+was ever started by the application. This is the sixth process review round 20 and E01-M01-S10 each met once;
+that theirs was this one is an inference, and the review's persisted for a minute where none here outlived
+5 s. It is the application's own, but it holds memory for those seconds only, whatever is loaded, and it falls
+about when the rule is met: in one of five runs before the rule asked for the same processes, a reading taken
+a second after the rule was met, 107 s after the paint, held it at 78.2 MiB of working set, and the idle ratio
+that started from that reading read 0.837. So a reading that holds it is not taken: the rule waits until
+40 s of readings hold the same processes, and the idle window opens on the reading that met the rule rather
+than on a second one.
+
+*Another program's processes.* Windows reuses process identifiers, and a process keeps the identifier of a
+parent that has ended. In a sixth launch of the curve above, left out of its table, a process of the application was given
+the identifier that Microsoft Edge's launcher had held before it ended, and `processTree` took in the sixteen
+Edge processes that still named it as their parent: 21 processes and 1 097 MB instead of five and 200. The case
+now drops from the tree any process created before the parent it names. `processTree` itself, in
+`test/e2e/support/budgets.ts`, is unchanged; its one other use, in `test/e2e/budgets-start.spec.ts`, reads the
+root process alone.
+
+**The sum of the working sets is printed and held to nothing.** The five runs read at ten seconds on
+2026-10-03 read 432.0 to 442.5 MiB of
 working sets, 453 to 464 MB, over 400; on 2026-09-28 it read 441.7 to 455.2 MiB, and E01-M01-S10 read 430.4
 to 435.6 MiB on 2026-10-02. It was kept out of `perf/baselines.json`, not given a tolerance, for this reason: a
 working set is what the operating system has left resident, so it moves with how hard every other program on
@@ -210,11 +289,16 @@ by, and a tighter one fails on the machine's mood. The private bytes do not depe
 are what is held; across the same five runs they moved from 175.6 to 184.3 MiB, 5 %, against 2.4 % for the
 working sets, and that is inside their tolerance of 1.1 from either end.
 
-**Shown failing at the ceiling.** With 250 MiB filled and held in the utility process as it starts — a plant
-in the working tree, rebuilt, never committed — the case read 457 728 000 bytes on 2026-10-03 and failed as
-*past the budget of 400000000*, the ceiling's own message rather than the baseline's; with the plant removed
-and the build redone, the next run read 190 582 784 and passed. The entry has no `ciTolerance`, so the CI regime
-holds it to the same two limits.
+**Shown failing, each limit and each part of the rule.** Every plant was in the working tree, rebuilt, never
+committed, on 2026-10-03, with the case as it now is. With 250 MiB filled and held in the utility process as it
+starts, the case read 421 789 696 bytes and failed as *past the budget of 400000000*, the ceiling's own
+message. With 40 MiB held there it read 202 289 152 and failed as *regressed … from a baseline of 157372416*,
+the baseline's. With 45 buffers of 2 MiB held there and one given back every six seconds, the sum fell from
+281.5 MiB all the way to the cap and the case failed as *the memory had not settled at the cap* with no
+reading taken. With those plants removed and the build redone, four runs read 156 360 704 to 159 985 664 and
+passed. Last, with the main process starting a child that lives six seconds every twelve, and the fall
+switched off in the working tree so that only the processes could hold the rule back, it failed at the cap the
+same way. The entry has no `ciTolerance`, so the CI regime holds it to the same two limits.
 
 **After the window closed**, none of the five processes was still running, so nothing was still resident; the
 utility process's memory went back to the operating system with the process, which is the claim S06 made and
@@ -226,12 +310,65 @@ identifier **and** creation time, so that an identifier reused by another progra
 survivor. With that handler's `app.quit()` removed, three of the five processes were still running thirty
 seconds later, 227.8 MiB of them, and the gate failed.
 
+That reading is taken the moment the main process has exited or the thirty seconds are up, and on a busy
+machine it is not always zero. In 32 runs of the case by E01-M01-FIX-28 on 2026-10-03 that reached it, with
+another project's gate and mutation runs in the process table during every one of them, six read processes still
+running: in two the main process had not exited in thirty seconds, and in four it had and one or two of its
+children had not yet. In the one of those four that was watched from outside, with the processor at 100 per
+cent, the network service and the utility process were gone 12.5 s after the main process. Nothing in this
+part of the case was changed by E01-M01-FIX-28; it is raised in that task's audit.
+
 ### Five idle minutes after the load
 
-Five real minutes, with the case's own timeout set to fit them. **Memory:** the working sets at the end were
-0.931 of what they were at the start, down by 6.9 %, at 413.7 MiB; four more five-minute runs, none with a plant
-that touched the idle window, read 0.947, 0.923, 0.939 and 0.933. The collections the load left behind finishing is the likely
-cause, and that is an inference. **CPU:** the five processes used 187 ms of processor time in 300 s,
+Five real minutes, with the case's own timeout set to fit them. **They open on the reading that met the rule
+of the section above**, not ten seconds after the paint as S07 had it, so that they measure the application at
+rest and not the end of its load.
+
+**Memory:** the ratio is the sum of the working sets five minutes after that reading over the sum at it. The
+nine runs of 2026-10-03 described above read 1.006, 0.853, 1.002, 1.002 and 0.988, then 1.002, 1.002, 0.998
+and 1.002. The baseline is the median of the first five, **1.002**: up by 0.2 %. In the seven that read 0.998
+to 1.006 no process's working set moved by more than 3.0 MiB. In the run that read 0.988 the working sets fell
+by 6.2 MiB while the private bytes rose by 0.1; in the one that read 0.853 they fell by 58.7 MiB, every process
+but the main one losing 10 to 21, while the private bytes rose by 0.2, and the free memory sampled during that
+run went down to 0.08 GB. The operating system taking resident pages back is what that looks like; it is an
+inference.
+
+With the window opening at ten seconds, S07 read 0.923 to 0.947 on 2026-09-28 and 0.869 to 0.952 on
+2026-10-03, and put the fall down to the load's collections finishing, as an inference. The curve above
+supports it: 31 to 32 MB came back after the tenth second, about 7 % of the working sets. **The baseline rose
+from 0.931 to 1.002 because the method changed, not because the application grew**, and the limit a run is
+held to did not move: it was and is the ceiling, 1.02, which the old baseline's own limit of 1.024 was already
+above.
+
+**How small a leak the window sees.** Review round 20 planted a leak in the utility process, a one-second
+interval keeping 5 625 numbers, and under the ten-second window the ratio read 0.969: the load's release hid
+it. E01-M01-FIX-28 planted it again on 2026-10-03, and larger ones, in the working tree, rebuilt, never
+committed:
+
+| numbers kept each second | the utility's working set grew by | the other four's moved by | ratio | verdict |
+| --- | --- | --- | --- | --- |
+| 5 625 (45 KB) | 13.7 MiB, 3.3 % of the sum | −9.0 MiB | 1.011 | green |
+| 5 625 again | 11.7 MiB, 2.9 % | −7.3 MiB | 1.011 | green |
+| 6 560 (52 KB) | 17.5 MiB, 4.3 % | −7.0 MiB | 1.026 | red, on the ceiling's message |
+| 7 500 (60 KB) | 19.6 MiB, 4.8 % | +0.3 MiB | 1.049 | red |
+| 7 500 again | 19.5 MiB, 4.8 % | +1.1 MiB | 1.050 | red |
+
+The first and fourth rows ran before the rule asked for the same processes and read the start of the window
+a second after the rule was met; the others ran on the case as it is. With the plants removed, the four runs
+of the second session above passed.
+
+**So the window now sees a leak, and sees it from about twice its budget, not from the budget.** The plant the
+review used no longer reads as shrinkage, and it still passes: in both of its runs the working sets of the
+other four processes fell by 7 to 9 MiB, about 2 % of the sum, while their private bytes stayed within 0.4 MiB.
+The same fall happened with nothing planted, in three of the 18 unplanted runs of that day (−6.2, −7.2 and
+−7.7 MiB, ratios 0.981 to 0.988), and in a fourth by 58.7. A ratio of working sets therefore carries, from the
+operating system alone, a movement as large as the 2 % it is held to, and in one direction: down. It cannot
+fail an application that does not leak for that reason, and it can pass one that leaks by 3 %. Over the same
+18 runs the sum of the private bytes moved by −1.0 to +0.5 MiB across the window, under 0.7 %. Decision 6 as
+amended on 2026-10-03 keeps this row on the working sets, so which sum it should read is the owner's question,
+raised by E01-M01-FIX-28 and not answered here.
+
+**CPU:** as S07 measured it on 2026-09-28, the five processes used 187 ms of processor time in 300 s,
 **0.063 % of one core**, read from Windows' per-process kernel and user times; the second run read 0.063 % as
 well, the third **0.453 %**, the fourth 0.099 % and the fifth 0.156 %. Of the third run's time, 1 110 ms was
 the main process alone, while the main-process count below saw no Node callback at all in that run, so the
@@ -241,7 +378,14 @@ the init scripts count every callback of `setTimeout`, `setInterval`, `requestAn
 process an `async_hooks` hook counts every callback Node runs — a timer, an immediate, a socket, a message —
 and none ran either, once the two reads of the count itself are subtracted. That held in all five runs.
 
-The five runs of the case on 2026-10-03, on the loaded machine described at the top, read idle ratios of 0.869,
+The nine runs of 2026-10-03 on the case as it now is read processor time of 0.177, 0.099, 0.078, 0.109 and
+0.089, then 0.099, 0.104, 0.182 and 0.125 % of one core, and zero wakeups in the page and the main process in
+every run. Their window opens at the settled reading, before the counters are installed, so it holds three
+calls into the application that S07's did not; the readings are not told apart from S07's by that, and the
+entry `idleCpuPerCent` is unchanged.
+
+Before that, with the window still opening at ten seconds, the five runs of the case on 2026-10-03, on the
+loaded machine described at the top, read idle ratios of 0.869,
 0.952, 0.942, 0.922 and 0.924, processor time of 0.099, 0.104, 0.156, 0.094 and 0.115 % of one core, and zero
 wakeups in the page and the main process in every run. The 0.869 came from the run that began with 1.17 GB free
 and ended with 0.79: a working set trimmed by the operating system is what that looks like, an inference the
@@ -448,8 +592,14 @@ and the repair is the owner's choice between a per-platform image and a toleranc
   is therefore after the main thread painted what it shows and may be before the compositor presented it.
 - **A probe installed too late.** Each init script records whether the renderer's view already existed; every
   launch requires all five to say no.
-- **A memory reading that misses a process.** The tree is read from the operating system, rooted at the pid the
-  main process reports, and must hold at least four processes; it held five in every run.
+- **A memory reading that misses a process, or counts one that is not the loaded application.** The tree is
+  read from the operating system, rooted at the pid the main process reports, and must hold at least four
+  processes. It held five in every reading taken; a sixth of the application's own lives for a few seconds two
+  minutes after the start, and once another program's processes were in the tree by a reused identifier, and
+  the case now takes neither (under *Memory at 50 000 commits*).
+- **A memory reading taken while the load's memory is still coming back.** It was, at ten seconds. The case now
+  reads when the private sum has not fallen by 1 MB in 40 s, and fails past 180 s rather than read; a step more
+  than 40 s after the one before it is what that still misses.
 - **An idle window whose wakeups the count cannot see.** Chromium's own work and the utility process are out of
   the counters' reach; the processor times of all five processes are what cover them.
 - **A memory reading that reads the wrong field.** The sum held is `PrivatePageCount`, which Windows' process
