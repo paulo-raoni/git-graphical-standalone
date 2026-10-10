@@ -208,7 +208,7 @@ Two sessions of this slice measured what follows, both on **2026-10-10** and on 
 Intel Core i5-10310U, four cores and eight threads, 15.6 GB, Windows 11 Pro 10.0.26200, Node 24.18.0,
 Electron 44.3.0, Playwright 1.63.0, Vitest 5.0.0, Stryker 10.0.0 (the versions as the third session read
 them). The third session ran from 00:43 to 08:40 local time at commit `dab51b5`, before the timed benchmarks
-moved. The fourth ran from 08:45 to 17:15 at `b60051f`, after. Exit statuses were read from the command
+moved. The fourth ran from 08:45 to 16:52 at `b60051f`, after. Exit statuses were read from the command
 itself, never through a pipe.
 
 **Other projects' agents ran test, lint, mutation and build runs on the machine through both sessions.** The
