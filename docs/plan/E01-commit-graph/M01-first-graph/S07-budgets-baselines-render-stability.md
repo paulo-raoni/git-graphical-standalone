@@ -441,7 +441,7 @@ is named:
 | git processes per Refresh | 5 | the same five |
 | git processes per Load More | 5 | worst of five presses |
 | commits read by the fifth Load More over the first | 3 | 1 800 over 600 |
-| heap bytes allocated parsing a commit | 3 168.776, tolerance 1.001 | see *Allocation* |
+| heap bytes allocated parsing a commit | 3 168.776, tolerance 1.001 | see *Allocation*; the four allocation figures are held under V8 13.6.233.17-node.50 only |
 | typed-array bytes allocated parsing a commit | 66.64 | the store's columns |
 | heap bytes allocated laying out a row | 13.512, tolerance 1.01 | |
 | typed-array bytes allocated laying out a row | 130.491 | the layout's output and segment buffer |
@@ -468,6 +468,43 @@ growth across the third run — `--trace-gc` on the same program printed only th
 processes read the parse at 3 168.7272 to 3 168.776 heap bytes a commit and the layout at 13.4814 to 13.5118 a
 row: a residue `--predictable` does not remove, which the two tolerances cover four times over while still
 failing one more small object per unit. The typed-array figures were identical in all five.
+
+**The four figures belong to one runtime, and the gate holds them against no other** (E01-M01-FIX-30,
+2026-10-10). They were read under this machine's Node 24.18.0, the Node the first section names, whose V8
+reports itself as 13.6.233.17-node.50. The child process now reports `process.versions.v8` and `process.version`
+beside its figures — its own, read inside the child, not the parent's — and the case prints them. The V8 string
+the entries were measured under is the constant `MEASURED_UNDER` in the test, and each entry's `unit` sentence
+names it. When the child's V8 string is any other, the case fails on that line, before any figure is compared:
+its message names both versions, says nothing was compared and that the failure says nothing about the
+product, and asks for all four entries to be measured again under the new runtime and committed together with
+the constant and the `unit` sentences, never one alone.
+
+Why, measured: FIX-30 ran the gate as it stood before that check, once under each of two other runtimes.
+
+| runtime of the child | heap, a commit | typed-array, a commit | heap, a row | typed-array, a row | what the gate said |
+| --- | --- | --- | --- | --- | --- |
+| Node 24.18.0, V8 13.6.233.17-node.50 (five processes at FIX-30's head) | 3 168.776 to 3 168.782 | 66.64 | 13.481 to 13.511 | 130.49 | green |
+| Node 20.19.5, V8 11.3.244.8-node.30 (one process) | 3 182.339 | 66.64 | 2.276 | 130.49 | red: the parse *regressed*, on an unchanged product |
+| Electron 44.3.0 in Node mode, Node 24.20.0, V8 15.2.124.19-electron.0 (one process) | 1 710.464 | 0 | 0.651 | 0 | green, and asked for both typed-array figures of 0 to be committed |
+
+The Electron row is the reading review round 20 took at `f0963dd`, reproduced by FIX-30 to the last digit the
+gate prints; its two zeros are that runtime reporting `arrayBuffers` as 0 (review round 20 records that
+E01-M01-S10 met the same). Under
+it a later regression of up to 1.85 times in the parse or 20 times in the layout would have passed. The figures
+are as the gate prints them, rounded to three decimals. One of the five parse readings, 3 168.782, is above the
+3 168.776 that was the top of S07's five; it is within the tolerance, whose limit is 3 171.945.
+
+**The whole V8 string must match, embedder suffix included.** The alternative was to match its four numbers and
+let the suffix vary. The suffix counts the changes Node has itself made to that V8, so that alternative would
+hold the figures across a V8 that differs by those changes, and whether the heap figures move across such a
+step by more than the parse tolerance's one part in a thousand **has not been measured by anyone**: both
+runtimes in the table are a whole V8 release line away, and no second build of V8 13.6.233.17 was on this
+machine to read. Without that measurement the looser match could turn a Node patch release into a red that says
+the product regressed; the strict one turns it into a red that says to measure again, which is five runs of
+this gate. What the strict match costs is in CI: `.github/workflows/ci.yml` installs the latest Node 24, not
+24.18.0, and if that release's V8 string is not this one — an inference, nobody here has run it — the `perf`
+job fails on the runtime check at its first run, until CI and the entries are brought to one Node. That is the
+owner's to settle and is not changed here.
 
 **3 169 heap bytes a commit is worth a reader's attention.** The store keeps under 96 bytes a commit and the
 parser allocates thirty-three times that on the way, most of it — an inference from the parser's code, not a
