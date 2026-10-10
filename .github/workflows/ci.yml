@@ -129,7 +129,8 @@ jobs:
           retention-days: 3
 
   # Windows is the verified platform (ADR-0001), and this gate drives the built
-  # application, so it runs there and nowhere else.
+  # application, so it runs there and nowhere else. It runs the application set
+  # of `playwright.config.js`: every end-to-end case that is not held to a clock.
   e2e:
     name: end to end
     needs: build
@@ -150,6 +151,35 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+
+  # The wall-clock budgets, alone (`AGENTS.md` §11, *Gate tiers*): the timed
+  # benchmarks of `perf/`, which the performance job below leaves out, and the
+  # other set of `playwright.config.js`, on the runner the end-to-end job uses. It
+  # needs the build job as that job does, so that a build that fails is reported
+  # once and not here as well, but it does not download the bundles:
+  # `gates:budgets` builds for itself, here as in a worktree. A runner sets
+  # `CI`, which holds every entry that carries a `ciTolerance` to its wide
+  # regime (`perf/baselines.ts`).
+  budgets:
+    name: budgets
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run gates:budgets
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-budgets
           path: |
             playwright-report/
             test-results/
@@ -198,6 +228,7 @@ jobs:
       - unit
       - mutation
       - e2e
+      - budgets
       - perf
       - size
     runs-on: ubuntu-latest

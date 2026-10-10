@@ -22,10 +22,13 @@ import { fixture } from './support/fixtures';
  *
  * **One case, on purpose.** The idle window has to follow a load, and the load
  * worth idling after is the largest one; a second launch for each budget would
- * add two more loads of fifty thousand and ten more minutes to a gate that
- * already runs for hours. Each budget is compared separately and every
- * comparison is made before any assertion fails, so one red budget does not
- * hide the verdicts of the others.
+ * add two more loads of fifty thousand and ten more minutes to a gate whose
+ * one run of this case already waits five idle minutes, and up to three before
+ * them for the settle. That gate is `npm run gates:budgets`: the case carries
+ * the `@budgets` tag that `playwright.config.js` selects by, and neither
+ * `gates:e2e` nor `npm run gates` runs it (`AGENTS.md` §11, *Gate tiers*).
+ * Each budget is compared separately and every comparison is made before any
+ * assertion fails, so one red budget does not hide the verdicts of the others.
  *
  * ### What is read, and from where
  *
@@ -384,7 +387,7 @@ function closedVerdicts(loaded: readonly ProcessReading[]): boolean[] {
   ];
 }
 
-test('fifty thousand commits: memory, five idle minutes, and what closing gives back', async () => {
+test('fifty thousand commits: memory, five idle minutes, and what closing gives back @budgets', async () => {
   test.setTimeout(IDLE_MS + SETTLE.capMs + 180_000);
   const repository = fixture('huge', 'large', COMMITS);
   const budgeted = await launchBudgeted({ open: repository });

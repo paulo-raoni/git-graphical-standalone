@@ -55,6 +55,11 @@ import { fixture } from './support/fixtures';
  * "Painted" is a mark of `./support/budgets-page.ts`: the state is read in an
  * animation frame after the change, and the time in the frame after that, which
  * cannot run before the state read was painted.
+ *
+ * **These three cases are run by `npm run gates:budgets`**, and by neither
+ * `gates:e2e` nor `npm run gates`: each is held to a time, so each carries
+ * the `@budgets` tag in its title, which is what `playwright.config.js`
+ * selects that gate's cases by (`AGENTS.md` §11, *Gate tiers*).
  */
 
 /** How many readings each case takes; the fastest of them is compared. */
@@ -160,7 +165,7 @@ async function coldStarts(open: string, wanted: (state: PaintState) => boolean):
 
 test.describe.configure({ timeout: 300_000 });
 
-test('cold start to a painted window, empty repository', async () => {
+test('cold start to a painted window, empty repository @budgets', async () => {
   const empty = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-empty-'));
   try {
     execFileSync('git', ['init', '--quiet', empty], { stdio: 'ignore' });
@@ -179,7 +184,7 @@ test('cold start to a painted window, empty repository', async () => {
   }
 });
 
-test('cold start to a painted first page, ten thousand commits on the command line', async () => {
+test('cold start to a painted first page, ten thousand commits on the command line @budgets', async () => {
   const large = fixture('large', 'large', 10_000);
   const quickest = await coldStarts(
     large,
@@ -262,7 +267,7 @@ async function refreshesInOneWindow(large: string, count: number): Promise<reado
   return runs;
 }
 
-test('ten thousand commits, one load, to rows painted', async () => {
+test('ten thousand commits, one load, to rows painted @budgets', async () => {
   const large = fixture('large', 'large', 10_000);
   const runs: number[] = [];
   for (let window = 0; window < REFRESH_WINDOWS; window += 1) {

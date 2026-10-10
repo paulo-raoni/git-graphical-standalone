@@ -154,7 +154,10 @@ chunk S03 saw arrive from the pipe, so it pays for more boundaries, not fewer. `
 times `layoutPage` over 40 000 rows of a braided shape — for row *i*, a first parent at *i + 1 + r* with *r*
 from 0 to 2, and every ninth row a second parent at *i + 1 + r* with *r* from 0 to 39, from a fixed
 congruential sequence — implemented from S04's description, so its counters are this gate's own. Both take
-the fastest of five runs after a warm-up.
+the fastest of five runs after a warm-up. (Those are the files' names as S07 wrote them. Since E01-M01-S11,
+2026-10-10, the two timings are `perf/parse.timed.perf.test.ts` and `perf/layout.timed.perf.test.ts`, and
+`perf/layout.perf.test.ts` keeps the layout's counters; the table under *Where each baseline lives* has the
+gate each runs in.)
 
 **Both are held as time per commit, not commits per second.** A throughput is a lower bound and
 `compareWithBaseline` fails a number that rises; 20 000 commits a second turned over is at most 50 µs a commit,
@@ -483,10 +486,23 @@ is what was measured on 2026-09-28 — the private memory at 50 000 commits on 2
 
 | gate | files | entries | the line that reaches `compareWithBaseline` |
 | --- | --- | --- | --- |
-| `gates:perf` | `perf/parse.perf.test.ts` | `parseMicrosecondsPerCommit` | its `compareInRegime` call |
-| `gates:perf` | `perf/layout.perf.test.ts` | `layoutMicrosecondsPerCommit`, `layoutWorkPerRow`, `layoutScalingRatio` | `compareInRegime` in its `held` |
+| `gates:budgets` | `perf/parse.timed.perf.test.ts` | `parseMicrosecondsPerCommit` | its `compareInRegime` call |
+| `gates:budgets` | `perf/layout.timed.perf.test.ts` | `layoutMicrosecondsPerCommit` | `compareInRegime` in its `held` |
+| `gates:perf` | `perf/layout.perf.test.ts` | `layoutWorkPerRow`, `layoutScalingRatio` | `compareInRegime` in its `held` |
 | `gates:perf` | `perf/allocation.perf.test.ts` | the four allocation entries | `compareInRegime` in its `held` |
-| `gates:e2e` | `test/e2e/budgets-start.spec.ts`, `budgets-frames.spec.ts`, `budgets-git.spec.ts`, `budgets-memory.spec.ts` | every other new entry | `compareInRegime` in `holdToBaseline`, `test/e2e/support/budgets.ts` |
+| `gates:budgets` | `test/e2e/budgets-start.spec.ts`, `budgets-memory.spec.ts`, and the case *main-thread work per frame while scrolling* of `budgets-frames.spec.ts` | `coldStartEmptyMilliseconds`, `coldStartOpenMilliseconds`, `load10000Milliseconds`; `privateBytesAt50000`, `idleResidentRatio`, `idleCpuPerCent`, `idlePageWakeups`, `idleRedraws`, `idleMainWakeups`, `residentBytesAfterClose`; `scrollFrameMeanMilliseconds`, `scrollFrameWorstMilliseconds` | `compareInRegime` in `holdToBaseline`, `test/e2e/support/budgets.ts` |
+| `gates:e2e` | `test/e2e/budgets-git.spec.ts`, and the other two cases of `budgets-frames.spec.ts` | `gitProcessesPerOpen`, `gitProcessesPerRefresh`, `gitProcessesPerLoadMore`, `loadMoreReadGrowth`; `liveRowElements`, `liveRowGrowth`, `redrawsPerScrolledFrame`, `redrawsPerScrollBurst` | the same line |
+
+As S07 built it, one gate, `gates:e2e`, ran all four files. E01-M01-S11 split them on 2026-10-10: the cases
+held to a clock or to the machine's load run in `npm run gates:budgets`, which is in none of the tiers of
+`AGENTS.md` §11 and so is not part of `npm run gates`, and the cases that hold counts stay in `gates:e2e`. A
+`@budgets` tag in a case's title is what `playwright.config.js` selects them by, and the S11 slice document
+says how.
+
+As S07 built it, `gates:perf` ran the parse and layout timings too, from `perf/parse.perf.test.ts` and
+`perf/layout.perf.test.ts`. E01-M01-S11 moved the two timings the same day into files named
+`*.timed.perf.test.ts`, which `gates:perf` leaves out and `npm run gates:budgets` runs, with the comparison
+each makes unchanged; the layout's two counters stayed where they were.
 
 `compareInRegime`, in `perf/baselines.ts`, applies the regime's limits and calls `compareWithBaseline`, which is
 unchanged. Every case asserts on the verdict it gets back, and a case that holds several budgets makes every

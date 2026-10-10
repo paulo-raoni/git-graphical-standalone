@@ -17,9 +17,11 @@ import type { Comparison } from './baselines';
  *
  * Counters, not stopwatches (`docs/ADR-0003-quality-gates-and-ci.md` decision
  * 4). Bytes retained per commit and units of work done per commit are the same
- * numbers on every machine, so they can be a ratchet; the wall clock is recorded
- * beside them and asserted only at an order of magnitude, which is all it can
- * honestly carry on a shared runner.
+ * numbers on every machine, so they can be a ratchet. The wall clock of the same
+ * three builds is held, at an order of magnitude, by
+ * `perf/store.timed.perf.test.ts`, which `npm run gates:budgets` runs and
+ * `gates:perf` does not (`AGENTS.md` §11, *Gate tiers*); that file builds from
+ * a copy of `nameInto` and `build` below, and the two must stay the same.
  *
  * **Where a benchmark measures is part of what it measures.** The store retains
  * a step function of the commit count — its columns grow by five quarters and
@@ -131,13 +133,10 @@ function build(count: number): CommitStoreBuilder {
 interface Measurement {
   readonly count: number;
   readonly builder: CommitStoreBuilder;
-  readonly milliseconds: number;
 }
 
 function measure(count: number): Measurement {
-  const started = performance.now();
-  const builder = build(count);
-  return { count, builder, milliseconds: performance.now() - started };
+  return { count, builder: build(count) };
 }
 
 /** How much room the store ended up holding beyond the commits it was given. */
@@ -265,18 +264,6 @@ describe('the commit store, counted', () => {
       baselines['workPerCommit'] ?? { baseline: 20, unit: 'units' },
     );
     report(comparison, large);
-    expect(comparison.failed).toBe(false);
-  });
-
-  it('stays inside an order of magnitude of its recorded wall clock', () => {
-    const perTenThousand = everySize.map((each) => (each.milliseconds / each.count) * 10000);
-    const slowest = everySize[perTenThousand.indexOf(Math.max(...perTenThousand))] ?? large;
-    const comparison = compareWithBaseline(
-      'milliseconds to build ten thousand commits',
-      Math.max(...perTenThousand),
-      baselines['buildMilliseconds'] ?? { baseline: 1000, tolerance: 10, unit: 'ms' },
-    );
-    report(comparison, slowest);
     expect(comparison.failed).toBe(false);
   });
 });

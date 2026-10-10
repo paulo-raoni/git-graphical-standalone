@@ -354,7 +354,7 @@ test('the second and the fifth load more, measured on ten thousand commits', asy
   });
 });
 
-test('the main process keeps answering while the whole of a large load runs', async () => {
+test('the main process keeps answering while the whole of a large load runs @budgets', async () => {
   test.setTimeout(SLOW_TEST_MS);
   const large = fixture('large', 'large', 10_000);
   await withWindow({ open: large }, async (page) => {
