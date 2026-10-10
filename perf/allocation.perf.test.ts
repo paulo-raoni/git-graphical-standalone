@@ -49,6 +49,22 @@ import { compareInRegime, readBaselines } from './baselines';
  * the parse figure, and sixteen bytes more a row more than doubles the layout's.
  * The typed-array figures were identical in all five and carry no tolerance.
  *
+ * **Those five processes were one runtime, and the figures belong to it**:
+ * {@link MEASURED_UNDER}. What a heap figure reads is V8's doing as much as the
+ * product's — the size it gives an object, and what its compilers have removed
+ * by the third run — and tolerances of a tenth of a per cent and one per cent
+ * were sized against the spread of that one V8, not against the distance between
+ * two. E01-M01-FIX-30 ran this gate as it then stood, with no runtime check,
+ * once under each of two others on 2026-10-10. Under Node 20.19.5 (V8
+ * 11.3.244.8-node.30) the parse read 3 182.339 heap bytes a commit and the gate
+ * printed that the product had regressed, which it had not; the layout read
+ * 2.276 a row. Under Electron 44.3.0's runtime in Node mode (Node 24.20.0, V8
+ * 15.2.124.19-electron.0) they read 1 710.464 and 0.651, the gate passed, and it
+ * asked for two typed-array figures of 0 to be committed as baselines; review
+ * round 20 had read the same four figures there. So the child reports the
+ * runtime it ran under beside its figures, and under any other V8 the case fails
+ * **before** it compares anything.
+ *
  * What it does not see: allocation outside V8's heap other than typed-array
  * storage, and the renderer's hot path, which runs in Chromium where these
  * switches are not this gate's to set; the frame budget in
@@ -59,12 +75,35 @@ const COMMITS = 10_000;
 const ROWS = 40_000;
 const CHUNK_BYTES = 16 * 1024;
 
-/** What the child reports, per unit of work, for each workload. */
+/**
+ * The runtime the four allocation entries of `perf/baselines.json` were measured
+ * under, and the only one they are held against.
+ *
+ * **The whole V8 version string has to match, embedder suffix included.** The
+ * suffix counts the changes Node has made to that V8 itself, so two strings that
+ * differ only there are two different V8s, and nobody has measured whether the
+ * heap figures hold across such a step to the one part in a thousand the parse
+ * tolerance allows: the two other runtimes read so far (the comment above) are
+ * both further away than that. Matching the four numbers alone would let such a
+ * step through unseen, and what it could cost is a red saying the product
+ * regressed. Matching the whole string costs a re-measurement at every Node
+ * release that touches V8, which is five runs of this gate. Node's own version
+ * is reported and printed, and not matched: the work measured is this project's
+ * code running on V8.
+ */
+const MEASURED_UNDER = { v8: '13.6.233.17-node.50', node: 'v24.18.0' } as const;
+
+/** The runtime a child ran under, as that child read it from its own process. */
+interface Runtime {
+  readonly v8: string;
+  readonly node: string;
+}
+
+/** What the child reports: where it ran, and each workload's two figures per unit of work. */
 interface Allocation {
-  readonly parseHeapPerCommit: number;
-  readonly parseBuffersPerCommit: number;
-  readonly layoutHeapPerRow: number;
-  readonly layoutBuffersPerRow: number;
+  readonly runtime: Runtime;
+  readonly parse: readonly [heapPerCommit: number, buffersPerCommit: number];
+  readonly layout: readonly [heapPerRow: number, buffersPerRow: number];
 }
 
 /** A function of the modules the child is given. */
@@ -141,14 +180,9 @@ function childProgram(dependencies: ChildDependencies, logPath: string, sizes: n
     }
     return reading;
   };
-  const [parseHeapPerCommit, parseBuffersPerCommit] = third(parse, commits);
-  const [layoutHeapPerRow, layoutBuffersPerRow] = third(layout, rows);
-  const report = {
-    parseHeapPerCommit,
-    parseBuffersPerCommit,
-    layoutHeapPerRow,
-    layoutBuffersPerRow,
-  };
+  // `process` is the child's own here: this text is bundled and runs nowhere else.
+  const runtime = { v8: process.versions.v8, node: process.version };
+  const report = { runtime, parse: third(parse, commits), layout: third(layout, rows) };
   process.stdout.write(JSON.stringify(report));
 }
 
@@ -209,30 +243,30 @@ function held(key: string, name: string, measured: number): boolean {
   return comparison.failed;
 }
 
+/** What the case says, in place of any comparison, when the child ran under another V8. */
+function anotherRuntime(ran: Runtime): string {
+  return [
+    `The four allocation entries of perf/baselines.json were measured under V8 ${MEASURED_UNDER.v8}`,
+    `(Node ${MEASURED_UNDER.node}); this run's child process ran under V8 ${ran.v8} (Node ${ran.node}).`,
+    'Nothing was compared, so this failure says nothing about the product: under another V8 the',
+    'figures move with the runtime. Either run this gate under the runtime the entries belong to,',
+    'or measure all four again under the new one (parseHeapBytesPerCommit,',
+    'parseBufferBytesPerCommit, layoutHeapBytesPerRow and layoutBufferBytesPerRow: five runs of',
+    'this gate, each a fresh child process) and commit the four together, with the new runtime in',
+    'MEASURED_UNDER in perf/allocation.perf.test.ts and in their unit sentences. Never one alone.',
+  ].join(' ');
+}
+
 describe('allocation on the hot path, counted', () => {
   it('allocates no more per commit parsed, or per row laid out, than it did', async () => {
-    const allocation = await measure();
+    const { runtime, parse, layout } = await measure();
+    process.stdout.write(`  the child ran under V8 ${runtime.v8}, Node ${runtime.node}\n`);
+    expect(runtime.v8, anotherRuntime(runtime)).toBe(MEASURED_UNDER.v8);
     const failed = [
-      held(
-        'parseHeapBytesPerCommit',
-        'heap bytes allocated parsing a commit',
-        allocation.parseHeapPerCommit,
-      ),
-      held(
-        'parseBufferBytesPerCommit',
-        'typed-array bytes allocated parsing a commit',
-        allocation.parseBuffersPerCommit,
-      ),
-      held(
-        'layoutHeapBytesPerRow',
-        'heap bytes allocated laying out a row',
-        allocation.layoutHeapPerRow,
-      ),
-      held(
-        'layoutBufferBytesPerRow',
-        'typed-array bytes allocated laying out a row',
-        allocation.layoutBuffersPerRow,
-      ),
+      held('parseHeapBytesPerCommit', 'heap bytes allocated parsing a commit', parse[0]),
+      held('parseBufferBytesPerCommit', 'typed-array bytes allocated parsing a commit', parse[1]),
+      held('layoutHeapBytesPerRow', 'heap bytes allocated laying out a row', layout[0]),
+      held('layoutBufferBytesPerRow', 'typed-array bytes allocated laying out a row', layout[1]),
     ];
     expect(failed).toEqual([false, false, false, false]);
   });
