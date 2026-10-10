@@ -20,7 +20,8 @@ import { fixture } from './support/fixtures';
  * `branch-and-merge` and ten-thousand-commit fixtures, each opened in five
  * separate launches of the built application, gave the same canvas pixels and
  * the same window screenshot, byte for byte, in all five — with the GPU, and
- * again with `--disable-gpu`. The slice document records the digests.
+ * again with `--disable-gpu`. The slice document reports that comparison under
+ * *The golden-image question*; it records the outcome and no hash of the bytes.
  *
  * **The case renders in software** (`--disable-gpu`), which is a Chromium switch
  * given at launch and changes nothing in the product. A continuous-integration
