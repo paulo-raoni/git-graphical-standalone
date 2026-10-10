@@ -33,11 +33,11 @@ import type { PaintMark, PaintState } from './budgets-page';
  * visible.
  *
  * **The suites that use this run in two gates** (`AGENTS.md` §11, *Gate
- * tiers*). The cases held to a clock are on the `BUDGETS` list of
- * `playwright.config.js` and run in `npm run gates:budgets` alone; the cases
- * that hold counts or bytes through the same helpers — `budgets-git.spec.ts`,
- * `golden-graph.spec.ts` and two of `budgets-frames.spec.ts` — run in
- * `gates:e2e`.
+ * tiers*). The cases held to a clock carry the `@budgets` tag that
+ * `playwright.config.js` selects by, and run in `npm run gates:budgets`
+ * alone; the cases that hold counts or bytes through the same helpers —
+ * `budgets-git.spec.ts`, `golden-graph.spec.ts` and two of
+ * `budgets-frames.spec.ts` — run in `gates:e2e`.
  */
 
 export const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');

@@ -33,8 +33,8 @@ import { fixture } from './support/fixtures';
  *
  * **This case is run by `gates:e2e`**, and not by `npm run gates:budgets`,
  * though it shares a name with the suites that are: everything it holds is a
- * count, so it is not on the `BUDGETS` list of `playwright.config.js`
- * (`AGENTS.md` §11, *Gate tiers*).
+ * count, so it does not carry the `@budgets` tag that
+ * `playwright.config.js` selects by (`AGENTS.md` §11, *Gate tiers*).
  */
 
 /**

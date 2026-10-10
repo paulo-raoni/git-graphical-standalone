@@ -30,11 +30,11 @@ import { fixture } from './support/fixtures';
  * that is the limit of this reading.
  *
  * **The three cases are run by two gates** (`AGENTS.md` §11, *Gate tiers*).
- * *main-thread work per frame while scrolling* is held to a time, so it is on
- * the `BUDGETS` list of `playwright.config.js` and runs in
- * `npm run gates:budgets` alone. The other two hold counts — row elements,
- * canvas redraws — so they run in `gates:e2e`. The list names that case by its
- * title: renaming it moves it into `gates:e2e`.
+ * *main-thread work per frame while scrolling* is held to a time, so it
+ * carries the `@budgets` tag in its title, which `playwright.config.js`
+ * selects by, and runs in `npm run gates:budgets` alone. The other two hold
+ * counts — row elements, canvas redraws — so they carry no tag and run in
+ * `gates:e2e`.
  */
 
 const LARGE = 10_000;
@@ -101,7 +101,7 @@ async function framesAt(page: Page, step: number): Promise<{ means: number[]; wo
  * of a run is its work per frame and its worst frame is its worst; the median of
  * five runs of each is compared.
  */
-test('main-thread work per frame while scrolling', async () => {
+test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);
   await withBudgeted({ open: repository }, async ({ page }) => {
     await openAll(page, repository);

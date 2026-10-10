@@ -491,8 +491,9 @@ is what was measured on 2026-09-28 — the private memory at 50 000 commits on 2
 
 As S07 built it, one gate, `gates:e2e`, ran all four files. E01-M01-S11 split them on 2026-10-10: the cases
 held to a clock or to the machine's load run in `npm run gates:budgets`, which is in none of the tiers of
-`AGENTS.md` §11 and so is not part of `npm run gates`, and the cases that hold counts stay in `gates:e2e`. The
-`BUDGETS` list in `playwright.config.js` is what selects them, and the S11 slice document says how.
+`AGENTS.md` §11 and so is not part of `npm run gates`, and the cases that hold counts stay in `gates:e2e`. A
+`@budgets` tag in a case's title is what `playwright.config.js` selects them by, and the S11 slice document
+says how.
 
 `compareInRegime`, in `perf/baselines.ts`, applies the regime's limits and calls `compareWithBaseline`, which is
 unchanged. Every case asserts on the verdict it gets back, and a case that holds several budgets makes every

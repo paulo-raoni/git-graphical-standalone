@@ -21,34 +21,26 @@ import { defineConfig } from '@playwright/test';
  */
 
 /**
- * The cases whose verdict depends on the clock or on the machine's load: a
- * time, a frame cost, a processor percentage, a memory reading that waits for a
- * settle. `npm run gates:budgets` runs these and nothing else, on a free
- * machine (`AGENTS.md` §11, *Wall-clock gates on a shared machine*);
- * `npm run gates:e2e` runs every other case.
+ * The tag a case carries in its title when its verdict depends on the clock or
+ * on the machine's load: a time, a frame cost, a processor percentage, a memory
+ * reading that waits for a settle. `npm run gates:budgets` runs the tagged
+ * cases and nothing else, on a free machine (`AGENTS.md` §11, *Wall-clock gates
+ * on a shared machine*); `npm run gates:e2e` runs every untagged case.
  *
- * Each pattern is matched against a case's file name, a space, and its title,
- * which is the text Playwright filters a project by. A whole file is named
- * where every case in it is held to a clock; a single title where its
- * neighbours in the file are counts, which no load moves.
- *
- * **This list is the one thing the partition hinges on, and it is used twice
- * below**: as the `grep` of the `budgets` project and as the `grepInvert` of the
- * `application` project. A case the list matches is in the first and not in the
+ * **This pattern is the one thing the partition hinges on, and it is used twice
+ * below**: as the `grep` of the `budgets` project and as the `grepInvert` of
+ * the `application` project. A case it matches is in the first and not in the
  * second, and a case it does not match is in the second and not in the first,
- * so whatever a case is called it is in exactly one of the two. What the list
- * cannot do is follow a rename: a budget case whose title or file changes
- * stops matching and runs in `gates:e2e` from then on, still run, on a machine
- * nobody checked was free. A pattern that matches nothing leaves the `budgets`
- * project with fewer cases than it had, and with none at all Playwright fails
- * the run as having found no tests.
+ * so whatever a case is called it is in exactly one of the two.
+ *
+ * The rule for an author: a case held to a time or to the machine's load ends
+ * its title with the tag; a case that holds a count or a byte comparison has
+ * none. The tag travels with the case through a rename of the case or of its
+ * file. What nothing checks is the judgement itself: a new wall-clock case
+ * written without the tag runs in `gates:e2e`, still run, on a machine nobody
+ * checked was free, and a tag misspelt does the same.
  */
-const BUDGETS = [
-  /budgets-start\.spec\.ts /,
-  /budgets-memory\.spec\.ts /,
-  /budgets-frames\.spec\.ts main-thread work per frame while scrolling$/,
-  /open-repository\.spec\.ts the main process keeps answering while the whole of a large load runs$/,
-];
+const BUDGETS = /@budgets\b/;
 
 export default defineConfig({
   testDir: './test/e2e',
