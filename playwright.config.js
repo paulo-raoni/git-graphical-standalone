@@ -24,8 +24,9 @@ import { defineConfig } from '@playwright/test';
  * The tag a case carries in its title when its verdict depends on the clock or
  * on the machine's load: a time, a frame cost, a processor percentage, a memory
  * reading that waits for a settle. `npm run gates:budgets` runs the tagged
- * cases and nothing else, on a free machine (`AGENTS.md` §11, *Wall-clock gates
- * on a shared machine*); `npm run gates:e2e` runs every untagged case.
+ * cases and no other case of this folder, beside the timed benchmarks of
+ * `perf/`, on a free machine (`AGENTS.md` §11, *Wall-clock gates on a shared
+ * machine*); `npm run gates:e2e` runs every untagged case.
  *
  * **This pattern is the one thing the partition hinges on, and it is used twice
  * below**: as the `grep` of the `budgets` project and as the `grepInvert` of

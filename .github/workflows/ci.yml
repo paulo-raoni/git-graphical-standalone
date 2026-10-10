@@ -156,8 +156,9 @@ jobs:
             test-results/
           retention-days: 3
 
-  # The wall-clock budget cases, alone (`AGENTS.md` §11, *Gate tiers*): the other
-  # set of `playwright.config.js`, on the runner the end-to-end job uses. It
+  # The wall-clock budgets, alone (`AGENTS.md` §11, *Gate tiers*): the timed
+  # benchmarks of `perf/`, which the performance job below leaves out, and the
+  # other set of `playwright.config.js`, on the runner the end-to-end job uses. It
   # needs the build job as that job does, so that a build that fails is reported
   # once and not here as well, but it does not download the bundles:
   # `gates:budgets` builds for itself, here as in a worktree. A runner sets
