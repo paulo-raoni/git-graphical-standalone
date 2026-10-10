@@ -1,14 +1,37 @@
-# E01-M01-S10 · Fifty thousand commits and the resident-memory budget
+# E01-M01-S10 · Fifty thousand commits and the memory budget as first written
 
-`docs/ADR-0002-architecture-and-performance.md` decision 6 budgets **resident memory, all processes, 50 000
-commits loaded, at ≤ 400 MB**, and E01-M01-S07 measured the assembled application over it. This slice was
-asked to make it fit, or to show with measurements that it cannot inside the decisions already taken.
+When this slice ran, on 2026-10-02, `docs/ADR-0002-architecture-and-performance.md` decision 6 budgeted
+**resident memory, all processes, 50 000 commits loaded, at ≤ 400 MB**, and E01-M01-S07 had measured the
+assembled application over it, at 463 to 477 MB on 2026-09-28. This slice was asked to make it fit, or to show
+with measurements that it could not inside the decisions already taken.
 
-**It cannot.** The window open on a repository with **no commits at all** already reads 406.0 to 409.4 MB in
-five runs, over the 400 000 000 bytes the budget allows before a single commit is loaded. No change to what a
-load holds can bring a reading under a floor that is itself over the limit, so no product code was changed.
-What follows is the floor, the attribution of the load, and what each change that is not this slice's to make
-would buy, measured.
+**Against that row, it could not.** The window open on a repository with **no commits at all** already read
+406.0 to 409.4 MB in five runs, summed over the working sets: over the 400 000 000 bytes that row allowed,
+before a single commit was loaded. No change to what a load holds could bring that sum under a floor that was
+itself over the limit, so no product code was changed. What follows is the floor, the attribution of the load,
+and what each change that was not this slice's to make would have bought, measured.
+
+## What changed after this slice
+
+**The row this document measured is no longer the budget.** On 2026-10-03 the owner ruled that the memory row
+of decision 6 counts the **sum of the private bytes** of every process of the application, and the decision
+was amended that day; the row now reads *"Memory, all processes, 50 000 commits loaded: the sum of their
+private bytes"*, and its limit, 400 MB in SI megabytes, is unchanged. The amendment quotes this document's
+readings as its grounds.
+
+Every verdict below — *over*, *fits*, *no*, *could not* — is about the row as it was written on 2026-10-02,
+the sum of the working sets, and none of them is a verdict on the budget as amended. This slice read the
+private bytes too, at the same moments, and they are in the tables below: 174.4 to 182.5 MiB with 50 000
+commits loaded, which is 182.9 to 191.4 MB, under 400.
+
+The budget as amended is measured and held elsewhere:
+`docs/plan/E01-commit-graph/M01-first-graph/S07-budgets-baselines-render-stability.md`, section *Memory at
+50 000 commits, and what closing gives back*, and the end-to-end case it names,
+`test/e2e/budgets-memory.spec.ts`, which holds the sum to the entry `privateBytesAt50000` of
+`perf/baselines.json` and to the 400 MB ceiling. That section's verdict is that the application meets the
+budget; its figures are its own and were not re-measured for this document. By its account the private sum
+goes on falling for about a minute after the rows are painted, so a reading taken ten seconds after the
+paint, as this document's readings of the process table were, is higher than the one the case now takes.
 
 ## How every figure here was taken
 
@@ -63,20 +86,22 @@ Per process, the range over each set of five runs, working set / private, MiB:
 ### The decision the floor makes
 
 Opening a repository starts the utility process, and the utility process alone adds 79.1 to 79.3 MiB of
-working set while holding no commit: the window on an empty repository reads **6.0 to 9.4 MB over** the
-budget. Decision 3's own figure for the store is at most 96 bytes a commit, so 50 000 commits held once in
+working set while holding no commit: the window on an empty repository read **6.0 to 9.4 MB over** the
+row as it was then written. Decision 3's own figure for the store is at most 96 bytes a commit, so 50 000 commits held once in
 each of the three processes that need them — the utility process that builds them, the main process that
-forwards them, the renderer that draws them — occupy at most 14.4 MB. The room left for that is not 14.4 MB
-or less; it is **less than nothing**. A load that held no byte beyond the floor would still fail.
+forwards them, the renderer that draws them — occupy at most 14.4 MB. The room that row left for that was
+not 14.4 MB or less; it was **less than nothing**. A load that held no byte beyond the floor would still have
+failed it.
 
 So scope item 2 was not attempted: anything it removes comes out of the 42 to 51 MB the load adds above the
-floor, and the floor alone does not fit.
+floor, and the floor alone did not fit under the sum of the working sets.
 
 Most of each working set is not this application's memory at all. A working set counts every page a process
 has mapped and touched, and Electron's own binary and libraries are mapped into all five processes and
 counted once for each; the gap between a process's working set and its private bytes is 54.7 to 55.8 MiB in the
 utility process on an empty repository, and **about 250 MiB summed over the five**. That is what S07's
-document says the reading is, measured again here.
+document said the reading was when this slice ran (its text of 2026-09-28, since rewritten for the amended
+row), measured again here; the amendment to decision 6 now says the same.
 
 ## Where the load goes: 50 000 commits against the empty repository
 
@@ -115,9 +140,9 @@ What that says, and how far it can be trusted:
   the context bridge into the page's world; that the garbage is the first of those two is an inference from
   the size, which matches the live page.
 - **Collectable garbage was about 9 to 10 MB of the working sets**: forcing a collection in all three
-  JavaScript processes took the two totals from 451.5 and 454.1 MB to 442.4 and 444.2 MB. None of the readings
-  in this document fits because a collection happened to run, and none would have fitted had one run in every
-  process.
+  JavaScript processes took the two totals from 451.5 and 454.1 MB to 442.4 and 444.2 MB. None of the
+  working-set readings in this document is under 400 MB because a collection happened to run, and none would
+  have been had one run in every process.
 - **The rest of the growth is invisible to these instruments**: about 7 MiB in the GPU process, which runs no
   JavaScript (that it is the compositor's tiles for the painted rows is an inference), and most of the
   utility process's growth, which is more than its 10 MB of JavaScript-visible memory — memory touched while
@@ -125,9 +150,10 @@ What that says, and how far it can be trusted:
   `arrayBuffers` as 0 in both Node processes, so typed arrays there cannot be told from other memory outside
   the V8 heap.
 
-## What would make it fit, and whose each change is
+## What would have made the working sets fit, and whose each change is
 
-None of these is built. Each was applied **transiently** — a Chromium switch on the command line, or a patch
+*Fits* in this section means the sum of the working sets under 400 000 000 bytes, the row as it was written on
+2026-10-02. None of the changes to the product below was built by this slice. Each was applied **transiently** — a Chromium switch on the command line, or a patch
 of the built `dist/main.cjs` that `npm run build` removes — run five times at 50 000 commits on 2026-10-02
 between 19:53 and 19:59 under the load condition above, and removed. Totals in MB:
 
@@ -152,9 +178,11 @@ between 19:53 and 19:59 under the load condition above, and removed. Totals in M
   `NetworkServiceInProcess` and `NetworkServiceInProcess2`, one run each; in both the network service was
   still a separate process, so what folding it in would buy was not measured. It holds 48.3 to 48.8 MiB of
   working set and 11.8 to 12.2 MiB private.
-- **The budget itself** is decision 6, the owner's. Held against the sum of the working sets as it is, the
-  application at `ca4bab6` needs at least 457 MB on these readings and 477 MB on S07's. Held against the sum
-  of the private bytes, the reading that counts nothing twice, it reads 182.9 to 191.4 MB at 50 000 commits.
+- **The budget itself** is decision 6, the owner's. Held against the sum of the working sets, as it was when
+  this was measured, the application at `ca4bab6` read up to 456.8 MB in these five runs and up to 477 MB in
+  S07's of 2026-09-28. Held against the sum of the private bytes, the reading that counts nothing twice, it
+  read 182.9 to 191.4 MB at 50 000 commits. That is the change the owner took, on 2026-10-03 (*What changed
+  after this slice*, above).
 
 ## What a person sees
 
@@ -166,7 +194,9 @@ were on screen. Looked at by this slice's executor on 2026-10-02.
 
 ## What remains
 
-The budget cannot be met without one of the changes above, and each of them is the owner's or a recorded
-decision's. With one of them taken, what is left of scope item 2 is what this document attributes: the
-renderer's second copy of the page, the 3.7 MB the main process keeps after forwarding, and the utility
-process's memory that no JavaScript instrument here could see.
+The row as it was written on 2026-10-02 could not be met without one of the changes above, and each of them
+was the owner's or a recorded decision's. The owner took the last of them the next day: the budget counts the
+private bytes, and by this slice's own readings the application was already under it. What this slice left of
+scope item 2 is what this document attributes: the renderer's second copy of the page, the 3.7 MB the main
+process keeps after forwarding, and the utility process's memory that no JavaScript instrument here could see.
+Those three were measured at `ca4bab6` and have not been measured again for this document.
