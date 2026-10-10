@@ -171,8 +171,10 @@ polling.
 > 463 to 477 MB on 2026-09-28. The owner ruled that the budget counts the **sum of the private bytes** of every
 > process of the application, which counts nothing twice; S10 measured it at **182.9 to 191.4 MB** with 50 000
 > commits loaded. The limit, 400 MB in SI megabytes, is unchanged. The idle-growth row still reads the working
-> sets: it compares the same processes with themselves five minutes apart, and S07 measured its ratio at 0.923
-> to 0.947.
+> sets: it compares the same processes with themselves five minutes apart. S07 measured its ratio at 0.923 to
+> 0.947 on 2026-09-28, when the idle window opened ten seconds after the load; E01-M01-FIX-28 moved the opening
+> to the reading at which the load's memory has settled and measured 0.853 to 1.006 over five runs on
+> 2026-10-03.
 
 > **Amended 2026-10-03, by the owner's ruling.** "≈ 0 %" for the idle processor needed a number a gate can
 > hold. E01-M01-S07 chose **0.5 % of one core**, read from the processes' kernel and user time over five idle

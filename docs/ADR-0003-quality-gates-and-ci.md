@@ -30,6 +30,16 @@ primary evidence is local, produced in the lane and recorded in the audit. CI is
 `main`**, which run only when the owner asks for a push, and the promotion pull request. The two must
 therefore be the same commands, or the ratchet checks something the lane never ran.
 
+> **Amended 2026-10-09, by the owner's ruling.** There is still one family of scripts and CI still calls
+> them, but a lane no longer runs all of them whatever it changed. In the first milestone every lane ran every
+> gate; the mutation gate took 88 minutes in E01-M01-FIX-28's last full run (2026-10-04), and the lanes that
+> only corrected documents or comments paid it for nothing. So the entry point has **tiers** — `gates:static`,
+> `gates:quick` and `gates` — and the task file names the tier its lane runs, as a boundary. The **wall-clock
+> budgets of decision 4 are their own gate, `gates:budgets`**, outside every tier and run on a free machine:
+> run seconds after the mutation gate, one of them went red on an unchanged product in the same lane's runs.
+> The reviewer runs everything at the reviewed commit, every round. `AGENTS.md` §11 holds the rule, and
+> E01-M01-S11 lands the scripts and says what each holds.
+
 ## Decision 2 · The gates
 
 Ordered cheapest first, so a failure is reported in seconds rather than minutes.
