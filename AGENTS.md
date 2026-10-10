@@ -221,6 +221,10 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
   task files before creating any worktree.
 - **At most three lanes per wave.** Integration and review are the bottleneck, not the number of agents.
 - **Fix tasks run one at a time**, in number order, each cut from the `dev` tip after the previous one merged.
+  A review file may state another order for the fix tasks still unmerged, with its reason; that order then
+  holds. (Added 2026-10-09: review round 20's fixes each run every gate, and FIX-28 found a gate on `dev` that
+  goes red inside the full run for a reason no queued task repairs, so the task that repairs it has to run
+  before the ones numbered ahead of it.)
 
 ### Entering the tree
 
