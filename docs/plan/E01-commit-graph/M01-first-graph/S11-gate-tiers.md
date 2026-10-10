@@ -208,8 +208,9 @@ Two sessions of this slice measured what follows, both on **2026-10-10** and on 
 Intel Core i5-10310U, four cores and eight threads, 15.6 GB, Windows 11 Pro 10.0.26200, Node 24.18.0,
 Electron 44.3.0, Playwright 1.63.0, Vitest 5.0.0, Stryker 10.0.0 (the versions as the third session read
 them). The third session ran from 00:43 to 08:40 local time at commit `dab51b5`, before the timed benchmarks
-moved. The fourth ran from 08:45 to 16:52 at `b60051f`, after. Exit statuses were read from the command
-itself, never through a pipe.
+moved. The fourth ran from 08:45 to 16:52 at `b60051f`, after. A fifth session, the same day, ran
+the static and quick tiers once more at `71d141c` from 16:58 (*What the tiers measured*) and took no budgets
+run. Exit statuses were read from the command itself, never through a pipe.
 
 **Other projects' agents ran test, lint, mutation and build runs on the machine through both sessions.** The
 third session sampled load every five seconds from Windows' formatted processor counter and read the process
@@ -267,6 +268,20 @@ assertion of the table above in the tree.
 
 **`npm run gates:static` at `b60051f`: exit 0**, at 09:32, after the planted token was removed.
 
+**Both tiers at `71d141c`, by the fifth session: exit 0.** `git diff --name-only b60051f..71d141c` lists
+this document and nothing else. `npm run gates:static`, 16:58:14 to 16:58:19, ran its two gates and exited
+0. `npm run gates:quick`, 16:58:19 to 17:02:03, ran its fourteen and exited 0, with the same counts as at
+`b60051f`: 380 unit tests in 25 files and 70 in 5, 39 end-to-end cases in 2.0 minutes, 9 benchmarks in 3
+files, 48 087 of 54 272 bytes. Load was not sampled during these two runs. No reading of that tier is a
+time: the nine benchmarks it ran are the counted ones of the table under *How the timed benchmarks are
+selected*.
+
+**The commits gate had been red in between, on this slice's own history.** The commit that first carried
+this document's fourth-session text had a subject of 73 characters against the 72 `gates:commits` allows,
+and both tiers exited 1 there, at that gate and at no other (the fourth session, 16:46 to 16:50). That
+commit was replaced by one with the same tree and a shorter subject, and the commit after it re-applied
+unchanged; `71d141c` is the result.
+
 **`npm run gates`, once, by the third session at `dab51b5`, 00:58 to 03:52: it did not exit 0, and the gate
 that stopped it no longer holds what stopped it.**
 
@@ -293,6 +308,10 @@ measured:
    configuration files; which files the run opens was not traced;
 3. `gates:quick` exit 0 at `b60051f`, above;
 4. the two lists compared at `b60051f`: `gates` is `gates:quick` with `gates:mutation` added.
+
+The same inference holds at `71d141c`, where `gates:quick` exited 0 as well and the only file changed
+since `b60051f` is this document, which neither the mutation run nor any gate but `gates:provenance` and
+`gates:commits` reads (*What a Markdown-only change can move*).
 
 ## The timed benchmarks before they moved
 
@@ -352,10 +371,12 @@ process of another project was stopped or signalled.
 
 ### What was taken: 65 runs, none kept
 
-**None of the three kept runs this slice's task asks for was obtained.** Between 08:51 and 16:42 on
+**No kept run was obtained, and this slice ends without one.** Between 08:51 and 16:42 on
 2026-10-10, 65 runs were started. 7 ran to their end and 58 were stopped, after 0.1 to
 8.2 minutes, 49 of them within two; every one of the 65 met at least one sample over 75 per cent, so
-every one is discarded.
+every one is discarded. Read from the two tables below: the mean load in the minute before a run was 13.7
+to 41.0 per cent, the highest sample met by a run 75.1 to 100 per cent, and the mean load during the seven
+that ended 25.2 to 64.2 per cent.
 
 In the minute before or during 39 of them the process table listed another project's test, mutation or lint
 run, or a `wsl.exe`: the worktrees named were another project's review and fix lanes. In the other 26, all
@@ -484,8 +505,11 @@ The runs that were stopped, with the readings each had printed by then:
   phase read 42 to 68.4 per cent with a mutation run of another project listed. So a `gates:budgets` run can
   put a five-second sample over 75 per cent with no other run listed. That nothing else was running then is
   an inference from the listing, which sees only the kinds of process it looks for and nothing inside WSL.
-  Whether the rule means the machine's whole load or the load that is not the gate's own is not this slice's
-  to decide; as written it is the whole load, and that is how these runs were judged.
+  This is an observation and not a rule: counted whole, the gate's own cold-start cases sampled 45.7 to
+  77.7 per cent with no other run listed. The 65 runs were judged by the whole load, which is how the rule
+  read when they were taken. `AGENTS.md` §11 on `dev`, read at `0439a82` on 2026-10-10, now says that the
+  load counted is that of everything except the reading's own process tree. No run of this slice was judged
+  that way: the sampler read one figure for the whole machine and did not separate the gate's own share.
 - **How rare a free stretch was.** Between 08:50 and 16:43 the load series holds five stretches of nine
   minutes or more with no sample over 75 per cent: 08:55 to 09:13, 09:13 to 09:23, 09:26 to 09:41, 11:01 to
   11:10 and 16:21 to 16:30. The third held this slice's own quick-tier and planted-failure runs. Runs 2, 3, 8
@@ -548,16 +572,27 @@ working tree, which was not run. The fourth session did not look at the folders 
   green on this machine with the default one, for the reason above, and the shared caches were left as they
   were found.
 - **`npm run gates` at this slice's head.** One full run, at `dab51b5`, green through mutation and the
-  end-to-end set and red at the timings that have since moved; its verdict at `b60051f` is the inference
-  under *What the tiers measured*.
+  end-to-end set and red at the timings that have since moved; its verdict at `b60051f` and at `71d141c`
+  is the inference under *What the tiers measured*.
 - **`npm run gates` on any planted failure, and `gates:quick` on the two benchmark plants**: inferences from
   composition, labelled above.
-- **`npm run gates:budgets` on a free machine.** Not one kept run exists, of the three asked for: 65
-  runs in the fourth session and four in the third, every one on a machine that was not free by the rule of
-  its day. So whether the gate is green on a free machine at this head is unmeasured, for the six end-to-end
-  cases and for the three benchmarks that joined it.
-- **Whether a run of the gate can meet the rule at all on this machine**, given that its own cold-start
-  cases read up to 77.7 per cent in a five-second sample with no other run listed.
+- **No `gates:budgets` run since the split has been taken on a free machine.** 69 runs were taken to read the
+  gate, not counting the three that carried a planted failure, and all 69 are discarded. The fourth
+  session's 65 each met a five-second sample over 75 per cent: the highest sample of a run was 75.1 to 100
+  per cent, the mean load in the minute before one 13.7 to 41.0 per cent, and the mean during the seven
+  that ran to their end 25.2 to 64.2 per cent. The third session's four, taken
+  before the timed benchmarks joined the gate, were started with another project's run in the process table
+  and read instantaneous samples up to 72, 100, 81 and 87 per cent; they were not judged by the rule as it
+  now stands. **A red in a discarded run is not a verdict**, about the product or about the gate, and
+  neither is a green. So whether the gate is green on a free machine is unmeasured, for the six end-to-end
+  cases and for the three benchmarks that joined it. What is measured is what the gate holds and that it
+  can fail: it runs the three timed benchmarks and the six tagged cases and nothing else (the lists above),
+  and it went red on a planted failure in a case and in a benchmark (*The planted failures*).
+- **The first kept run is owed by whoever next has a free machine.** `AGENTS.md` §11 has the reviewer run
+  `npm run gates:budgets` on a free machine at the reviewed commit every round.
+- **Whether a run of the gate can meet the rule on this machine.** Under the whole-load reading its own
+  cold-start cases reached 77.7 per cent in a five-second sample with no other run listed. Under the reading
+  `dev` now states, which leaves out the reading's own process tree, nothing has been measured.
 - **The `budgets` job in continuous integration**: never run.
-- **This document's own commit**: the runs above are at `b60051f` or earlier. The commits after it change
+- **This document's last commit**: the runs above are at `71d141c` or earlier. The commit after it changes
   this one Markdown file, which of the fifteen gates only `gates:provenance` and `gates:commits` read.
