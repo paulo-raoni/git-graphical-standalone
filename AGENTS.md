@@ -536,8 +536,10 @@ free decides.**
   for a table with no other project's run in it and never got 65 seconds of one, because an idle run of another
   project stayed listed for hours.) The machine is free for a reading when the processor load, sampled every
   five seconds or oftener across all processors, averaged under 40 % over the minute before it and over the
-  reading itself, with no sample over 75 % during it. The two numbers are the orchestrator's first choice and are
-  to be re-argued by whoever measures that they are wrong.
+  reading itself, with no sample over 75 % during it. **The load counted is that of everything except the
+  reading's own process tree**: counted whole, a reading can discard itself, as E01-M01-S11 measured on
+  2026-10-10 when the gate's own cold-start cases sampled 45.7 to 77.7 % with no other run listed. The two
+  numbers are the orchestrator's first choice and are to be re-argued by whoever measures that they are wrong.
 - A wall-clock reading taken when the machine was not free by that measure is **discarded, whatever it read**:
   it is recorded as discarded, with its load, and the case is read again when the machine is free.
 - A red on a free machine is red. A case that goes red on a free machine is a defect of the product or of the
