@@ -220,7 +220,11 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
   same file are one slice, or they are in different waves. The orchestrator checks this across the wave's
   task files before creating any worktree.
 - **At most three lanes per wave.** Integration and review are the bottleneck, not the number of agents.
-- **Fix tasks run one at a time**, in number order, each cut from the `dev` tip after the previous one merged.
+- **Fix tasks that share a path run one at a time**, in number order, each cut from the `dev` tip after the
+  previous one merged. **Fix tasks whose boundaries share no path may run together**, at most three, cut from the
+  same `dev` commit like the lanes of a wave; the orchestrator checks the boundaries against each other before
+  cutting them. (Owner's ruling, 2026-10-09: sequential fixes cost a full gate run each for lanes that could not
+  collide.)
   A review file may state another order for the fix tasks still unmerged, with its reason; that order then
   holds. (Added 2026-10-09: review round 20's fixes each run every gate, and FIX-28 found a gate on `dev` that
   goes red inside the full run for a reason no queued task repairs, so the task that repairs it has to run
@@ -295,16 +299,30 @@ even when the last wave's review already passed.
 ### A FAIL
 
 The reviewer writes one `TASK-FIX-<nn>.md` per independent defect, numbered in sequence, each naming the
-slices it repairs and the finding it comes from. The orchestrator runs them one at a time (§5), and a **new**
+slices it repairs and the finding it comes from. **Corrections to committed sentences are one task for the whole
+round**, whatever number of findings and files they span, because each is minutes of work and a lane apiece is
+hours of gates (owner's ruling, 2026-10-09). The orchestrator runs them one at a time (§5), and a **new**
 executor context takes each one and writes its `AUDIT-FIX-<nn>.md`. When the last one is merged, the reviewer
 **reviews everything again**: the whole diff from the base tag, every task and every audit. It then writes the
 next `REVIEW-<nn>.md`.
 
 ### A PASS
 
-`PASS` means **zero open findings**. The reviewer never defers a finding on its own. If the owner chooses to
-defer one, it is first added to the plan as a numbered item of a later milestone, and the review names that
-item. A `PASS` review file is the reviewer's **handover to the orchestrator**, and nothing else is.
+Every finding is classed by the reviewer, in the review file, with the reason:
+
+- **Blocking:** a defect of the product (what a user of the application would meet), a breach of §1, §9 or §10,
+  or a defect of a gate that protects the product: a gate that stays green when the thing it guards is broken,
+  or that goes red on an unchanged product.
+- **Carried:** everything else — a sentence that measurement contradicts, test-infrastructure hygiene, a
+  measurement worth taking, an improvement.
+
+`PASS` means **zero open blocking findings**. Carried findings do not hold a promotion: the reviewer lists them
+in the review file, the orchestrator adds each to `docs/PLAN.md` as an item of the next milestone before
+promoting, and the next milestone's first wave takes them. The class is the reviewer's judgement and is argued,
+not assumed; when in doubt a finding blocks. (Owner's ruling, 2026-10-09: six review rounds followed the fifth
+wave of the first milestone, each with new findings, and review rounds 17 to 20 named no defect of the
+application among theirs.) Beyond that the reviewer never defers a finding on its own. A `PASS` review file is
+the reviewer's **handover to the orchestrator**, and nothing else is.
 
 ### A gate is not evidence until it has been watched failing
 
@@ -379,7 +397,8 @@ milestone.
 3. `git branch --list "*/e<ee>-m<mm>-*"` prints nothing, and `git worktree list` shows only the primary
    checkout.
 4. The latest `REVIEW-<nn>.md` says `PASS`, names the reviewed commit, shows every gate green and has zero
-   open findings.
+   open blocking findings, and every finding it carries is an item of the next milestone in `docs/PLAN.md`
+   (§7).
 5. The orchestrator fills in the **delivery record** in `MILESTONE.md` (base tag, reviewed commit, number of
    review rounds, list of tasks, the tag about to be created) and commits it to `dev` as
    `docs(plan): record delivery of E<ee>-M<mm>`.
@@ -449,6 +468,30 @@ Every gate of the project is reachable through **one entry point**, named in `MI
 integration calls **the same scripts** rather than its own inlined commands. A gate that exists only in a
 workflow file cannot be run inside a worktree, and a gate an executor cannot run is a gate that fails at the
 wrong moment, against work already merged.
+
+### Gate tiers: a lane runs the gates its change can move
+
+Every lane used to run every gate, and the mutation gate alone took 88 minutes in E01-M01-FIX-28's last run;
+most fix lanes after the fifth wave of the first milestone changed no file it reads. **The task file names the
+lane's tier, and the tier is a boundary** like the mutation scope: an executor may not narrow it to pass or widen
+it to look thorough. (Owner's ruling, 2026-10-09.)
+
+| tier | script | for a lane whose boundary holds |
+| --- | --- | --- |
+| static | `npm run gates:static` | only Markdown documents |
+| quick | `npm run gates:quick` | anything else that the mutation run does not read |
+| full | `npm run gates` | a file the mutation run reads: anything under the mutated folders, a unit test, or the mutation and unit configuration |
+
+**The wall-clock budgets are their own gate, `npm run gates:budgets`**, and are in none of the tiers. A lane
+runs it only when its boundary holds code that ships or the budget cases themselves, and then on a free
+machine, under the rule below. Run seconds after this project's own mutation gate, one of those cases went red
+on an unchanged product (E01-M01-FIX-28, 2026-10-04).
+
+**The reviewer runs everything**, `npm run gates` and then `npm run gates:budgets` on a free machine, at the
+reviewed commit, every round. That is what bounds the exposure of a narrower tier to one round.
+
+These scripts are landed by E01-M01-S11; until it is merged, `npm run gates` is the only entry point and holds
+every gate.
 
 ### Where evidence comes from
 

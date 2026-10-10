@@ -65,6 +65,9 @@ wave.>
 <Every command that must pass, with its exact invocation. For each gate the executor adds or relies on, the
 audit records the probe that made it fail (AGENTS.md §7).>
 
+**Gate tier for this lane:** <`static`, `quick` or `full`, and whether `npm run gates:budgets` is also run, by
+the table of `AGENTS.md` §11. It is a boundary, like the mutation scope below: the executor runs exactly this.>
+
 **Mutation scope for this lane:** <the exact paths the mutation gate covers while this lane runs, or "the
 configured scope, unnarrowed".>
 

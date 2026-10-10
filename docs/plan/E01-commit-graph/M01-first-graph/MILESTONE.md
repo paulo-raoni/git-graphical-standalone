@@ -30,6 +30,8 @@ It also lays the ground every later milestone stands on: the four rings and the 
 | S09 | the mutation gate's two clocks | 5 | Choose the test runner's inner timeout, which was never set, and make it coherent with the mutation runner's budget, so the same source gets the same verdict at any machine load. |
 | S07 | budgets, baselines and render stability | 6 | The assembled application measured against every budget of ADR-0002, the baselines committed, and the golden-image question settled. |
 | S10 | fit fifty thousand commits in the memory budget | 6 | The assembled application at 50 000 loaded commits inside the resident-memory budget of ADR-0002 decision 6, which S07 measured it over; or the measurements showing which recorded decision stands in the way. |
+| S11 | gate tiers and the budgets gate | 7 | The gate scripts of AGENTS.md §11: `gates:static`, `gates:quick`, `gates` and a separate `gates:budgets` holding the wall-clock budget cases, with continuous integration calling the same scripts. |
+| S12 | the mutation gate without per-file isolation | 7 | The mutation gate run without isolating test files from each other, if every mutant keeps its verdict; S09 measured about four times the throughput. |
 
 Scope and boundary of each slice live **only** in its task file (`AGENTS.md` §3).
 
@@ -42,6 +44,8 @@ sequence has reached: a gate exists from the slice that lands it and is run by e
 | --- | --- |
 | S01 | format, lint, boundaries, types, build |
 | S02 | contract, unit with coverage thresholds, mutation, end to end, performance, size, licences, provenance, commits, placeholders |
+| S07 | the wall-clock and counter budgets of ADR-0002 decision 6, and the golden image of the graph |
+| S11 | the same gates behind tiered scripts (`AGENTS.md` §11), with the wall-clock budgets as their own gate, `npm run gates:budgets` |
 
 Always, for every slice (`TASK_TEMPLATE.md`): the boundary check, the commit check, the placeholder check,
 and `git status --short` printing nothing.
