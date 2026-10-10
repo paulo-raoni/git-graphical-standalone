@@ -482,7 +482,8 @@ it to look thorough. (Owner's ruling, 2026-10-09.)
 | quick | `npm run gates:quick` | anything else that the mutation run does not read |
 | full | `npm run gates` | a file the mutation run reads: anything under the mutated folders, a unit test, or the mutation and unit configuration |
 
-**The wall-clock budgets are their own gate, `npm run gates:budgets`**, and are in none of the tiers. A lane
+**The wall-clock budgets are their own gate, `npm run gates:budgets`**, and are in none of the tiers: every
+case and every benchmark reading whose verdict is a time, a processor share or a settled memory reading. A lane
 runs it only when its boundary holds code that ships or the budget cases themselves, and then on a free
 machine, under the rule below. Run seconds after this project's own mutation gate, one of those cases went red
 on an unchanged product (E01-M01-FIX-28, 2026-10-04).
@@ -531,8 +532,15 @@ green in ten of ten full runs at 10 to 100 % sampled load. **The owner ruled on 
 free decides.**
 
 - The strict limits stand. Nothing is widened for load.
-- A wall-clock case that goes red while another project's test, mutation or build run is in the process table is
-  re-run, that case alone, once that run has ended. The record (audit or review file) carries both readings, the
-  load sampled during each, and what was running.
-- A red on a machine with no such run is red. A case that goes red on a free machine is a defect of the product
-  or of the gate, and never a reason to re-run until green.
+- **Free is a measured state, not an empty process table.** (Amended 2026-10-10: E01-M01-S11 waited 144 minutes
+  for a table with no other project's run in it and never got 65 seconds of one, because an idle run of another
+  project stayed listed for hours.) The machine is free for a reading when the processor load, sampled every
+  five seconds or oftener across all processors, averaged under 40 % over the minute before it and over the
+  reading itself, with no sample over 75 % during it. The two numbers are the orchestrator's first choice and are
+  to be re-argued by whoever measures that they are wrong.
+- A wall-clock reading taken when the machine was not free by that measure is **discarded, whatever it read**:
+  it is recorded as discarded, with its load, and the case is read again when the machine is free.
+- A red on a free machine is red. A case that goes red on a free machine is a defect of the product or of the
+  gate, and never a reason to re-run until green.
+- The record (audit or review file) carries every reading, kept or discarded, the load sampled during each, and
+  what else was running.
