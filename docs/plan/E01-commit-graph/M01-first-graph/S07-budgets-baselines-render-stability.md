@@ -571,15 +571,23 @@ either job has happened (the task file records that `origin` carries only the sc
 GPU, so its frames are drawn in software, and it builds its fixtures cold. That the runner is less than about
 three times slower than this machine is an inference, and the first CI run is where it is tested.
 
-The idle processor figure carries a tolerance of 4 and a `ciTolerance` of 4, because it is a time too; the
-memory figures carry a tolerance and no `ciTolerance`, because the budget is about the product and not about
-the machine.
+The idle processor figure, `idleCpuPerCent`, carries a `ciTolerance` of 4 as well, because it is a time too;
+its tolerance is 8 and not 1.5, for the reason given under *Five idle minutes after the load*. Of the memory
+figures of the 50 000-commit load, `privateBytesAt50000` and `idleResidentRatio` carry a tolerance of 1.1 and
+no `ciTolerance`, because the budget is about the product and not about the machine; `residentBytesAfterClose`
+carries neither, and is held to its baseline of zero exactly. (Read from `perf/baselines.json` by
+E01-M01-FIX-31 on 2026-10-10.)
 
 **Shown failing, both ways.** A regression planted at about ten times the measured cost — a busy-wait at the
 start of the renderer, in the utility process's Refresh, in the renderer's `paint`, in the parser and in the
 layout pass, which read 7.2 to 10.8 times each figure's baseline — failed every wall-clock gate in both
-regimes. A regression planted at about three times — 2.7 to 3.1 times — failed every one in the strict regime
-and passed every one in the CI regime. Removing the plants turned every one green in both.
+regimes. A regression planted at about three times — 2.7 to 3.2 times — failed every one in the strict regime
+and passed every one in the CI regime. Removing the plants turned every one green in both. That range is not
+a reading: it is the quotient of each figure S07's lane recorded for those plants over the baseline it was
+planted against, as review round 20 worked them out, seven quotients in all. Six lie between 2.72 and 3.11
+and the seventh is the parse figure, 46.5 µs over 14.579, which is 3.19. E01-M01-FIX-31 repeated the seven
+divisions on 2026-10-10 from the figures as that review's fix task gives them; it did not re-run the plants,
+and the figures themselves are in no file this repository tracks.
 
 E01-M01-FIX-27 planted again, on 2026-10-03, against the fastest of ten and the re-measured baselines. A
 busy-wait of 850 ms in the utility process's Refresh made the fastest of ten Refreshes, five in each of two
