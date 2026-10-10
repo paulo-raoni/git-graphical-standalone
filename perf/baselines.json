@@ -53,20 +53,20 @@
   "parseHeapBytesPerCommit": {
     "baseline": 3168.776,
     "tolerance": 1.001,
-    "unit": "JavaScript heap bytes allocated per commit parsing the 10000-commit fixture's log into the store, third run in a child Node process under --predictable with no collection inside the run: five processes read 3168.7272 to 3168.776, perf/allocation.perf.test.ts, 2026-09-28"
+    "unit": "JavaScript heap bytes allocated per commit parsing the 10000-commit fixture's log into the store, third run in a child Node process under --predictable with no collection inside the run: five processes read 3168.7272 to 3168.776, perf/allocation.perf.test.ts, 2026-09-28; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against a child process whose V8 version string is that one, five processes under it reading 3168.776 to 3168.782 on 2026-10-10"
   },
   "parseBufferBytesPerCommit": {
     "baseline": 66.64,
-    "unit": "typed-array bytes allocated per commit by the same parse: the store's columns, identical in five processes"
+    "unit": "typed-array bytes allocated per commit by the same parse: the store's columns, identical in five processes; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against that V8, five processes under it reading 66.64 on 2026-10-10"
   },
   "layoutHeapBytesPerRow": {
     "baseline": 13.512,
     "tolerance": 1.01,
-    "unit": "JavaScript heap bytes allocated per row laying out 40000 braided rows, third run in the same child: five processes read 13.4814 to 13.5118"
+    "unit": "JavaScript heap bytes allocated per row laying out 40000 braided rows, third run in the same child: five processes read 13.4814 to 13.5118; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against that V8, five processes under it reading 13.481 to 13.511 on 2026-10-10"
   },
   "layoutBufferBytesPerRow": {
     "baseline": 130.491,
-    "unit": "typed-array bytes allocated per row by the same layout: its output columns and segment buffer, 130.490225 in five processes"
+    "unit": "typed-array bytes allocated per row by the same layout: its output columns and segment buffer, 130.490225 in five processes; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against that V8, five processes under it reading 130.49 on 2026-10-10"
   },
   "coldStartEmptyMilliseconds": {
     "baseline": 991,
