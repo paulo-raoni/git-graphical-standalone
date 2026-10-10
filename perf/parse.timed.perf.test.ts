@@ -17,6 +17,13 @@ import { compareInRegime, readBaselines } from './baselines';
  * The parse throughput budget of `docs/ADR-0002-architecture-and-performance.md`
  * decision 6 — at least 20 000 commits a second from a streamed log — as a gate.
  *
+ * **It runs in `npm run gates:budgets`, not in `gates:perf`.** Its verdict is a
+ * time, so it is read on a free machine with the other wall-clock budgets
+ * (`AGENTS.md` §11, *Gate tiers*), and the file's name says so: `gates:perf`
+ * leaves out every `perf/*.timed.perf.test.ts` and `gates:budgets` runs those
+ * and no other file of this folder. A benchmark held to a clock goes in a file
+ * named that way; one held to a count does not.
+ *
  * **It is held as time per commit, not commits per second.** A throughput is a
  * lower bound, and `compareWithBaseline` fails a number that rises; turned over,
  * 20 000 commits a second is at most 50 microseconds a commit, and a slower

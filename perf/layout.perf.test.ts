@@ -8,21 +8,21 @@ import { compareInRegime, readBaselines } from './baselines';
 import type { Comparison } from './baselines';
 
 /**
- * The lane layout, counted and timed.
+ * The lane layout, counted.
  *
- * **Counted** is the ratchet (`docs/ADR-0003-quality-gates-and-ci.md`
- * decision 4): `layoutWork` sums the rows laid out, the parent entries read, the
- * lane slots inspected and the segments emitted, which are the same numbers on
- * every machine. Work per row at forty thousand, and the work of forty thousand
- * over the work of ten thousand, are both held with no tolerance at all; a pass
- * that had become quadratic would read about sixteen, not four.
+ * This is the ratchet (`docs/ADR-0003-quality-gates-and-ci.md` decision 4):
+ * `layoutWork` sums the rows laid out, the parent entries read, the lane slots
+ * inspected and the segments emitted, which are the same numbers on every
+ * machine. Work per row at forty thousand, and the work of forty thousand over
+ * the work of ten thousand, are both held with no tolerance at all; a pass that
+ * had become quadratic would read about sixteen, not four.
  *
- * **Timed** is the budget of `docs/ADR-0002-architecture-and-performance.md`
- * decision 6: at least 200 000 commits a second, held as **at most five
- * microseconds a commit** so that a slower pass raises the number, as every other
- * regression in `perf/baselines.json` does (`perf/parse.perf.test.ts` says why
- * the unit is turned over rather than the comparison). The fastest of five runs
- * after a warm-up pass is compared.
+ * The same layout **timed**, against the budget of
+ * `docs/ADR-0002-architecture-and-performance.md` decision 6, is
+ * `perf/layout.timed.perf.test.ts`, which `npm run gates:budgets` runs and
+ * `gates:perf` does not: a time is read on a free machine (`AGENTS.md` §11,
+ * *Gate tiers*), a count anywhere. That file builds the same shape from a copy
+ * of `braided` below; the two must stay the same function.
  *
  * The shape is braided on purpose: the straight chain the end-to-end fixtures
  * have costs five units a row and says nothing about lanes. For row *i* the
@@ -36,7 +36,6 @@ import type { Comparison } from './baselines';
 
 const SMALL = 10_000;
 const LARGE = 40_000;
-const RUNS = 5;
 
 /** The parents of a braided page of `count` commits; nothing else of the columns is read. */
 function braided(count: number): CommitColumns {
@@ -73,13 +72,11 @@ function braided(count: number): CommitColumns {
   };
 }
 
-/** Lay `columns` out in one page from a fresh state; the work it counted, and the time it took. */
-function layOut(columns: CommitColumns): { work: number; microseconds: number } {
+/** Lay `columns` out in one page from a fresh state, and say how much work it counted. */
+function layOut(columns: CommitColumns): number {
   const state = createLayoutState();
-  const started = performance.now();
   layoutPage(state, columns, 0);
-  const elapsed = performance.now() - started;
-  return { work: layoutWork(state), microseconds: (elapsed * 1000) / columns.count };
+  return layoutWork(state);
 }
 
 const baselines = readBaselines();
@@ -97,32 +94,14 @@ const large = braided(LARGE);
 
 describe('the lane layout, counted', () => {
   it('does a constant amount of work per row on a braided page', () => {
-    const perRow = layOut(large).work / LARGE;
+    const perRow = layOut(large) / LARGE;
     expect(held('layoutWorkPerRow', 'units of layout work per row', perRow).failed).toBe(false);
   });
 
   it('does about four times the work for four times the rows, not sixteen', () => {
-    const ratio = layOut(large).work / layOut(small).work;
+    const ratio = layOut(large) / layOut(small);
     const comparison = held('layoutScalingRatio', 'layout work at 40000 over 10000', ratio);
     expect(comparison.failed).toBe(false);
     expect(ratio).toBeGreaterThan(2);
-  });
-});
-
-describe('the lane layout, timed', () => {
-  it('lays a commit out in no more than five microseconds', () => {
-    layOut(large);
-    const runs = Array.from({ length: RUNS }, () => layOut(large).microseconds);
-    process.stdout.write(
-      `  layout: ${String(LARGE)} braided rows, ` +
-        `${runs.map((each) => each.toFixed(4)).join(', ')} microseconds a commit\n`,
-    );
-    const fastest = Math.min(...runs);
-    const comparison = held(
-      'layoutMicrosecondsPerCommit',
-      'microseconds to lay out one commit of a braided page',
-      fastest,
-    );
-    expect(comparison.failed).toBe(false);
   });
 });
