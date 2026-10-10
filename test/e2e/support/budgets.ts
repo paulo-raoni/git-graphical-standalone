@@ -31,6 +31,13 @@ import type { PaintMark, PaintState } from './budgets-page';
  * measured something and did not compare it would have to have skipped this
  * function, which each case's assertion on the comparison it returns makes
  * visible.
+ *
+ * **The suites that use this run in two gates** (`AGENTS.md` §11, *Gate
+ * tiers*). The cases held to a clock are on the `BUDGETS` list of
+ * `playwright.config.js` and run in `npm run gates:budgets` alone; the cases
+ * that hold counts or bytes through the same helpers — `budgets-git.spec.ts`,
+ * `golden-graph.spec.ts` and two of `budgets-frames.spec.ts` — run in
+ * `gates:e2e`.
  */
 
 export const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -183,9 +190,10 @@ const PROCESS_QUERY =
  * Every process on the machine, read from the operating system's own process
  * table rather than from anything the application reports about itself.
  *
- * Windows only, because it asks Windows Management Instrumentation; the
- * end-to-end gate runs on Windows alone (`.github/workflows/ci.yml`), and on
- * another platform this throws rather than reading nothing.
+ * Windows only, because it asks Windows Management Instrumentation; the two
+ * jobs that run these suites, `e2e` and `budgets`, run on Windows alone
+ * (`.github/workflows/ci.yml`), and on another platform this throws rather than
+ * reading nothing.
  */
 function everyProcess(): readonly ProcessReading[] {
   const output = execFileSync(

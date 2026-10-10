@@ -55,6 +55,10 @@ import { fixture } from './support/fixtures';
  * "Painted" is a mark of `./support/budgets-page.ts`: the state is read in an
  * animation frame after the change, and the time in the frame after that, which
  * cannot run before the state read was painted.
+ *
+ * **These three cases are run by `npm run gates:budgets`**, and by neither
+ * `gates:e2e` nor `npm run gates`: each is held to a time, so each is on the
+ * `BUDGETS` list of `playwright.config.js` (`AGENTS.md` §11, *Gate tiers*).
  */
 
 /** How many readings each case takes; the fastest of them is compared. */

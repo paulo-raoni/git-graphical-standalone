@@ -28,6 +28,13 @@ import { fixture } from './support/fixtures';
  * `perf/baselines.json`. The fixture is a straight chain, one lane wide, so a
  * frame here draws one line and one dot a row; a braided history draws more, and
  * that is the limit of this reading.
+ *
+ * **The three cases are run by two gates** (`AGENTS.md` §11, *Gate tiers*).
+ * *main-thread work per frame while scrolling* is held to a time, so it is on
+ * the `BUDGETS` list of `playwright.config.js` and runs in
+ * `npm run gates:budgets` alone. The other two hold counts — row elements,
+ * canvas redraws — so they run in `gates:e2e`. The list names that case by its
+ * title: renaming it moves it into `gates:e2e`.
  */
 
 const LARGE = 10_000;

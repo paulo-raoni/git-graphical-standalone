@@ -486,7 +486,13 @@ is what was measured on 2026-09-28 — the private memory at 50 000 commits on 2
 | `gates:perf` | `perf/parse.perf.test.ts` | `parseMicrosecondsPerCommit` | its `compareInRegime` call |
 | `gates:perf` | `perf/layout.perf.test.ts` | `layoutMicrosecondsPerCommit`, `layoutWorkPerRow`, `layoutScalingRatio` | `compareInRegime` in its `held` |
 | `gates:perf` | `perf/allocation.perf.test.ts` | the four allocation entries | `compareInRegime` in its `held` |
-| `gates:e2e` | `test/e2e/budgets-start.spec.ts`, `budgets-frames.spec.ts`, `budgets-git.spec.ts`, `budgets-memory.spec.ts` | every other new entry | `compareInRegime` in `holdToBaseline`, `test/e2e/support/budgets.ts` |
+| `gates:budgets` | `test/e2e/budgets-start.spec.ts`, `budgets-memory.spec.ts`, and the case *main-thread work per frame while scrolling* of `budgets-frames.spec.ts` | `coldStartEmptyMilliseconds`, `coldStartOpenMilliseconds`, `load10000Milliseconds`; `privateBytesAt50000`, `idleResidentRatio`, `idleCpuPerCent`, `idlePageWakeups`, `idleRedraws`, `idleMainWakeups`, `residentBytesAfterClose`; `scrollFrameMeanMilliseconds`, `scrollFrameWorstMilliseconds` | `compareInRegime` in `holdToBaseline`, `test/e2e/support/budgets.ts` |
+| `gates:e2e` | `test/e2e/budgets-git.spec.ts`, and the other two cases of `budgets-frames.spec.ts` | `gitProcessesPerOpen`, `gitProcessesPerRefresh`, `gitProcessesPerLoadMore`, `loadMoreReadGrowth`; `liveRowElements`, `liveRowGrowth`, `redrawsPerScrolledFrame`, `redrawsPerScrollBurst` | the same line |
+
+As S07 built it, one gate, `gates:e2e`, ran all four files. E01-M01-S11 split them on 2026-10-10: the cases
+held to a clock or to the machine's load run in `npm run gates:budgets`, which is in none of the tiers of
+`AGENTS.md` §11 and so is not part of `npm run gates`, and the cases that hold counts stay in `gates:e2e`. The
+`BUDGETS` list in `playwright.config.js` is what selects them, and the S11 slice document says how.
 
 `compareInRegime`, in `perf/baselines.ts`, applies the regime's limits and calls `compareWithBaseline`, which is
 unchanged. Every case asserts on the verdict it gets back, and a case that holds several budgets makes every

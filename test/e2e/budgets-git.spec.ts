@@ -30,6 +30,11 @@ import { fixture } from './support/fixtures';
  * start at an offset. A reader that could would bring it to 1, which this gate
  * would report as an improvement to commit. The wall clock of each press is
  * printed beside it, and is not what is held.
+ *
+ * **This case is run by `gates:e2e`**, and not by `npm run gates:budgets`,
+ * though it shares a name with the suites that are: everything it holds is a
+ * count, so it is not on the `BUDGETS` list of `playwright.config.js`
+ * (`AGENTS.md` §11, *Gate tiers*).
  */
 
 /**
