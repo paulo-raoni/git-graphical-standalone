@@ -231,7 +231,8 @@ like the budget cases this slice moved out of one.
 run in the process table and load under 40 per cent for a minute, and in the 144 minutes this session spent
 waiting for exactly that (03:58 to 04:07, 04:30 to 05:41, 06:08 to 06:36 and 06:44 to 07:21) it never held
 for sixty-five seconds. Four runs were taken instead when load alone had stayed under 40 per cent for
-sixty-five seconds, with another project's gate run in the table at the start of each. They are readings on a quiet machine that was not free, and are not the five.
+sixty-five seconds, with another project's gate run in the table at the start of each. They are readings on
+a quiet machine that was not free, and are not the five.
 
 | | run 1 | run 2 | run 3 | run 4 | limit |
 | --- | --- | --- | --- | --- | --- |
@@ -283,8 +284,8 @@ folder named after a digest of the recipe, and reuse it for as long as it exists
 folders held repositories whose working-tree files were gone — `git status` in the adapter suite's
 `dirty-working-tree` listed its tracked file as deleted and no untracked file — while their `.git` folders
 were intact; the damaged repositories' folders were last modified on 2026-10-05 at 16:19. What removed the
-files was not established. The suites rebuild a fixture only when its folder is missing, so a folder that exists and is
-damaged is used as it is.
+files was not established. The suites rebuild a fixture only when its folder is missing, so a folder that
+exists and is damaged is used as it is.
 
 This session did not touch those folders. It set `TEMP` and `TMP` to an empty directory of its own for every
 run, the suites built fresh fixtures there, and the same case passed (34 of 34 in that file). **Until those
