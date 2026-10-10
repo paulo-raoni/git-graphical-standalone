@@ -553,6 +553,11 @@ red in both, past 800 and past 3200. With all ten in one window the same plants 
 A busy-wait of 700 ms at the start of the renderer made the fastest of ten empty cold starts 1685 ms: red, past
 1500. Removing each plant and rebuilding turned it green.
 
+Since E01-M01-FIX-29 (2026-10-10) `perf/baselines.perf.test.ts`, which `npm run gates:perf` runs, holds the two
+regimes with chosen environments and readings instead of this machine's: that lane planted four edits one at a
+time — an unset `CI` read as the CI regime, the strict regime given the CI limits, the tolerance widened without
+the ceiling, the tolerance tested before the ceiling — and each turned that file red.
+
 ## The size budgets, calibrated
 
 `npm run gates:size` weighed the production build on 2026-09-28, at the lane's base and again at its head:
