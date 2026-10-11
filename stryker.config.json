@@ -27,6 +27,6 @@
   },
   "timeoutMS": 120000,
   "commandRunner": {
-    "command": "node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache"
+    "command": "node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache --no-isolate"
   }
 }

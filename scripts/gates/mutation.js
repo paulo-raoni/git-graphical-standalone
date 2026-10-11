@@ -60,6 +60,36 @@ import { repositoryRoot, report } from './tree.js';
  * is deleted before Stryker starts, so a crash cannot leave one behind to be
  * checked in place of the run that just failed.
  *
+ * ## The command every mutant is measured by
+ *
+ * Stryker runs under its command runner, so a verdict is the exit status of one
+ * command, and the command is the one line `commandRunner.command` of
+ * `stryker.config.json`: `node node_modules/vitest/vitest.mjs run --reporter=dot
+ * --fsModuleCache --no-isolate`. It runs the whole unit suite `vitest.config.js`
+ * includes, once per mutant, its files one at a time, and — since E01-M01-S12 —
+ * **without isolating the test files from one another**: with `--no-isolate`
+ * the files of one run share a module registry instead of each getting a fresh
+ * one. That flag is on the command line and nowhere else, so `gates:unit`, which
+ * runs the same suite from the same configuration without it, keeps isolation.
+ *
+ * **The flag is the line the gate's speed and its equivalence both hinge on.**
+ * It was taken only because S12 ran this gate over the configured scope both
+ * ways at one commit and compared the two reports mutant by mutant: the
+ * measurement, its method and what would undo it are in
+ * `docs/plan/E01-commit-graph/M01-first-graph/S12-mutation-without-isolation.md`
+ * and are not repeated here. What it rests on is that no test file of the suite
+ * depends on module state another file leaves behind; a test or a module that
+ * starts keeping such state is the reason to take that measurement again, and
+ * removing the flag restores the isolated run with nothing else to change.
+ *
+ * One figure this gate prints reads differently since the flag. S12 took seven
+ * full runs with it and two without: the count of kills naming no failing test
+ * was 2 and 3 in two of the seven and nought in the other seven runs. Each of
+ * those five was a suite that could not get memory to start, beside a mutant
+ * that allocates without end, and not a statement about the mutant. Whether
+ * the flag makes that more likely was not established; the same document has
+ * the measurements.
+ *
  * ## The two clocks, and what the second clause actually counts
  *
  * There are two clocks over every mutant run and only one of them is Stryker's.
