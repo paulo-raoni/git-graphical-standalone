@@ -82,6 +82,14 @@ import { repositoryRoot, report } from './tree.js';
  * starts keeping such state is the reason to take that measurement again, and
  * removing the flag restores the isolated run with nothing else to change.
  *
+ * One figure this gate prints reads differently since the flag. S12 took seven
+ * full runs with it and two without: the count of kills naming no failing test
+ * was 2 and 3 in two of the seven and nought in the other seven runs. Each of
+ * those five was a suite that could not get memory to start, beside a mutant
+ * that allocates without end, and not a statement about the mutant. Whether
+ * the flag makes that more likely was not established; the same document has
+ * the measurements.
+ *
  * ## The two clocks, and what the second clause actually counts
  *
  * There are two clocks over every mutant run and only one of them is Stryker's.
