@@ -1,0 +1,176 @@
+{
+  "structuralBytesPerCommitWorst": {
+    "baseline": 85.519,
+    "ceiling": 96,
+    "unit": "bytes per commit, message text excluded, at 12502 commits: the worst size found by a sweep of every count from 4097 to 200000, re-measured under this gate's synthetic workload of one parent per commit and one author and committer; 25.0 per cent column slack"
+  },
+  "structuralBytesPerCommit": {
+    "baseline": 79.828,
+    "ceiling": 96,
+    "unit": "bytes per commit, message text excluded, at 20000 commits: mid-cycle, 22.1 per cent column slack"
+  },
+  "structuralBytesPerCommitLarge": {
+    "baseline": 76.416,
+    "ceiling": 96,
+    "unit": "bytes per commit, message text excluded, at 80000 commits: mid-cycle, 16.4 per cent column slack"
+  },
+  "scalingRatio": {
+    "baseline": 4.403,
+    "ceiling": 8,
+    "unit": "times the work of 20000 commits, for 80000 of them: 22.1 and 16.4 per cent slack, neither size capacity-exact"
+  },
+  "workPerCommit": {
+    "baseline": 13.792,
+    "unit": "counted operations per commit, over 80000 commits: 16.4 per cent column slack"
+  },
+  "buildMilliseconds": {
+    "baseline": 300,
+    "tolerance": 10,
+    "unit": "milliseconds to append 10000 commits, the slowest of the 12502, 20000 and 80000 builds normalised to ten thousand"
+  },
+  "parseMicrosecondsPerCommit": {
+    "baseline": 14.579,
+    "ceiling": 50,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks; fastest of five runs after a warm-up, perf/parse.perf.test.ts, 2026-09-28"
+  },
+  "layoutMicrosecondsPerCommit": {
+    "baseline": 0.59,
+    "ceiling": 5,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, perf/layout.timed.perf.test.ts; the reading is the fastest of 25 runs in five batches half a second apart since E01-M01-FIX-37; the baseline is S07's fastest of five after a warm-up, 2026-09-28, which is that file's first batch; re-measured as the fastest of 25 in six kept runs on 2026-10-17, 0.572 to 0.643, median 0.611, at other load of 19 to 39 per cent, and not raised to it"
+  },
+  "layoutWorkPerRow": {
+    "baseline": 18.747,
+    "unit": "units of layoutWork per row, 40000 braided rows laid out in one page: identical on every run"
+  },
+  "layoutScalingRatio": {
+    "baseline": 3.966,
+    "unit": "times the layout work of 10000 braided rows, for 40000 of them: 3.96501 measured, identical on every run"
+  },
+  "parseHeapBytesPerCommit": {
+    "baseline": 3168.776,
+    "tolerance": 1.001,
+    "unit": "JavaScript heap bytes allocated per commit parsing the 10000-commit fixture's log into the store, third run in a child Node process under --predictable with no collection inside the run: five processes read 3168.7272 to 3168.776, perf/allocation.perf.test.ts, 2026-09-28; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against a child process whose V8 version string is that one, five processes under it reading 3168.776 to 3168.782 on 2026-10-10"
+  },
+  "parseBufferBytesPerCommit": {
+    "baseline": 66.64,
+    "unit": "typed-array bytes allocated per commit by the same parse: the store's columns, identical in five processes; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against that V8, five processes under it reading 66.64 on 2026-10-10"
+  },
+  "layoutHeapBytesPerRow": {
+    "baseline": 13.512,
+    "tolerance": 1.01,
+    "unit": "JavaScript heap bytes allocated per row laying out 40000 braided rows, third run in the same child: five processes read 13.4814 to 13.5118; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against that V8, five processes under it reading 13.481 to 13.511 on 2026-10-10"
+  },
+  "layoutBufferBytesPerRow": {
+    "baseline": 130.491,
+    "unit": "typed-array bytes allocated per row by the same layout: its output columns and segment buffer, 130.490225 in five processes; measured under Node 24.18.0 (V8 13.6.233.17-node.50) and held only against that V8, five processes under it reading 130.49 on 2026-10-10"
+  },
+  "coldStartEmptyMilliseconds": {
+    "baseline": 991,
+    "ceiling": 1500,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "milliseconds from the operating system creating the main process to the window painted over an empty repository named on the command line: the fastest of ten launches, test/e2e/budgets-start.spec.ts; the baseline is the median of that figure over five runs on 2026-10-03, which read 958 to 1096, with the processor load sampled at 15 to 80 per cent"
+  },
+  "coldStartOpenMilliseconds": {
+    "baseline": 1040,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "milliseconds from the main process's creation to the first page of 300 painted, the 10000-commit fixture named on the command line: the fastest of ten launches; the baseline is the median of that figure over five runs on 2026-10-03, which read 1014 to 1100, with the processor load sampled at 15 to 80 per cent"
+  },
+  "load10000Milliseconds": {
+    "baseline": 423.5,
+    "ceiling": 800,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, the fastest of ten Refreshes a second apart, five in each of two windows; the baseline is the median of that figure over five runs on 2026-10-03 with all ten in one window, which read 418.4 to 539.4 at a processor load of 15 to 80 per cent; five runs with two windows read 418.7 to 560.8, median 428.5, at 12 to 100 per cent, and the baseline was not raised to them"
+  },
+  "scrollFrameMeanMilliseconds": {
+    "baseline": 5.24,
+    "ceiling": 8,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts: the reading is the lowest of ten runs a second apart since E01-M01-FIX-37; the baseline is S07's median of five runs, which read 5.13 to 5.34 on 2026-09-28; re-measured as the lowest of ten in seven kept runs on 2026-10-17, 5.02 to 5.67, median 5.33, at other load of 20 to 38 per cent, and not raised to it"
+  },
+  "scrollFrameWorstMilliseconds": {
+    "baseline": 7.7,
+    "ceiling": 16.7,
+    "tolerance": 1.5,
+    "ciTolerance": 4,
+    "unit": "milliseconds of main-thread work in the worst of the same 240 frames: the reading is the lowest of the same ten runs' worst frames; the baseline is S07's median of five, which read 7.3 to 8.1; re-measured as the lowest of ten in the same seven kept runs, 7.0 to 10.6, median 8.6, and not raised to it"
+  },
+  "liveRowElements": {
+    "baseline": 37,
+    "ceiling": 37,
+    "unit": "row elements in the document with 10000 commits loaded and scrolled, window 1280 by 800: the ceiling is the viewport's 29 rows plus twice the overscan of 4, at the 669-pixel viewport this window has"
+  },
+  "liveRowGrowth": {
+    "baseline": 1,
+    "ceiling": 1,
+    "unit": "times the row elements with 300 commits loaded, once 10000 are: independent of commits loaded"
+  },
+  "redrawsPerScrolledFrame": {
+    "baseline": 1,
+    "unit": "canvas redraws per frame of a scripted scroll of 120 frames, 240 pixels each"
+  },
+  "redrawsPerScrollBurst": {
+    "baseline": 1,
+    "unit": "canvas redraws for 25 scroll events dispatched in one task"
+  },
+  "gitProcessesPerOpen": {
+    "baseline": 6,
+    "unit": "git processes started to open a repository named on the command line, counted by GIT_TRACE2_EVENT: finding git, then rev-parse, log, for-each-ref, stash and status"
+  },
+  "gitProcessesPerRefresh": {
+    "baseline": 5,
+    "unit": "git processes started per Refresh, counted by GIT_TRACE2_EVENT"
+  },
+  "gitProcessesPerLoadMore": {
+    "baseline": 5,
+    "unit": "git processes started per Load More, the worst of five presses, counted by GIT_TRACE2_EVENT"
+  },
+  "loadMoreReadGrowth": {
+    "baseline": 3,
+    "unit": "times the commits the first Load More of 300 read, read by the fifth: 1800 over 600, because each press reads every page again"
+  },
+  "privateBytesAt50000": {
+    "baseline": 157372416,
+    "ceiling": 400000000,
+    "tolerance": 1.1,
+    "unit": "bytes, the sum of the private bytes of every process of the application, 50000 commits loaded and painted, read from the operating system's process table once that sum has not fallen by 1 MB over 40 seconds with the same processes throughout, which was 97 to 124 seconds after the paint: the median of five runs on 2026-10-03, which read 154775552 to 161611776 (147.6 to 154.1 MiB); with four runs of a second session that day the nine readings span the same range, the largest 1.029 times their median, beside a tolerance of 1.1; the ceiling is ADR-0002 decision 6's 400 MB in SI megabytes, counted in private bytes by the owner's ruling of 2026-10-03"
+  },
+  "idleResidentRatio": {
+    "baseline": 1.002,
+    "ceiling": 1.02,
+    "tolerance": 1.1,
+    "unit": "times the resident memory at the reading that met the settling rule of privateBytesAt50000, five real idle minutes after it: the median of five runs on 2026-10-03, which read 0.853 to 1.006, the lowest where the operating system trimmed 58.7 MiB of working sets while the private bytes stayed; the ceiling is the strict limit, as it was"
+  },
+  "idleCpuPerCent": {
+    "baseline": 0.063,
+    "ceiling": 0.5,
+    "tolerance": 8,
+    "ciTolerance": 4,
+    "unit": "per cent of one core used by every process of the application over five idle minutes after the 50000-commit load, from the operating system's processor times: five runs on 2026-09-28 read 0.063, 0.063, 0.453, 0.099 and 0.156, the third with the main process alone using 1110 ms, none of it in a Node callback; the tolerance leaves the ceiling as the strict limit, which reads ADR-0002 decision 6's approximately zero as a figure that rounds to zero per cent"
+  },
+  "idlePageWakeups": {
+    "baseline": 0,
+    "ceiling": 0,
+    "unit": "timer, interval, animation-frame and idle callbacks run in the page over the same five idle minutes"
+  },
+  "idleRedraws": {
+    "baseline": 0,
+    "unit": "canvas redraws over the same five idle minutes"
+  },
+  "idleMainWakeups": {
+    "baseline": 0,
+    "ceiling": 0,
+    "unit": "callbacks Node ran in the main process over the same five idle minutes, counted by async_hooks, less the cost of reading the count"
+  },
+  "residentBytesAfterClose": {
+    "baseline": 0,
+    "unit": "bytes still resident, summed over the processes of the 50000-commit load still running 30 seconds after its window was closed the way a person closes it"
+  }
+}

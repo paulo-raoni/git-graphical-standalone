@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "command",
+  "mutate": [
+    "src/core/**/*.ts",
+    "!src/core/**/*.test.ts",
+    "src/contracts/**/*.ts",
+    "!src/contracts/**/*.test.ts"
+  ],
+  "coverageAnalysis": "off",
+  "incremental": false,
+  "incrementalFile": ".stryker-tmp/incremental.json",
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true,
+  "thresholds": {
+    "high": 100,
+    "low": 95,
+    "break": 85
+  },
+  "reporters": ["progress", "clear-text", "html", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "timeoutMS": 120000,
+  "commandRunner": {
+    "command": "node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache --bail=1 --no-cache --no-isolate"
+  }
+}

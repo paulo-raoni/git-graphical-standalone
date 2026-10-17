@@ -1,0 +1,66 @@
+# E01-M01 · First graph
+
+**Epic:** E01 · The commit graph
+**Base tag:** v0.0.0
+**State:** delivered, promoted as v0.1.0
+
+## Goal
+
+A window that opens a real repository and draws its commit graph: one row per commit with the graph, the
+description, the date, the author and the abbreviated hash; branch, remote-branch and tag labels on their
+commits; the uncommitted changes as the top row when the working tree is dirty; and a Load More Commits
+button that appends the next page. It is the first milestone of the MVP (`docs/PLAN.md` §4) and is promoted
+as **v0.1.0**.
+
+It also lays the ground every later milestone stands on: the four rings and the dependency rule of
+`docs/ADR-0002-architecture-and-performance.md`, the frozen contracts, and the gate pipeline of
+`docs/ADR-0003-quality-gates-and-ci.md`.
+
+## Slices
+
+| ID | title | wave | outcome |
+| --- | --- | --- | --- |
+| S01 | scaffold, rings and the frozen contract | 1 | The project with its rings, the dependency rule enforced mechanically, every development dependency of the milestone pinned, the frozen contracts, the static gates, and a window that opens. |
+| S02 | gate pipeline, the commit store and CI | 2 | The columnar commit store with its builder and accessors, its 96-byte budget proved by benchmark; unit and coverage thresholds, StrykerJS, the Playwright harness, the benchmark harness and its baselines, deterministic fixture repositories, `npm run gates`, and the single grouped workflow. |
+| S03 | git read adapter and the log parser | 3 | Git discovery; log, refs, status and stash list streamed and parsed incrementally into the store; the git version floor measured. |
+| S04 | lane layout engine | 3 | The single-pass, incremental lane assignment from the store to layout rows, with unit tests over fixture shapes. |
+| S08 | the contract decode API | 3 | Move the pure decoders of CommitColumns out of core and into contracts, where the renderer can reach them (ADR-0002 decision 3, amended). |
+| S05 | graph table renderer | 4 | Recycled virtualised rows and the coalesced graph canvas, drawing layout buffers supplied as fixtures. |
+| S06 | open a repository | 5 | The composition root: open by argument or folder dialog, initial load, Load More, refresh, and the error page when git is missing. |
+| S09 | the mutation gate's two clocks | 5 | Choose the test runner's inner timeout, which was never set, and make it coherent with the mutation runner's budget, so the same source gets the same verdict at any machine load. |
+| S07 | budgets, baselines and render stability | 6 | The assembled application measured against every budget of ADR-0002, the baselines committed, and the golden-image question settled. |
+| S10 | fit fifty thousand commits in the memory budget | 6 | The assembled application at 50 000 loaded commits inside the memory budget of ADR-0002 decision 6 as first stated (the sum of the working sets), which S07 measured it over; or the measurements showing which recorded decision stands in the way. |
+| S11 | gate tiers and the budgets gate | 7 | The gate scripts of AGENTS.md §11: `gates:static`, `gates:quick`, `gates` and a separate `gates:budgets` holding the wall-clock budget cases, with continuous integration calling the same scripts. |
+| S12 | the mutation gate without per-file isolation | 7 | The mutation gate run without isolating test files from each other, if every mutant keeps its verdict; S09 measured about four times the throughput. |
+
+Scope and boundary of each slice live **only** in its task file (`AGENTS.md` §3).
+
+## Gates
+
+Every gate of `docs/ADR-0003-quality-gates-and-ci.md` §2, reachable through `npm run gates`, at the state the
+sequence has reached: a gate exists from the slice that lands it and is run by every slice after it.
+
+| from | gates |
+| --- | --- |
+| S01 | format, lint, boundaries, types, build |
+| S02 | contract, unit with coverage thresholds, mutation, end to end, performance, size, licences, provenance, commits, placeholders |
+| S07 | the wall-clock and counter budgets of ADR-0002 decision 6, and the golden image of the graph |
+| S11 | the same gates behind tiered scripts (`AGENTS.md` §11), with the wall-clock budgets as their own gate, `npm run gates:budgets` |
+
+Always, for every slice (`TASK_TEMPLATE.md`): the boundary check, the commit check, the placeholder check,
+and `git status --short` printing nothing.
+
+The reviewer runs the full set at the end of every wave and again over the whole sequence before promotion
+(`AGENTS.md` §7).
+
+## Delivery record
+
+Filled in before promotion (`AGENTS.md` §8.5).
+
+| field | value |
+| --- | --- |
+| base tag | v0.0.0 |
+| reviewed commit | `a2abb94` (review round 22, PASS, 2026-10-17; it reviewed the whole diff from `v0.0.0` and every task after the last wave's review, round 21, which serves `AGENTS.md` §7's review over the whole sequence before promotion) |
+| review rounds | 22 |
+| tasks | slices S01 to S12 (S10 delivered measurements and no product change; all merged); fix tasks FIX-01 to FIX-33 and FIX-35 to FIX-37 (no FIX-34: a file of that number was written by a review dispatch the owner cancelled, and was never dispatched) |
+| tag created | `v0.1.0` |

@@ -3,10 +3,20 @@
 **Verified on 2026-09-11** on the development machine: Windows 11 Pro, x64. Machines drift. Re-run the checks
 at the end of this file rather than trusting this table.
 
-There is nothing to build yet. This file records what each **candidate** stack would need and what the
-machine already has, so that the stack decision can be made knowing what it costs to set up.
+## The chosen stack, and what it needs
 
-## What each candidate stack needs
+`docs/ADR-0001-stack.md` is approved: **Electron with TypeScript end to end**, the `git` command-line
+interface read over a pipe, and no native compilation. Its requirements are **git, Node and npm**, all three
+already present. **Nothing has to be installed on this machine**, which is why the table below matters less
+than it did: the two missing rows, Rust and the Microsoft C++ build tools, belong to candidates that were
+not chosen and are kept only so the decision can be re-read against what it cost.
+
+The git version floor the adapter needs is **2.14.0**, raised by `--no-optional-locks`. E01-M01-S03 derived it
+from git's documented history of each option it uses and **did not measure it**, because no git older than
+2.51.0 is installed on this machine; its slice document, *The version floor*, carries the derivation. The floor
+`docs/ADR-0001-stack.md` assumes, git 2.25, is above it and stays the stated requirement.
+
+## What each candidate stack needed, at the time of the decision
 
 Every candidate needs **git**, which is the application's data source.
 
@@ -111,3 +121,36 @@ if (Test-Path $vswhere) {
     ForEach-Object { "$($_.id) $($_.version)" } | Sort-Object -Unique
 } else { 'vswhere: MISSING' }
 ```
+
+## Traps met while building
+
+- **`npm ci` does not fetch the Electron binary. The first run does, from a cache shared by every worktree
+  of the same user on the machine.** After a clean install, `node_modules/electron/` has no `dist/` and no `path.txt`. That is normal
+  and not a broken install: this version of the package has no post-install step at all, and its entry point
+  fetches the binary the first time it is required, without any manual step.
+
+  The cache is **one directory per machine and user account**, `%LOCALAPPDATA%\electron\Cache` on Windows,
+  keyed by Electron version, platform and architecture, holding one zip per key. It is **not** per worktree.
+  So only the **first** worktree on a machine with a cold cache downloads anything. Every worktree after it
+  extracts from that cache, which on this machine took **3.4 seconds**. It really is offline: with every
+  proxy variable pointed at a dead endpoint, and `dist/` and `path.txt` deleted, it still extracted and
+  resolved in 5.3 seconds, exit 0.
+
+  **`Downloading Electron binary...` is printed before the cache is consulted**, so seeing it proves nothing
+  either way. Tell a download from an extraction by the cached zip's last-write time: an extraction leaves it
+  untouched and only moves its last-access time.
+
+  Measured on 2026-09-11 across four fresh worktrees, each a clean `npm ci` followed by the same lazy fetch,
+  reached through `npm start` in one of them: four cache hits, zero downloads, the cached zip's last-write
+  time unchanged throughout. The zip is **150.8 MB** (158,149,320 bytes) and expands to **367 MB of `dist/`
+  per worktree**, because each worktree has its own `node_modules`, which comes to **560 MB** per worktree in
+  total. Budget for that when cutting a wave: three lanes at once cost about **1.6 GB** of disk in
+  `.worktrees/`, two thirds of it the Electron runtime.
+
+- **A shell can silently re-encode a source file, and no gate here would notice.** PowerShell's
+  `Set-Content` rewrote a UTF-8 source as mojibake while planting a probe, in a lane that then ran a full
+  green pipeline. **No gate in this repository reads a file for its encoding**: format, lint, types, build
+  and the tests all passed on the corrupted file. It was caught by the executor reading the file, and
+  repaired with `git checkout --` before anything was committed. Edit source through an editing tool, not
+  through a shell redirect, and if you must, grep the touched files for mojibake afterwards. Observed on
+  2026-09-12 in a fix lane.

@@ -19,8 +19,10 @@ Git Graph (`mhutchie/vscode-git-graph`) is not under an open-source licence. Fro
 of the Software."* This repository is public, so nothing in it may be a derivative work of Git Graph.
 
 - **Behaviour is the only input.** It comes from running the extension and observing it, and from its
-  user-facing documentation: the marketplace listing, its `README` and its `LICENSE`. It is recorded in this
-  repository in our own words.
+  user-facing documentation **as published on its Marketplace page**: the listing, its `README`, its
+  `LICENSE`, its Changelog, its settings list and its command list. It is recorded in this repository in our
+  own words. Its repository stays off-limits, including the `package.json` and the `CHANGELOG.md` inside it:
+  the same text is read only where the Marketplace publishes it.
 - **NEVER open, read, copy, adapt or translate** any other part of Git Graph: its source code, stylesheets,
   icons, images, localisation strings or any other file of its repository or of its packaged extension. This
   covers **every version**, including the MIT-licensed releases before v1.5.0, and **every fork**.
@@ -47,7 +49,10 @@ Three roles. **A context holds exactly one role for its whole life.**
 **Nobody approves what they wrote.** The reviewer and the executor are never the same context. The
 orchestrator never reviews. An executor never reviews, not even its own work "as a check".
 
-**The owner approves every EPIC and every MILESTONE before its first task file is written.**
+**The owner approves `docs/PLAN.md`, the architecture decision records under `docs/` that it rests on, and
+the MVP cut, once.** Inside the MVP, epics
+and milestones need no separate approval. Outside the MVP, the owner approves every EPIC and every MILESTONE
+before its first task file is written.
 
 ### What each role MAY do. Everything not listed is forbidden.
 
@@ -57,6 +62,11 @@ orchestrator never reviews. An executor never reviews, not even its own work "as
 - Build, run gates and tests, and start processes that it then stops.
 - **Commit on its own lane branch**, which is the branch checked out in its worktree.
 - Rebase its own lane branch onto `dev`, **only when its task file has a `## Rebase` section**.
+- Replace commits of its own lane by commits with **identical trees** whose messages differ, **only when its
+  task file has a section that allows it** and names the commits, and only before the lane is merged. The audit
+  lists every replaced commit's old and new hash and tree. (Added 2026-10-17: review round 21 found that four
+  task sections had allowed such rewrites, every one tree-identical, while this list did not, and three
+  executors had committed a subject one character over §9's limit.)
 
 It MUST NOT: switch branches; create, delete or rename branches or tags; merge; push; touch any remote or the
 hosted repository's settings; open pull requests; add or remove worktrees; touch another worktree or the
@@ -215,7 +225,15 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
   same file are one slice, or they are in different waves. The orchestrator checks this across the wave's
   task files before creating any worktree.
 - **At most three lanes per wave.** Integration and review are the bottleneck, not the number of agents.
-- **Fix tasks run one at a time**, in number order, each cut from the `dev` tip after the previous one merged.
+- **Fix tasks that share a path run one at a time**, in number order, each cut from the `dev` tip after the
+  previous one merged. **Fix tasks whose boundaries share no path may run together**, at most three, cut from the
+  same `dev` commit like the lanes of a wave; the orchestrator checks the boundaries against each other before
+  cutting them. (Owner's ruling, 2026-10-09: sequential fixes cost a full gate run each for lanes that could not
+  collide.)
+  A review file may state another order for the fix tasks still unmerged, with its reason; that order then
+  holds. (Added 2026-10-09: review round 20's fixes each run every gate, and FIX-28 found a gate on `dev` that
+  goes red inside the full run for a reason no queued task repairs, so the task that repairs it has to run
+  before the ones numbered ahead of it.)
 
 ### Entering the tree
 
@@ -264,8 +282,9 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
 
 ### When
 
-After **every slice task** of the milestone has been merged into `dev`. Then again, in full, after every fix
-task of a round has been merged.
+At the **end of every wave**, once every lane of the wave has been merged into `dev`. Then again, in full,
+after every fix task of a round has been merged. And once more over the **whole sequence** before promotion,
+even when the last wave's review already passed.
 
 ### How
 
@@ -285,16 +304,30 @@ task of a round has been merged.
 ### A FAIL
 
 The reviewer writes one `TASK-FIX-<nn>.md` per independent defect, numbered in sequence, each naming the
-slices it repairs and the finding it comes from. The orchestrator runs them one at a time (§5), and a **new**
+slices it repairs and the finding it comes from. **Corrections to committed sentences are one task for the whole
+round**, whatever number of findings and files they span, because each is minutes of work and a lane apiece is
+hours of gates (owner's ruling, 2026-10-09). The orchestrator runs them one at a time (§5), and a **new**
 executor context takes each one and writes its `AUDIT-FIX-<nn>.md`. When the last one is merged, the reviewer
 **reviews everything again**: the whole diff from the base tag, every task and every audit. It then writes the
 next `REVIEW-<nn>.md`.
 
 ### A PASS
 
-`PASS` means **zero open findings**. The reviewer never defers a finding on its own. If the owner chooses to
-defer one, it is first added to the plan as a numbered item of a later milestone, and the review names that
-item. A `PASS` review file is the reviewer's **handover to the orchestrator**, and nothing else is.
+Every finding is classed by the reviewer, in the review file, with the reason:
+
+- **Blocking:** a defect of the product (what a user of the application would meet), a breach of §1, §9 or §10,
+  or a defect of a gate that protects the product: a gate that stays green when the thing it guards is broken,
+  or that goes red on an unchanged product.
+- **Carried:** everything else — a sentence that measurement contradicts, test-infrastructure hygiene, a
+  measurement worth taking, an improvement.
+
+`PASS` means **zero open blocking findings**. Carried findings do not hold a promotion: the reviewer lists them
+in the review file, the orchestrator adds each to `docs/PLAN.md` as an item of the next milestone before
+promoting, and the next milestone's first wave takes them. The class is the reviewer's judgement and is argued,
+not assumed; when in doubt a finding blocks. (Owner's ruling, 2026-10-09: six review rounds followed the fifth
+wave of the first milestone, each with new findings, and review rounds 17 to 20 named no defect of the
+application among theirs.) Beyond that the reviewer never defers a finding on its own. A `PASS` review file is
+the reviewer's **handover to the orchestrator**, and nothing else is.
 
 ### A gate is not evidence until it has been watched failing
 
@@ -302,6 +335,39 @@ A check that would stay green with the code deleted proves nothing, and from out
 one that works. For every gate an executor adds or relies on: **plant a probe** that should make it fail,
 **watch it go red**, **remove the probe**, **watch it go green**, and record all four steps in the audit. A
 gate that has never been seen red is reported as unproven.
+
+### A claim carries its measurement
+
+The first milestone's second wave found the same defect four times, in four artefacts, by four authors, two
+of them the reviewer and two the orchestrator: **a sentence asserting how this project behaves, written
+without measuring it.** Each sounded true, each was wrong, each cost a review round, and not one would have
+survived a minute of its own author's attention.
+
+**Every committed sentence stating how this project behaves must say what was measured and how, or name who
+measured it.** This binds task files, audits, review files, slice documents and the documents under `docs/`
+exactly as §7 binds gates.
+
+- **A number carries its method and its range.** "The worst case" is a claim about every case. "The worst
+  size found by an exhaustive pass over every append to 200 000 commits" is a claim a search establishes.
+  Where the two differ, write the second.
+- **A fact you could falsify in a minute, falsify before you write it**, not after someone else commits it.
+- **Repeating another's measurement makes it yours.** Reproduce it, or say whose it is and that you did not.
+- **An inference is labelled as one.** "It could not have launched" is not an observation, and reads as one.
+- **A message a gate prints is a committed sentence too.** A guard whose failure text repeats a discredited
+  claim teaches the next author the error at the moment they are deciding.
+
+The reviewer checks prose against this section the way it checks gates against the rest of §7.
+
+### The mutation gate, and the reviewer's own mutation
+
+A mutation-testing gate runs over the rings that hold the product's decisions, with a score threshold that
+fails the build (`docs/ADR-0003-quality-gates-and-ci.md`). It is mechanical, it runs on every slice, and it
+raises the floor: a test suite that asserts nothing cannot pass it.
+
+**It does not replace the pass below.** The gate proves the suite kills the mutants a tool can generate; the
+reviewer proves the suite exercises *this slice's guarantee*, which is a judgement no tool makes. The two
+compose: **every mutant the gate reports as surviving is a candidate line for the reviewer**, and the
+reviewer says in its review file whether it used one and why it chose the line it chose.
 
 ### The reviewer mutates a different line
 
@@ -336,11 +402,15 @@ milestone.
 3. `git branch --list "*/e<ee>-m<mm>-*"` prints nothing, and `git worktree list` shows only the primary
    checkout.
 4. The latest `REVIEW-<nn>.md` says `PASS`, names the reviewed commit, shows every gate green and has zero
-   open findings.
+   open blocking findings, and every finding it carries is an item of the next milestone in `docs/PLAN.md`
+   (§7).
 5. The orchestrator fills in the **delivery record** in `MILESTONE.md` (base tag, reviewed commit, number of
    review rounds, list of tasks, the tag about to be created) and commits it to `dev` as
    `docs(plan): record delivery of E<ee>-M<mm>`.
-6. `git diff --name-only <reviewed commit> dev` lists **exactly** that `MILESTONE.md` and nothing else.
+6. `git diff --name-only <reviewed commit> dev` lists that `MILESTONE.md`, and besides it only `docs/PLAN.md`
+   (the carried findings item 4 requires, which can only be written after the review) and `AGENTS.md` (only for
+   this item's own amendment of 2026-10-17, which E01-M01's promotion needed: the two items could not both hold).
+   Nothing else: no file a lane wrote or a gate reads.
 7. `git status --short` in the primary checkout prints nothing.
 
 ### Promotion
@@ -395,3 +465,92 @@ asks for it in the current session**.
   - Each agent shell invocation is fresh, so a job table is always empty and proves nothing.
   - Some agent Bash tools **strip `TZ`** from child processes. A timezone-dependent gate run through one
     passes while testing only the host clock. Run those from PowerShell.
+
+---
+
+## 11 · Gates, continuous integration and the ratchet
+
+### One gate script
+
+Every gate of the project is reachable through **one entry point**, named in `MILESTONE.md`, and continuous
+integration calls **the same scripts** rather than its own inlined commands. A gate that exists only in a
+workflow file cannot be run inside a worktree, and a gate an executor cannot run is a gate that fails at the
+wrong moment, against work already merged.
+
+### Gate tiers: a lane runs the gates its change can move
+
+Every lane used to run every gate, and the mutation gate alone took 88 minutes in E01-M01-FIX-28's last run;
+most fix lanes after the fifth wave of the first milestone changed no file it reads. **The task file names the
+lane's tier, and the tier is a boundary** like the mutation scope: an executor may not narrow it to pass or widen
+it to look thorough. (Owner's ruling, 2026-10-09.)
+
+| tier | script | for a lane whose boundary holds |
+| --- | --- | --- |
+| static | `npm run gates:static` | only Markdown documents |
+| quick | `npm run gates:quick` | anything else that the mutation run does not read |
+| full | `npm run gates` | a file the mutation run reads: anything under the mutated folders, a unit test, or the mutation and unit configuration |
+
+**The wall-clock budgets are their own gate, `npm run gates:budgets`**, and are in none of the tiers: every
+case and every benchmark reading whose verdict is a time, a processor share or a settled memory reading. A lane
+runs it only when its boundary holds code that ships or the budget cases themselves, and then on a free
+machine, under the rule below. Run seconds after this project's own mutation gate, one of those cases went red
+on an unchanged product (E01-M01-FIX-28, 2026-10-04).
+
+**The reviewer runs everything**, `npm run gates` and then `npm run gates:budgets` on a free machine, at the
+reviewed commit, every round. That is what bounds the exposure of a narrower tier to one round.
+
+These scripts are landed by E01-M01-S11; until it is merged, `npm run gates` is the only entry point and holds
+every gate.
+
+### Where evidence comes from
+
+**Executors never push (§2), so continuous integration never sees a lane branch.** The primary evidence for
+a slice is produced locally, in its worktree, and recorded in its audit with the probe that proved each gate
+can fail (§7). Continuous integration is the **ratchet on `dev` and `main`**: it runs when the orchestrator
+pushes, which happens only when the owner asks, and on the promotion pull request. A green pipeline is never
+accepted in place of an audit, and a red one is a finding regardless of what any audit claims.
+
+### One workflow, one line
+
+There is **exactly one workflow file**. Every trigger lives in it, and a job that should not run for a given
+event is skipped by condition, never moved to a second file. The reason is how the platform renders: one row
+per workflow run, with jobs nested inside it, so a second file is a second row for the same commit and an
+orphan. One job depends on all the others and is the single required check.
+
+### Pull requests
+
+Lane branches are never pushed and never get a pull request. **A pull request exists only for a promotion**,
+`dev` into `main` at the end of a milestone (§8), opened only when the owner asks for the push. One
+milestone, one pull request, one tag.
+
+### The ratchet
+
+A committed baseline — coverage thresholds, mutation thresholds, performance counters and budgets, size
+budgets — **moves in the improving direction only**. Loosening one is a commit that says why, inside the
+diff the reviewer reads. An executor that cannot meet a baseline raises it as a blocker in its audit; it
+never edits the target to match its result. A gate that flaps is a defect of the gate, fixed as one, and
+never a reason to relax a threshold.
+
+### Wall-clock gates on a shared machine
+
+The development machine is shared with other projects' agents, and a mutation run of another project can hold
+every core for minutes. Measured by E01-M01-FIX-27 on 2026-10-03: under its first two methods, every start and
+load run that met such a stretch went red on an unchanged product; under its final method the same cases were
+green in ten of ten full runs at 10 to 100 % sampled load. **The owner ruled on 2026-10-03 that the machine when
+free decides.**
+
+- The strict limits stand. Nothing is widened for load.
+- **Free is a measured state, not an empty process table.** (Amended 2026-10-10: E01-M01-S11 waited 144 minutes
+  for a table with no other project's run in it and never got 65 seconds of one, because an idle run of another
+  project stayed listed for hours.) The machine is free for a reading when the processor load, sampled every
+  five seconds or oftener across all processors, averaged under 40 % over the minute before it and over the
+  reading itself, with no sample over 75 % during it. **The load counted is that of everything except the
+  reading's own process tree**: counted whole, a reading can discard itself, as E01-M01-S11 measured on
+  2026-10-10 when the gate's own cold-start cases sampled 45.7 to 77.7 % with no other run listed. The two
+  numbers are the orchestrator's first choice and are to be re-argued by whoever measures that they are wrong.
+- A wall-clock reading taken when the machine was not free by that measure is **discarded, whatever it read**:
+  it is recorded as discarded, with its load, and the case is read again when the machine is free.
+- A red on a free machine is red. A case that goes red on a free machine is a defect of the product or of the
+  gate, and never a reason to re-run until green.
+- The record (audit or review file) carries every reading, kept or discarded, the load sampled during each, and
+  what else was running.

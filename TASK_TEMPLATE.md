@@ -65,6 +65,22 @@ wave.>
 <Every command that must pass, with its exact invocation. For each gate the executor adds or relies on, the
 audit records the probe that made it fail (AGENTS.md §7).>
 
+**Gate tier for this lane:** <`static`, `quick` or `full`, and whether `npm run gates:budgets` is also run, by
+the table of `AGENTS.md` §11. It is a boundary, like the mutation scope below: the executor runs exactly this.>
+
+**Mutation scope for this lane:** <the exact paths the mutation gate covers while this lane runs, or "the
+configured scope, unnarrowed".>
+
+> A lane may run the mutation gate over less than the whole project, because the full run costs most of an
+> hour and every lane pays it. **Narrowing is safe in one specific way and dangerous in another.** Safe:
+> narrowing which files are mutated does not change which tests run, so every kill relationship survives — a
+> mutant in one folder that only a neighbour's test kills is still killed. Dangerous: an executor who chooses
+> its own scope can narrow until the result flatters it.
+>
+> So the scope is **named here, by the task's author, and it is a boundary**: an executor may not widen it to
+> look thorough or narrow it to pass. The wave-end review runs the configured scope in full (`AGENTS.md` §7),
+> which bounds the exposure to one wave.
+
 Always:
 
 - The boundary check: `git diff --name-only <Base>..HEAD` lists only paths from **May touch**.

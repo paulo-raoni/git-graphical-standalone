@@ -1,0 +1,261 @@
+/*
+ * The renderer's only stylesheet. Plain CSS, no framework, no preprocessor.
+ * `--row-height` and `--graph-width` are written onto the view by `src/ui/` and
+ * never here, so the arithmetic that places a row and the rule that sizes it
+ * cannot disagree. Copied, not bundled: its budget weighs these comments too.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --surface: #ffffff;
+  --text-primary: #1f1f1f;
+  --text-secondary: #5c5c5c;
+  --line: #e2e2e2;
+
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1f1f1f;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0a0;
+    --line: #333333;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+#app {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+/*
+ * The control bar, the stage the table is mounted into, and the failure view.
+ * The stage is a flex column of its own so that `.graph`, which fills it and
+ * positions everything inside itself absolutely, has a height to fill; without
+ * `min-height: 0` a flex item refuses to shrink below its content and the table
+ * would push the window instead of scrolling.
+ */
+.bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  gap: 8px;
+}
+
+.bar__path {
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.bar__button,
+.graph__more {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.bar__button {
+  flex: none;
+}
+
+.bar__button:disabled,
+.graph__more:disabled {
+  color: var(--text-secondary);
+}
+
+.stage {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.failure {
+  display: flex;
+  overflow: auto;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 24px;
+  gap: 12px;
+}
+
+.failure__headline {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.failure__message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.empty-state {
+  display: flex;
+  margin: auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  user-select: none;
+}
+
+.empty-state__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.empty-state__message {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.graph {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.graph__scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.graph__head {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.graph__spacer {
+  position: relative;
+}
+
+.graph__head,
+.row {
+  display: grid;
+  height: var(--row-height);
+  grid-template-columns: var(--graph-width, 100px) minmax(0, 1fr) 132px 148px 84px;
+  align-items: center;
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+
+.row__cell,
+.row__subject {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.row__cell {
+  padding: 0 8px;
+}
+
+.row__description {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.row__refs {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.row--uncommitted .row__subject {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.row__hash {
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.ref {
+  padding: 0 5px;
+  border: 1px solid var(--ref-colour);
+  border-radius: 3px;
+  color: var(--ref-colour);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.ref--remote {
+  border-style: dashed;
+}
+
+.ref--tag {
+  border-radius: 9px;
+}
+
+.graph__canvas {
+  position: absolute;
+  top: var(--row-height);
+  left: 0;
+  width: var(--graph-width, 100px);
+  height: calc(100% - var(--row-height));
+  pointer-events: none;
+}
+
+.graph__more {
+  display: block;
+  margin: 6px 8px 10px;
+}
