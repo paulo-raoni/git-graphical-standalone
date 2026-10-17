@@ -352,14 +352,20 @@ They are `.spec.ts` rather than `.test.ts` on purpose: `vitest.config.js` collec
 test that spawns five git processes must not be multiplied by the hundreds of mutants the mutation gate
 generates. It is the same extension the end-to-end suite uses, for the same reason.
 
-The adapter suite builds **its own copy** of the fixture repositories, under the temporary directory, by running
-the committed generator with the root it takes as an argument. `test/fixtures/repositories/` is rebuilt in place
-by the generator's own test, which deletes each repository and writes it again from its first commit, and vitest
-runs test files in parallel. Reading those directories while that happens was measured here first as a page that
-was missing its newest commits and agreed with git on the older ones — which is what half a rebuilt history
-looks like, and is not a shape any assertion would have named. The copy's directory is named after a digest of
-`specification.json`, so it is reused between runs and a change to the recipe builds elsewhere rather than
-leaving a stale one.
+The adapter suite builds **its own copy** of the fixture repositories, under the temporary directory, with the
+committed generator. `test/fixtures/repositories/` is rebuilt in place by the generator's own test, which deletes
+each repository and writes it again from its first commit, and vitest runs test files in parallel. Reading those
+directories while that happens was measured here first as a page that was missing its newest commits and agreed
+with git on the older ones — which is what half a rebuilt history looks like, and is not a shape any assertion
+would have named. The copy's directory is named after a digest of `specification.json`, so it is reused between
+runs and a change to the recipe builds elsewhere rather than leaving a stale one. Because every case here
+compares the adapter with git **on the same repository**, no case can see that a shared repository has changed
+since it was published: review round 21 removed a tracked file from the shared `branch-and-merge` and every case
+stayed green, and E01-M01-FIX-33 reproduced that and the same with a branch moved. So since E01-M01-FIX-33 each
+repository is published with a record of every file it holds and of its index, and `ensureFixtures()` and every
+`fixtureAt()` compare it with that record before they return a path; one that differs is left in place, unread,
+and a fresh copy is built beside it (`test/fixtures/shared-store.ts`). What is not verified is a repository after
+its path has been returned: a file removed while a case reads it is not seen by that case.
 
 ## What is not here
 

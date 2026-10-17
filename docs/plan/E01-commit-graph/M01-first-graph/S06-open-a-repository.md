@@ -370,7 +370,14 @@ does. From the page, `window.gitGraphical.openRepository({ path })` returns the 
 `Result<GraphPage>`, both answered by the utility process. `window.gitGraphicalView.showPage(page)` draws
 one without asking for it. `test/e2e/open-repository.spec.ts` does all three, with repositories of any shape
 the committed generator knows from `test/e2e/support/fixtures.ts`: `fixture()` for one shared by every run on
-the machine and never written into, `ownFixture()` for one a case writes into, which is that run's alone.
+the machine and never written into, `ownFixture()` for one a case writes into, which is that run's alone. Since
+E01-M01-FIX-33, `fixture()` compares the shared repository with the record written when it was published, every
+time it is called and before it returns, and never returns one that differs: a changed one is left in place,
+unread, and a fresh copy is built beside it. It does so before a case launches or times anything (the four
+`budgets-*.spec.ts` files call it first, read by that lane), and took 0.25 to 0.56 s for `large` and 0.44 to
+1.14 s for the fifty-thousand-commit `huge`, ten readings each by that lane on a loaded machine. What is not
+verified is a repository after `fixture()` has returned: a file removed while a window has it open is not seen
+by that case.
 
 ## What is not here
 
