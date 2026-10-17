@@ -150,7 +150,9 @@ What the editor provided around the extension, rebuilt as a desktop application.
 - Symbolic links in repository paths are resolved; repositories on mapped network drives on Windows work. → M02
 - Settings exist for everything the inventory names, at user scope and, where the extension allowed a
   workspace-folder scope, per repository; there is a settings UI; renamed settings keep old values working. → M03
-- Themes: light, dark and high contrast, including the text-selection colour. → M03
+- Themes: light, dark and high contrast, including the text-selection colour. → M03 (a light / dark /
+  follow-the-system selector in the bar, remembering the choice, comes first, as E03-M01's first slice: owner's
+  ruling of 2026-10-17)
 
 | ID | title | outcome |
 | --- | --- | --- |
