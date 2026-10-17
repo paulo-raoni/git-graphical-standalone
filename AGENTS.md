@@ -62,6 +62,11 @@ before its first task file is written.
 - Build, run gates and tests, and start processes that it then stops.
 - **Commit on its own lane branch**, which is the branch checked out in its worktree.
 - Rebase its own lane branch onto `dev`, **only when its task file has a `## Rebase` section**.
+- Replace commits of its own lane by commits with **identical trees** whose messages differ, **only when its
+  task file has a section that allows it** and names the commits, and only before the lane is merged. The audit
+  lists every replaced commit's old and new hash and tree. (Added 2026-10-17: review round 21 found that four
+  task sections had allowed such rewrites, every one tree-identical, while this list did not, and three
+  executors had committed a subject one character over §9's limit.)
 
 It MUST NOT: switch branches; create, delete or rename branches or tags; merge; push; touch any remote or the
 hosted repository's settings; open pull requests; add or remove worktrees; touch another worktree or the
