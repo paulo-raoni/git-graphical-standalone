@@ -284,17 +284,134 @@ where a suite of twenty-five is started once or twice, but that was not measured
 separate it from chance. The gate script's header records that E01-M01-FIX-10 found no such kill in four
 isolated runs; this lane did not reproduce those.
 
-**Why it matters.** A kill of this kind says nothing about the mutant. The gate cannot refuse such kills one
-at a time — the cap is a quarter, because a mutant that breaks its module on import looks the same — so:
+**Why it mattered.** A kill of this kind says nothing about the mutant. Until E01-M01-FIX-36 the gate could not
+refuse such kills one at a time — the cap is a quarter, because a mutant that breaks its module on import
+looks the same — so:
 
 - a *listed* survivor that met such a moment would be reported as detected, which the gate prints as a note;
 - an *unlisted* survivor that met one would be counted as killed, and the gate would pass that run.
 
 In these nine runs neither happened: every one of the five casualties is a mutant the other eight reports
-kill by assertion. What is exposed is a new test gap in a mutant that happens to run beside one of the six,
-for the runs in which the moment lands on it. The count is printed on every run, on the line `… killed
-mutants' recorded output names no failing test`, with the mutants named; a figure other than nought there is
-the thing to read, and re-running the gate is what tells a starved run from a real crash on import.
+kill by assertion. Review round 21 met one more at `021fba6`, for a cause nobody established. What
+E01-M01-FIX-36 changed about it, and measured, follows.
+
+#### What E01-M01-FIX-36 measured and changed
+
+Every figure in this subsection was taken by E01-M01-FIX-36 on 2026-10-17, in UTC, on the same eight-core
+machine with 15.6 GB of memory, which reported a commit limit of 28.8 to 31.2 GB during the samples below.
+The machine was never free: another project's gate script, and for part of the day its mutation run, was in
+the process table, and so were the two other fix lanes of this project. A sampler of FIX-36's own read every
+`node.exe`'s working set, peak working set, commit and peak commit, with the machine's free memory and
+processor load, every 250 ms through the single runs and every five seconds through the full ones, beside the
+process table once a minute; *peak* below is the process's own peak counter, which no sampling interval can
+miss. Base is `021fba6`.
+
+**The runaway mutants, reproduced.** S12's figures were for one of the six. FIX-36 planted each of the six by
+hand in a copy of the tree and ran the per-mutant command alone, as it was at the base (`… --fsModuleCache
+--no-isolate`). The ids are the ones FIX-36's base report gives them; *largest process* is the largest of the
+vitest process and its worker.
+
+| mutant | id | run took | largest process, peak working set | its peak commit | how the run ended |
+| --- | --- | --- | --- | --- | --- |
+| `reference-list.ts` 53:7 `ConditionalExpression` to `false` | 906 | 78.3 s, 65.4 s | 8.0 GB, 8.9 GB | 35.9 GB | exit 1, two tests failed on `RangeError: Array buffer allocation failed` |
+| `reference-list.ts` 53:7 `EqualityOperator` to `>` | 908 | 77.6 s | 9.5 GB | 71.9 GB | the same |
+| `reference-list.ts` 53:40 `BlockStatement` to `{}` | 909 | 62.0 s | 9.0 GB | 71.8 GB | the same |
+| `pending-parents.ts` 114:7 `ConditionalExpression` to `true` | 1362 | 39.4 s | 102 MB | 43.1 GB | exit 1, four tests failed, that `RangeError` among their errors |
+| `pending-parents.ts` 114:7 `EqualityOperator` to `!==` | 1364 | 25.8 s | 110 MB | 84.2 GB | the same |
+| `segment-buffer.ts` 103:3 `AssignmentOperator` to `-=` | 319 | 21.9 s | 113 MB | 41.3 GB | exit 1, 24 tests failed, one on that `RangeError` |
+
+So S12's working set of 10.9 to 12.0 GB was not reproduced: the three of `reference-list.ts` reached 8.0 to
+9.5 GB here, on a machine that had 5.9 to 9.1 GB free when each began and between 1 and 283 MB at its lowest.
+The other three hold little working set and take their memory as commit instead, tens of gigabytes of it for a
+moment, which is the resource whose exhaustion status, `0xC000012D`, S12 found in a casualty's output. The
+first of the six held more than 1 GB of working set for 62.5 s of its first run, and for 77.1 s of its run
+beside six other copies, below.
+
+**Seven copies at once, one planted.** At 08:48, mutant 906 planted in one copy and the healthy suite in six
+others, each of those six started again as soon as it finished, as Stryker's other workers would, for as
+long as the planted copy ran (103.1 s): the planted copy's largest process peaked at 8.0 GB, free memory
+fell to 4 MB, and the six healthy copies ran 35 times between them and **passed all 35**. So FIX-36 did not
+reproduce a casualty either: nothing in that one trial was starved into a false kill. That is one trial,
+not a rate.
+
+**What bounds them now.** Two tests, each first in its file, see the five growth mutants after one growth:
+*keeps the target column it started with for its first reference* in `reference-list.test.ts`, and *keeps the
+room it started with while its first parent waits* in `pending-parents.test.ts`. The sixth was already killed
+by assertion, by *a straight line of commits > draws exactly one segment a row* in `lane-layout.test.ts`,
+among others. And the per-mutant command now stops at its first failing test and runs its files in a fixed
+order: `node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache --bail=1 --no-cache
+--no-isolate`.
+
+`--no-cache` is the half that is easy to miss. Vitest orders a run's files by the results of the last run it
+recorded, in `node_modules/.vite/vitest/<hash>/results.json`, failed files first and then the slowest; every
+Stryker sandbox links the same `node_modules`, so that file is whatever the last of seven concurrent workers
+wrote. Measured with vitest's JSON report, three runs of the healthy suite in one copy: with the cache, a
+file this lane's planted runs had left marked failed, `pending-parents.test.ts`, ran first; with
+`--no-cache`, with isolation and without, the order was the 25 files by size, largest first,
+`lane-layout.test.ts` first and `column-read.test.ts` last. Without a fixed order, which failure comes first,
+and so whether a run stops before the allocation or after it, would depend on which mutant finished last.
+
+Planted again at the head, run alone with that command, both ways:
+
+| mutant | without isolation: run, largest process peak working set, peak commit | with isolation |
+| --- | --- | --- |
+| 906 | 3.9 s, 113 MB, 197 MB | 9.8 s, 109 MB, 171 MB |
+| 908 | 2.7 s, 110 MB, 173 MB | 8.9 s, 106 MB, 168 MB |
+| 909 | 4.9 s, 111 MB, 191 MB | 8.4 s, 105 MB, 169 MB |
+| 1362 | 2.9 s, 107 MB, 172 MB | 3.6 s, 110 MB, 174 MB |
+| 1364 | 1.4 s, 106 MB, 171 MB | 3.3 s, 106 MB, 186 MB |
+| 319 | 2.0 s, 107 MB, 172 MB | 1.6 s, not sampled: it ended before the sampler found its processes |
+
+Every run exited 1 on one failing test, the one named above, and none carried an allocation failure. The
+healthy suite, run alone the same way with isolation, peaked at 110 MB.
+
+**The clause.** The gate has a fifth clause, in `scripts/gates/mutation-remeasure.js`: every killed mutant
+whose recorded output names no failing test, or says its suite ran out of memory or lost its worker, is run
+again alone after Stryker has finished, by the same command under the same outer clock, in a copy of the tree
+with that one mutant planted, and is counted by what that run says. The argument, and the line it hinges on,
+are in that file. At the base it would have chosen the six above, whose kills all carried `Array buffer
+allocation failed` in FIX-36's base report, and run each of them again; FIX-36 did not run it there. At the
+head their kills carry none, and in the runs below it chose nothing. It was watched failing on a copy of the
+head report in which the kill of `growth.ts` 73:3, S12's probe mutant below, had its output replaced with a
+worker's crash, with the one assertion that kills that mutant neutered: refused, the mutant re-measured as a
+survivor that is not on the list; with the clause neutered, the same copy passed, counted as one kill naming
+no failing test; the original report passed. The audit of E01-M01-FIX-36 has the four steps.
+
+**Every mutant keeps its verdict.** Three full runs of `node scripts/gates/mutation.js` over the configured
+scope, compared mutant by mutant on file, start and end position, mutator and replacement, which all 1 353
+share between the three reports:
+
+| run | tree | started | wall clock | killed | timeout | survived | kills carrying vitest's test clock | kills naming no failing test | re-measured | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base | `021fba6` | 09:20 | 2 699.5 s | 1 303 | 47 | 3 | 0 | 0 | — | `mutation: ok` |
+| head, without isolation | `7129fd8` | 10:42 | 2 057.9 s | 1 316 | 34 | 3 | 2 | 0 | 0 | `mutation: ok` |
+| head, isolation restored in the working tree | `7129fd8` with `--no-isolate` deleted | 11:17 | 3 477.9 s | 1 316 | 34 | 3 | 2 | 0 | 0 | `mutation: ok` |
+
+Between the base and the head without isolation, **13 of 1 353 statuses differ, and all 13 are `Timeout` at
+the base and `Killed` at the head**: no mutant moved to `Survived`, and none moved from `Killed`. They are
+loop-control mutants of the growth loops (`growth.ts` 42 and 43, `segment-buffer.ts` 48 and 49,
+`open-lanes.ts` 74 and 75, `row-block.ts` 58), of the hash index's load test (`hash-index.ts` 120:7, two), of
+`bytes.ts` 144:20, `records.ts` 178:33, `pending-parents.ts` 74:38 and `column-read.ts` 64:71. Each hung the
+suite at the base until Stryker's clock stopped it; with the run stopping at its first failure, a test that
+fails before the hung one now ends the run: seven of the 13 by an assertion, four by an error the code under
+test throws, and the two of `hash-index.ts` by vitest's own 15 000 ms clock, which the clock clause counts.
+That is the one difference the bail can make, and it moves verdicts towards a named test, not away from one.
+A fourth full run, at 10:07 with S12's probe of *The gate can still fail* planted at the head, exited 1 with
+one finding, `growth.ts` 73:3 `CallExpression` survived and is not on the list, and differed from the base
+in those 13 and in that mutant alone.
+
+Between the two runs at the head, with isolation and without, **no status differs**, and every one of the
+1 316 kills names the same failing tests in both outputs: the bound and the clause hold with isolation too,
+and neither changes a verdict there. The flag
+`--no-isolate` was deleted in the working tree for that run only and restored after it; at `7129fd8` it is
+where S12 put it.
+
+The base run had another project's mutation run beside it in all 44 of its minute samples, and free memory
+under 1 GB in 13 of its 538 five-second samples, at its lowest 0.0 GB; the head run had that project's gate
+script beside it in 21 of 34 minutes and not its mutation run, the other fix lanes of this project in 33, and
+free memory never under 3.0 GB. The isolated run had that project's mutation run beside it in 10 of 57 minutes
+and free memory never under 2.6 GB. The processor averaged 99.3, 99.9 and 99.7 % over the three. So the wall
+clocks are not a comparison of the trees.
 
 ## The gate can still fail
 
@@ -323,14 +440,23 @@ its `undefined` result throws.
 
 ## What would make someone revisit this
 
-- **A kill that names no failing test.** See above. If the owner or a reviewer judges that exposure too
-  much, removing the flag restores a gate that showed none in two runs here, at 77.5 minutes against 35.0.
-  The other way out would keep the speed and remove the cause: the three mutants of `reference-list.ts` that
-  allocate without end are killed only when an allocation is finally refused, and an assertion that fails on
-  the column's size before that point is the kind of test that could kill them without taking the machine's
-  memory. This lane did not write or try one; it is test work in `src/core/parse/` and `src/core/store/`,
-  outside its boundary. Before either, the measurement worth taking is the one this lane did not: whether
-  isolated runs show such kills too, over more than two of them.
+- **A kill that names no failing test, or that says its suite starved.** Since E01-M01-FIX-36 the gate
+  re-measures each one alone after the run and prints the count on every run, on the line `… re-measured
+  alone after the run, <n> killed mutants …`, each with its second verdict. A figure other than nought there
+  is the thing to read: a mutant re-measured as a survivor is a test gap, and one that could not be measured
+  refuses the build with its output quoted. A run that refuses that way on unchanged source is the machine
+  starving the second run too, which is the measurement to take before anything else. Whether isolated runs
+  show such kills at the rate runs without isolation did is still not measured; FIX-36's one isolated run
+  and one without showed none either way. Whether the gate keeps `--no-isolate` remains the owner's
+  decision, recorded by review round 21, and FIX-36 did not take it.
+- **A mutant that asks for more memory than the machine has.** The six of *What E01-M01-FIX-36 measured and
+  changed* stop at a test that sees them after one growth, because the run stops at its first failure and
+  its files run largest first. Three things undo that: a seventh such mutant whose only killers fail on the
+  allocation (a kill carrying `Array buffer allocation failed` is now re-measured, so it shows on that line
+  first), `--bail=1` or `--no-cache` leaving the command, or a test file outgrowing `lane-layout.test.ts`,
+  which is what makes it run first and kill the sixth by assertion before `row-block.test.ts` asks for its
+  columns. The file sizes at `7129fd8` are 14 391 and 12 931 bytes. Re-planting the six by hand and reading
+  the largest process's peak, as that subsection did, takes a minute.
 - **A test file that keeps state, or a module that does.** The argument rests on *No test file depends on
   another's module state*. A `beforeAll`, a `vi.mock`, a fake timer left running, a top-level `let` in a
   module of `src/core/` or `src/contracts/`: any of these is the reason to run the shuffled orders again, and
