@@ -33,6 +33,23 @@ function collidingNamesFor(count: number): Uint8Array {
 }
 
 describe('pending parents', () => {
+  /**
+   * First in this file on purpose. A growth condition that is wrong in the
+   * direction of growing doubles every column on each parent remembered, and the
+   * forty parents of the growth tests below then ask for more memory than the
+   * machine has before anything is asserted. One parent is enough to see it, at
+   * the cost of one doubling, so the mutation gate's run stops here, at its first
+   * failure.
+   */
+  it('keeps the room it started with while its first parent waits', () => {
+    const pending = createPendingParents();
+    const capacity = pending.capacity;
+    const bytes = pendingByteLength(pending);
+    rememberParent(pending, namesFor(1), 0, 0);
+    expect(pending.capacity).toBe(capacity);
+    expect(pendingByteLength(pending)).toBe(bytes);
+  });
+
   it('starts empty, with twice as many buckets as entries', () => {
     const pending = createPendingParents();
     expect(pending.live).toBe(0);

@@ -19,6 +19,22 @@ function put(list: ReferenceList, name: string, value: number, flags = 0): void 
 }
 
 describe('addReference', () => {
+  /**
+   * First in this file on purpose. A growth condition that is wrong in the
+   * direction of growing doubles this column on every reference, and the two
+   * tests below that add sixty-four and sixty-five references then ask for more
+   * memory than the machine has before anything is asserted. One reference is
+   * enough to see it, at the cost of one doubling, so the mutation gate's run
+   * stops here, at its first failure.
+   */
+  it('keeps the target column it started with for its first reference', () => {
+    const list = createReferenceList();
+    const before = list.targets;
+    put(list, 'main', 0x11);
+    expect(list.targets).toBe(before);
+    expect(list.targets.length).toBe(64 * HASH_BYTE_LENGTH);
+  });
+
   it('keeps what it was given, in order', () => {
     const list = createReferenceList();
     put(list, 'main', 0x11);
