@@ -361,19 +361,21 @@ reference extension observed, or is new product scope, and placing it is the own
 - **A test for one Open overtaking another.** The guard exists (FIX-14) and is correct by reading; driving
   the ordering reliably needs a fixture whose `git status` is slow (review round 16).
 
-### Carried into E03-M01 from E01-M01's last review
+### Carried into E03-M01 from E01-M01's last reviews
 
-Review round 21 (2026-10-17, at `021fba6`) classed these as **carried** under `AGENTS.md` §7: none is a defect a
-user of the application meets, a breach of §1, §9 or §10, or a gate that passes a broken product. They do not
+Review rounds 21 (2026-10-17, at `021fba6`; items 1 to 20) and 22 (2026-10-17, at `a2abb94`; items 21 to 32)
+classed these as **carried** under `AGENTS.md` §7: none is a defect a user of the application meets, a breach of
+§1, §9 or §10, or a defect of a gate that protects the product — one that stays green when the thing it guards is
+broken, or goes red on an unchanged product. They do not
 hold E01-M01's promotion, and **E03-M01's first wave takes them** (the sentence corrections as one task, §7).
 Each is stated here in full because the review file is deleted at promotion; the reviewer's own readings are
 marked as such.
 
 **Committed sentences the tree contradicts**
 
-1. `perf/baselines.json`: the `unit` of `parseMicrosecondsPerCommit` names `perf/parse.perf.test.ts` and that of
-   `layoutMicrosecondsPerCommit` names `perf/layout.perf.test.ts`; since E01-M01-S11 those timings are in the
-   `*.timed.perf.test.ts` files, and the gate prints the old names with every verdict.
+1. `perf/baselines.json`: the `unit` of `parseMicrosecondsPerCommit` names `perf/parse.perf.test.ts`; since
+   E01-M01-S11 that timing is in `perf/parse.timed.perf.test.ts`, and the gate prints the old name with every
+   verdict. (The layout half was corrected by FIX-37, review round 22.)
 2. `perf/baselines.json`, `idleResidentRatio.unit`, states as fact that "the operating system trimmed 58.7 MiB of
    working sets"; the S07 slice document labels the same thing an inference.
 3. S07 slice document, *Two regimes*: "every wall-clock entry carries a tolerance of 1.5 … and a `ciTolerance` of
@@ -408,24 +410,59 @@ marked as such.
 
 **Not sentences**
 
-14. `AGENTS.md` §2 lets an executor rewrite history only by rebasing under a `## Rebase` section, while task
-    sections titled `## Repair` authorised four other rewrites (every rewritten tree identical, every message
-    on `dev` passing §9). Either §2 gains the permission or the orchestrator stops granting it.
+14. **Answered by `2621632`:** `AGENTS.md` §2 now lets a task allow tree-identical message rewrites of its own
+    lane's commits. Nothing left to take.
 15. Nothing checks the end-to-end partition that S11 introduced: a check that the `application` and `budgets`
     projects' case lists are disjoint and together cover `playwright test --list` would hold both together.
 16. `regimeOf` in `perf/baselines.ts` reads any value of `CI` other than empty, `0` or `false` as the CI regime;
     undocumented and unpinned by a test.
 17. Helpers copied into `perf/layout.timed.perf.test.ts` and `perf/store.timed.perf.test.ts`; equal today by the
     reviewer's reading, and nothing keeps them so.
-18. Measurements owed on a free machine: the idle-growth row with a ~3 % planted leak, and
-    `residentBytesAfterClose` at the main process's exit. FIX-28's readings of both were taken on a machine its
-    own audit calls never free, so neither defect is established either way.
+18. Owed on a free machine: the idle-growth row with a ~3 % planted leak, which FIX-28 read only on a machine its
+    own audit calls never free. (The other half is answered: review round 22 read `residentBytesAfterClose` at
+    0 bytes in all 14 of its kept memory readings.)
 19. The free-machine rule of `AGENTS.md` §11 has no instrument in the repository, so each lane and review builds
     its own sampler, and they have counted different things. A committed sampler that counts everything but the
     reading's own process tree, and a judge of readings against the rule, would make "kept" mean the same thing
     in every round.
-20. `launchBudgeted` refused one launch of the memory case under load because four of its five init scripts had
-    run before the renderer; whether that ordering race happens on a free machine is owed.
+20. **Answered by review round 22:** `launchBudgeted` refused one launch of the memory case under load in round
+    21; no launch was refused in round 22's 14 free-machine runs.
+
+**From review round 22: sentences**
+
+21. The re-measured layout median is given as 0.611 in `layoutMicrosecondsPerCommit.unit` (printed with every
+    verdict), in the S07 slice document and in FIX-37's record; the six kept readings FIX-37 lists give a median
+    of 0.605 (0.611 is the fourth of six). No verdict moves.
+22. `scripts/gates/mutation-remeasure.js` header says no file of `src/`, `test/`, `perf/` or `scripts/` held any of
+    its phrases on 2026-10-17; that file and `mutation.js` hold them. The argument holds for the three folders a
+    test run prints frames from; the sentence should name those.
+23. `test/e2e/budgets-frames.spec.ts` header: "a run's worst frame held the same work as its median frame, each
+    part about twice as long" compresses FIX-37's ranges (script part 1.0 to 4.4 times, rendering 1.5 to 3.6
+    times) and states as fact an inference: no instrument counted the work, only timed two parts of it.
+24. This section, as first written in `db27be2`, restated §7's blocking class without "or that goes red on an
+    unchanged product", called round 21 the last review, and had items 1, 14, 18 and 20 open. Corrected here.
+
+**From review round 22: not sentences**
+
+25. No case holds the index half of the fixture record (FIX-33): with its digest made constant, all 32 cases of
+    `test/fixtures/shared-store.test.ts` pass, while a scratch `git rm --cached` showed the half working. An
+    index-only damage case would hold it.
+26. The adapter store's damage cases share one published copy per shape, so a case's verdict depends on what an
+    earlier case did to it. Each case asking for a repository of its own would separate them.
+27. Owed: how often the mutation gate's re-measure clause (FIX-36) refuses unchanged source because the second
+    run starves too. Not seen in five full runs.
+28. Owed, and bearing on `AGENTS.md` §11's numbers: the cold-start cases' readings judged against the other load
+    less the virus scanner's share, which rose from about 0 to about 10 % with their launches in round 22; with
+    that share taken out, all 18 of its discarded cold-start readings would have been kept (the reviewer's
+    reading; that the scanner reacts to the application's launches is the reviewer's inference).
+29. The fixture stores published before `ade2dd6` (`…-e2e-shared-…`, 20.8 MB; `…-unit-shared-…`, 3.2 MB, under
+    the temporary directory) and every changed copy the new stores leave behind stay on disk; nothing removes
+    them.
+30. Three reds still unattributed: round 21's two of `gates:unit:fixtures`, and FIX-35's end-to-end case on the
+    old store. Owed: whether any recurs.
+31. `package.json` `engines` (`>=24.0.0`) admits Node versions under which `gates:perf` refuses to compare, while
+    CI is pinned to 24.18.0 (FIX-35).
+32. Kills resting on vitest's own per-test clock are not re-measured by the mutation gate's re-measure clause.
 
 ### What shapes the plan rather than the code
 
