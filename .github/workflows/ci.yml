@@ -30,8 +30,19 @@ concurrency:
 permissions:
   contents: read
 
+# The one Node every job runs on, set here and nowhere else, and exact, never a
+# range. The four allocation entries of `perf/baselines.json` are held only under
+# the runtime they were measured under, `MEASURED_UNDER` in
+# `perf/allocation.perf.test.ts`, and `gates:perf` fails before comparing under
+# any other V8 string. A range such as '24' lets `actions/setup-node` take a
+# cached or the newest 24.x, and review round 21 read in Node's own release files
+# (not in a run) that v24.22.0 carries V8 13.6.233.17-node.57, not the -node.50 of
+# v24.18.0. Moving this line costs measuring those four entries again under the
+# new Node and committing them together with it, as that check's message says.
+# That a runner given this version reports V8 13.6.233.17-node.50 is an inference
+# until the first CI run shows it.
 env:
-  NODE_VERSION: '24'
+  NODE_VERSION: '24.18.0'
 
 jobs:
   # Installs once against the cached store, builds, and publishes the bundles

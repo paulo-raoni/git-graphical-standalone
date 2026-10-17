@@ -501,10 +501,17 @@ step by more than the parse tolerance's one part in a thousand **has not been me
 runtimes in the table are a whole V8 release line away, and no second build of V8 13.6.233.17 was on this
 machine to read. Without that measurement the looser match could turn a Node patch release into a red that says
 the product regressed; the strict one turns it into a red that says to measure again, which is five runs of
-this gate. What the strict match costs is in CI: `.github/workflows/ci.yml` installs the latest Node 24, not
-24.18.0, and if that release's V8 string is not this one — an inference, nobody here has run it — the `perf`
-job fails on the runtime check at its first run, until CI and the entries are brought to one Node. That is the
-owner's to settle and is not changed here.
+this gate. What the strict match costs is a re-measurement at every change of Node, and E01-M01-FIX-35 holds
+CI to the same Node so that it does not pay it unseen: `.github/workflows/ci.yml` sets `NODE_VERSION`, the one
+Node of every job, to the exact `24.18.0`, where it had been `'24'`, a range under which `actions/setup-node`
+takes a cached or the newest 24.x. Under that range the runtime check would have refused the newest one, read
+by review round 21 on 2026-10-16 in Node's own files and not in a run: v24.22.0, dated 2026-10-14, is listed in
+`nodejs.org/dist/index.json` with V8 13.6.233.17, and its `common.gypi` sets the embedder string `-node.57`,
+against `-node.50` at v24.18.0. That a runner given `24.18.0` reports V8 13.6.233.17-node.50 is an inference
+until CI first runs, which it has not since the scaffold. What was run is this machine's: FIX-35 ran the case
+on 2026-10-17 under Node v24.18.0, where the child printed V8 13.6.233.17-node.50 and the case passed, and
+under Node v20.19.5, where the child printed V8 11.3.244.8-node.30 and the case failed on the runtime check.
+Moving `NODE_VERSION` costs the four entries measured again under the new Node and committed with it.
 
 **3 169 heap bytes a commit is worth a reader's attention.** The store keeps under 96 bytes a commit and the
 parser allocates thirty-three times that on the way, most of it — an inference from the parser's code, not a
