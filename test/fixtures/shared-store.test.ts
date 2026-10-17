@@ -65,6 +65,8 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
+  // A case that fails before its own clean-up must not leave its repository behind.
+  endToEnd.removeOwnFixtures();
   rmSync(privateRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 });
 
