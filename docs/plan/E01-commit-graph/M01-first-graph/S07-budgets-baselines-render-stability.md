@@ -29,11 +29,11 @@ cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day 
 | Cold start to a painted window, empty repository | ≤ 1500 ms | fastest of ten launches, **991 ms** (median of five runs) | five runs on 2026-10-03: fastest 958 to 1096 | meets |
 | Load 10 000 commits, to rows painted | ≤ 800 ms | fastest of ten Refreshes, **423.5 ms** (median of five runs) | five runs on 2026-10-03: fastest 418.4 to 539.4 | meets |
 | Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
-| Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs | meets |
+| Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs; since E01-M01-FIX-37 the fastest of twenty-five, six kept runs on 2026-10-17: 0.572 to 0.643 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
 | Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **157 372 416 bytes** (150.1 MiB), read once the load's memory has come back | five runs on 2026-10-03, 147.6 to 154.1 MiB | meets |
 | Resident memory growth over 5 minutes idle | ≤ 2 % | **+0.2 %** (ratio 1.002), from the settled reading | five five-minute runs on 2026-10-03: 0.853 to 1.006 | meets |
-| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1 | meets |
+| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
 | CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | five five-minute runs: 0.063 to 0.453 % | meets |
 
@@ -158,6 +158,31 @@ the fastest of five runs after a warm-up. (Those are the files' names as S07 wro
 2026-10-10, the two timings are `perf/parse.timed.perf.test.ts` and `perf/layout.timed.perf.test.ts`, and
 `perf/layout.perf.test.ts` keeps the layout's counters; the table under *Where each baseline lives* has the
 gate each runs in.)
+
+**Since E01-M01-FIX-37 (2026-10-17) the layout is timed over twenty-five runs, not five; the parse is
+not.** Review round 21 kept, under `AGENTS.md` §11, a reading of `perf/layout.timed.perf.test.ts` whose five
+runs read 1.5925, 1.5134, 1.2961, 1.2702 and 1.5085 µs a commit, fastest 1.27 against a limit of 0.885 (the
+baseline 0.59 times its tolerance of 1.5), at other load of 33.8 per cent in the minute before and 28.8 during,
+on a product unchanged since the baseline. FIX-37 measured on the same machine that day, 10:37 to 16:07. Every reading
+was judged by §11 with this lane's own processes counted apart through a Windows job object that held the run
+and the sampler, the machine sampled once a second from its idle, kernel and user times, the highest sample
+taken over five-second blocks. The file as review round 21 read it: seven readings kept, the fastest 0.669 to
+0.788, none red, at other load of 21.5 to 34.6 per cent in the minute before and 27.0 to 36.8 during. The
+same timing as S07 read it, after its file's counted cases had laid out the large page twice and the small
+one once (the file at `f0963dd`, run from a copy that was never committed): seven kept, 0.618 to 0.714, at
+24.1 to 33.5 and 24.8 to 38.2. So S07's warm-up is worth a few per cent and not the factor of two of review
+round 21's reading; that a burst of load explains that reading is an inference, from what the readings below
+show inside single runs.
+
+The timing now makes those passes first, then five batches half a second apart, each one untimed layout and
+five timed, and compares **the fastest of the twenty-five**: five runs back to back take under a fifth of a
+second, the twenty-five about three, and a slower layout moves every run. Six readings kept at `0e018ee`
+(16:23 to 16:50, other load 20.7 to 35.2 per cent in the minute before and 19.0 to 38.9 during): fastest
+0.572 to 0.643, all green, while the slowest run of each read 0.885 to 1.272. Planted, a busy-wait of twice
+the layout's own time inside the timed call read 2.006 and 1.725 in two kept readings, red. The baseline
+stays 0.59. The median of the six kept readings is 0.611, higher, and a baseline moves only down (`AGENTS.md`
+§11); the first batch is S07's reading as it was made, so the fastest of twenty-five is never above it, and
+S07's figure is not a looser limit for the new reading. The tolerance and the ceiling are unchanged.
 
 **Both are held as time per commit, not commits per second.** A throughput is a lower bound and
 `compareWithBaseline` fails a number that rises; 20 000 commits a second turned over is at most 50 µs a commit,
@@ -420,6 +445,35 @@ that every frame rewrites every row element, read means of 5.13 to 5.34 ms and w
 The budget is held on the second, the most a frame of this view can be asked to do, as the median of the five
 runs' means and the median of their worst frames. The fixture is a straight chain, one lane wide; a braided
 history draws more lines a row, and this reading does not include one.
+
+**Since E01-M01-FIX-37 (2026-10-17) the budget is held on the lowest of ten runs**, a second apart, not on
+the median of five. Review round 21 kept the median of five eight times under `AGENTS.md` §11 and found it red
+four times on the worst frame, 11.6 to 13.4 ms against 11.55 (the baseline 7.7 times 1.5). FIX-37 kept six of
+its own that afternoon, judged as the layout readings above are, at other load of 21.0 to 37.3 per cent
+during the reading: red three times (11.7, 11.7 and 13.4 ms), green three times (9.1, 9.8 and 11.5); the
+median mean was green in all six (5.49 to 7.43 against 7.86). The product had not changed since the baseline.
+
+What the slow frames hold, read from a copy of the case that was never committed, five kept runs of ten
+scrolls of 1 200 px: each frame split at an animation-frame callback queued after the renderer's, so into
+script (the scroll write and the renderer's `paint`) and rendering (style, layout, paint and the hand-off to
+the compositor), and a fixed loop of 200 000 iterations timed after each frame, outside it. In those 50 runs
+a run's worst frame was 1.4 to 3.5 times its median frame, its script part 1.0 to 4.4 times the median
+script part and its rendering 1.5 to 3.6 times the median rendering: the same work, done slower, and not one
+step grown. In 12 of the 50 the fixed loop after the worst frame was slowed by more than half too. That the
+slowness came from outside the page is an inference. A garbage collection is not excluded: the heap figure
+Chromium gives the page read the same in all 18 000 frames, so it could not show one.
+
+The case now takes ten runs of the 1 200 px scroll a second apart, about fifty seconds, after the five warm
+runs of 72 px, and compares **the lowest of the ten means and the lowest of the ten worst frames**, as the
+start cases compare the fastest of ten: a burst moves the lowest only if it lasts through all ten runs, and a
+slower product moves every run. Seven readings kept at `0e018ee` (16:24 to 16:51, other load 21.6 to 35.2 per
+cent in the minute before and 20.4 to 38.4 during): lowest worst frame 7.0 to 10.6 ms and lowest mean 5.02
+to 5.67, all green; in the same runs the median of ten worst frames read 10.1 to 15.4 and was past 11.55 in
+four. Planted, a busy-wait of 11 ms at the start of every frame read a lowest mean of 15.68 and 15.96 and a
+lowest worst of 19.7 and 19.3 in two kept readings, red on both and past both ceilings. What the lowest does
+not see is a slow frame the product makes in some runs and not others. The baselines stay 5.24 and 7.7: the
+medians of the seven kept readings are 5.33 and 8.6, higher, and a baseline moves only down; the lowest of
+ten is never above the median of any five of them. The tolerances and the ceilings are unchanged.
 
 ### Live row elements
 

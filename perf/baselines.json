@@ -40,7 +40,7 @@
     "ceiling": 5,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, fastest of five runs after a warm-up, perf/layout.perf.test.ts, 2026-09-28"
+    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, perf/layout.timed.perf.test.ts; the reading is the fastest of 25 runs in five batches half a second apart since E01-M01-FIX-37; the baseline is S07's fastest of five after a warm-up, 2026-09-28, which is that file's first batch; re-measured as the fastest of 25 in six kept runs on 2026-10-17, 0.572 to 0.643, median 0.611, at other load of 19 to 39 per cent, and not raised to it"
   },
   "layoutWorkPerRow": {
     "baseline": 18.747,
@@ -93,14 +93,14 @@
     "ceiling": 8,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture: median of five runs, which read 5.13 to 5.34, test/e2e/budgets-frames.spec.ts, 2026-09-28"
+    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts: the reading is the lowest of ten runs a second apart since E01-M01-FIX-37; the baseline is S07's median of five runs, which read 5.13 to 5.34 on 2026-09-28; re-measured as the lowest of ten in seven kept runs on 2026-10-17, 5.02 to 5.67, median 5.33, at other load of 20 to 38 per cent, and not raised to it"
   },
   "scrollFrameWorstMilliseconds": {
     "baseline": 7.7,
     "ceiling": 16.7,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work in the worst of the same 240 frames: median of five runs, which read 7.3 to 8.1"
+    "unit": "milliseconds of main-thread work in the worst of the same 240 frames: the reading is the lowest of the same ten runs' worst frames; the baseline is S07's median of five, which read 7.3 to 8.1; re-measured as the lowest of ten in the same seven kept runs, 7.0 to 10.6, median 8.6, and not raised to it"
   },
   "liveRowElements": {
     "baseline": 37,
