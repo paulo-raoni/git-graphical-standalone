@@ -31,16 +31,16 @@ import type { Comparison } from './baselines';
  * reading. Five runs back to back take under a fifth of a second, and on
  * 2026-10-17 review round 21 kept a reading of this file, as it then was, whose
  * five runs all read 1.27 to 1.59 µs a commit against a limit of 0.885, on a
- * product unchanged since its baseline. The same day E01-M01-FIX-37 read that
- * file seven times kept (other load 21 to 37 per cent): fastest 0.669 to 0.788;
- * and S07's file, with its passes before the timing, seven times kept: 0.618 to
- * 0.714. So the passes are worth a few per cent, not a factor of two; they are
- * restored because S07's baseline was read after them. The twenty-five runs take
- * about three seconds, so a burst moves the fastest only if it lasts through all
- * of them, and a slower layout moves every run, the fastest included. What the
- * fastest does not see is a regression that slows some runs and not others; the
- * start cases of `test/e2e/budgets-start.spec.ts` pay the same price for the
- * same reason.
+ * product unchanged since its baseline. The same day E01-M01-FIX-37 kept seven
+ * readings of that file, fastest 0.669 to 0.788, and seven of S07's file, with
+ * its passes before the timing, 0.618 to 0.714, all at other load of 25 to 38
+ * per cent during the reading. So the passes are worth a few per cent, not a
+ * factor of two; they are restored because S07's baseline was read after them.
+ * The twenty-five runs take about three seconds, so a burst moves the fastest
+ * only if it lasts through all of them, and a slower layout moves every run,
+ * the fastest included. What the fastest does not see is a regression that
+ * slows some runs and not others; the start cases of
+ * `test/e2e/budgets-start.spec.ts` pay the same price for the same reason.
  *
  * The shape is the braided one that file describes, and `braided` below is a
  * copy of its function of the same name: a test file cannot import another
