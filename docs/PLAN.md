@@ -359,6 +359,72 @@ reference extension observed, or is new product scope, and placing it is the own
 - **A test for one Open overtaking another.** The guard exists (FIX-14) and is correct by reading; driving
   the ordering reliably needs a fixture whose `git status` is slow (review round 16).
 
+### Carried into E03-M01 from E01-M01's last review
+
+Review round 21 (2026-10-17, at `021fba6`) classed these as **carried** under `AGENTS.md` §7: none is a defect a
+user of the application meets, a breach of §1, §9 or §10, or a gate that passes a broken product. They do not
+hold E01-M01's promotion, and **E03-M01's first wave takes them** (the sentence corrections as one task, §7).
+Each is stated here in full because the review file is deleted at promotion; the reviewer's own readings are
+marked as such.
+
+**Committed sentences the tree contradicts**
+
+1. `perf/baselines.json`: the `unit` of `parseMicrosecondsPerCommit` names `perf/parse.perf.test.ts` and that of
+   `layoutMicrosecondsPerCommit` names `perf/layout.perf.test.ts`; since E01-M01-S11 those timings are in the
+   `*.timed.perf.test.ts` files, and the gate prints the old names with every verdict.
+2. `perf/baselines.json`, `idleResidentRatio.unit`, states as fact that "the operating system trimmed 58.7 MiB of
+   working sets"; the S07 slice document labels the same thing an inference.
+3. S07 slice document, *Two regimes*: "every wall-clock entry carries a tolerance of 1.5 … and a `ciTolerance` of
+   4", while `buildMilliseconds` has 10 and none and `idleCpuPerCent` 8.
+4. S07 slice document, *Where each baseline lives*: leaves out `perf/store.perf.test.ts` (`gates:perf`) and
+   `perf/store.timed.perf.test.ts` (`gates:budgets`).
+5. S07 slice document, first section and *Where each baseline lives*: "every figure … measured on 2026-09-28",
+   while four baselines and three sections now carry 2026-10-03 and 2026-10-10 figures by other lanes.
+6. S11 slice document: statements that disagree with its own tables (a stretch "with no sample over 75 %" that
+   overlaps a run with 19 of 49 samples over 75; a start rule of "under 40" against runs that started at 41.0 and
+   40.0; "the five gates after it", which are four; `budgets-git` said to hold stored bytes, where it holds
+   process counts and a ratio), and figures stale at `021fba6`.
+7. Two accounts of one measurement that disagree: the `budgets-start.spec.ts` header against the S07 document on
+   the Refresh range and on the gap between the two Refresh speeds; `budgets-memory.spec.ts` against S07 on how
+   often the second GPU process appeared; the `budgets-page.ts` header against S07 on the cold-start counts.
+8. `budgets-memory.spec.ts`, the `SETTLE` comment says a case past `capMs` fails instead of reading; by the
+   reviewer's reading of the code, a reading just past the cap that meets the rule is accepted, because the rule
+   is tested before the cap.
+9. S07 slice document, *Five idle minutes*: 187 ms of processor time in 300 s is 0.0623 %, printed as 0.063.
+10. `scripts/gates/mutation.js` header: run counts behind by one; an inference about the memory crashes stated
+    without the label the S12 document gives it; "`gates:unit` … runs the same suite", which is
+    `gates:unit:modules`.
+11. `vitest.config.js` header and the S09 document quote the per-mutant command without `--no-isolate`; S09
+    says the flag was not taken and predicted a quarter of an hour, where S12 measured 77.5 against 35.0 minutes;
+    this file's deferred-items table keeps that prediction.
+12. Stale since S11: `AGENTS.md` §11's sentence that `npm run gates` is the only entry point until S11 merges;
+    `MILESTONE.md` *Gates* ("run by every slice after it"); `README.md` ("`npm run gates` — every quality
+    gate"); this file's "fifteen gates behind one `npm run gates`". Unmeasured: `AGENTS.md` §11's "most fix lanes
+    after the fifth wave … changed no file it reads".
+13. S12 slice document: "on a free machine" there means no other project's run in minute samples, not §11's
+    measured load; "this is the mutant and the load, not the flag" is an inference, unlabelled.
+
+**Not sentences**
+
+14. `AGENTS.md` §2 lets an executor rewrite history only by rebasing under a `## Rebase` section, while task
+    sections titled `## Repair` authorised four other rewrites (every rewritten tree identical, every message
+    on `dev` passing §9). Either §2 gains the permission or the orchestrator stops granting it.
+15. Nothing checks the end-to-end partition that S11 introduced: a check that the `application` and `budgets`
+    projects' case lists are disjoint and together cover `playwright test --list` would hold both together.
+16. `regimeOf` in `perf/baselines.ts` reads any value of `CI` other than empty, `0` or `false` as the CI regime;
+    undocumented and unpinned by a test.
+17. Helpers copied into `perf/layout.timed.perf.test.ts` and `perf/store.timed.perf.test.ts`; equal today by the
+    reviewer's reading, and nothing keeps them so.
+18. Measurements owed on a free machine: the idle-growth row with a ~3 % planted leak, and
+    `residentBytesAfterClose` at the main process's exit. FIX-28's readings of both were taken on a machine its
+    own audit calls never free, so neither defect is established either way.
+19. The free-machine rule of `AGENTS.md` §11 has no instrument in the repository, so each lane and review builds
+    its own sampler, and they have counted different things. A committed sampler that counts everything but the
+    reading's own process tree, and a judge of readings against the rule, would make "kept" mean the same thing
+    in every round.
+20. `launchBudgeted` refused one launch of the memory case under load because four of its five init scripts had
+    run before the renderer; whether that ordering race happens on a free machine is owed.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
