@@ -374,8 +374,9 @@ the machine and never written into, `ownFixture()` for one a case writes into, w
 E01-M01-FIX-33, `fixture()` compares the shared repository with the record written when it was published, every
 time it is called and before it returns, and never returns one that differs: a changed one is left in place,
 unread, and a fresh copy is built beside it. It does so before a case launches or times anything (the four
-`budgets-*.spec.ts` files call it first, read by that lane), and took 0.25 to 0.56 s for `large` and 0.44 to
-1.14 s for the fifty-thousand-commit `huge`, ten readings each by that lane on a loaded machine. What is not
+`budgets-*.spec.ts` files call it first, read by that lane), and took 0.25 to 0.75 s for `large` and 0.44 to
+1.14 s for the fifty-thousand-commit `huge`: twenty readings of each by that lane, in two sets of ten, the second
+taken while the processor load sampled every five seconds read 100 per cent throughout. What is not
 verified is a repository after `fixture()` has returned: a file removed while a window has it open is not seen
 by that case.
 
