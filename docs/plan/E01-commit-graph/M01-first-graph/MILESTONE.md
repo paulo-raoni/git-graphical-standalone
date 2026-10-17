@@ -2,7 +2,7 @@
 
 **Epic:** E01 · The commit graph
 **Base tag:** v0.0.0
-**State:** in flight
+**State:** delivered, promoted as v0.1.0
 
 ## Goal
 
@@ -60,7 +60,7 @@ Filled in before promotion (`AGENTS.md` §8.5).
 | field | value |
 | --- | --- |
 | base tag | v0.0.0 |
-| reviewed commit | |
-| review rounds | |
-| tasks | |
-| tag created | |
+| reviewed commit | `a2abb94` (review round 22, PASS, 2026-10-17; it reviewed the whole diff from `v0.0.0` and every task after the last wave's review, round 21, which serves `AGENTS.md` §7's review over the whole sequence before promotion) |
+| review rounds | 22 |
+| tasks | slices S01 to S12 (S10 delivered measurements and no product change; all merged); fix tasks FIX-01 to FIX-33 and FIX-35 to FIX-37 (no FIX-34: a file of that number was written by a review dispatch the owner cancelled, and was never dispatched) |
+| tag created | `v0.1.0` |
