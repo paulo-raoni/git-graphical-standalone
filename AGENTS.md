@@ -407,7 +407,10 @@ milestone.
 5. The orchestrator fills in the **delivery record** in `MILESTONE.md` (base tag, reviewed commit, number of
    review rounds, list of tasks, the tag about to be created) and commits it to `dev` as
    `docs(plan): record delivery of E<ee>-M<mm>`.
-6. `git diff --name-only <reviewed commit> dev` lists **exactly** that `MILESTONE.md` and nothing else.
+6. `git diff --name-only <reviewed commit> dev` lists that `MILESTONE.md`, and besides it only `docs/PLAN.md`
+   (the carried findings item 4 requires, which can only be written after the review) and `AGENTS.md` (only for
+   this item's own amendment of 2026-10-17, which E01-M01's promotion needed: the two items could not both hold).
+   Nothing else: no file a lane wrote or a gate reads.
 7. `git status --short` in the primary checkout prints nothing.
 
 ### Promotion
