@@ -3,6 +3,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { remeasure } from './mutation-remeasure.js';
 import { repositoryRoot, report } from './tree.js';
 
 /**
@@ -23,7 +24,7 @@ import { repositoryRoot, report } from './tree.js';
  * So the score is not the only thing read back. Stryker's own JSON report carries
  * `testsCompleted` per mutant — one completed test per mutant whose suite reached
  * an exit status under this runner, and none for a mutant that timed out — and
- * `statusReason`, the runner's whole captured output. Four properties of the
+ * `statusReason`, the runner's whole captured output. Five properties of the
  * report refuse the build on their own:
  *
  * 1. **Every killed and every surviving mutant carries a completed test run.**
@@ -45,6 +46,15 @@ import { repositoryRoot, report } from './tree.js';
  *    of the kills.** A kill under the command runner is only "the suite exited
  *    non-zero", and a suite that exits non-zero without failing a test did not
  *    assert anything about the mutant.
+ * 5. **No kill rests on a suite that could not get memory, that died before it
+ *    ran a test, or that printed nothing.** Every killed mutant whose output
+ *    names no failing test, or says its suite ran out of memory or lost its
+ *    worker, is run again alone once Stryker has finished, and is counted by
+ *    what that second run says: a failing test or a crash of its own module is
+ *    a kill, a pass is a survivor for the survivor clause below, and anything
+ *    else refuses the build. Added by E01-M01-FIX-36; the clause, its reasons
+ *    and the line it hinges on are in `mutation-remeasure.js` beside this file,
+ *    called once, below, before the survivor clause reads the report.
  *
  * No clause is the tests-per-mutant figure itself, because a genuinely
  * non-terminating mutant is a legitimate detection with no test result: 43 of the
@@ -65,9 +75,9 @@ import { repositoryRoot, report } from './tree.js';
  * Stryker runs under its command runner, so a verdict is the exit status of one
  * command, and the command is the one line `commandRunner.command` of
  * `stryker.config.json`: `node node_modules/vitest/vitest.mjs run --reporter=dot
- * --fsModuleCache --no-isolate`. It runs the whole unit suite `vitest.config.js`
- * includes, once per mutant, its files one at a time, and — since E01-M01-S12 —
- * **without isolating the test files from one another**: with `--no-isolate`
+ * --fsModuleCache --bail=1 --no-cache --no-isolate`. It runs the unit suite
+ * `vitest.config.js` includes, once per mutant, its files one at a time, and —
+ * since E01-M01-S12 — **without isolating the test files from one another**: with `--no-isolate`
  * the files of one run share a module registry instead of each getting a fresh
  * one. That flag is on the command line and nowhere else, so `gates:unit`, which
  * runs the same suite from the same configuration without it, keeps isolation.
@@ -82,13 +92,32 @@ import { repositoryRoot, report } from './tree.js';
  * starts keeping such state is the reason to take that measurement again, and
  * removing the flag restores the isolated run with nothing else to change.
  *
- * One figure this gate prints reads differently since the flag. S12 took seven
- * full runs with it and two without: the count of kills naming no failing test
- * was 2 and 3 in two of the seven and nought in the other seven runs. Each of
- * those five was a suite that could not get memory to start, beside a mutant
- * that allocates without end, and not a statement about the mutant. Whether
- * the flag makes that more likely was not established; the same document has
- * the measurements.
+ * **Since E01-M01-FIX-36 a run stops at its first failing test, and runs its
+ * files in an order that does not move.** Six mutants of this scope ask for
+ * more memory than the machine has: five make a column double without end, three
+ * in `src/core/parse/reference-list.ts` and two in
+ * `src/core/store/pending-parents.ts`, and one in
+ * `src/core/layout/segment-buffer.ts` runs a count below zero, after which a
+ * page's layout asks for columns far larger than memory. Planted one at a time
+ * at FIX-36's base and run alone with the command as it was, the three of
+ * `reference-list.ts` took a worker to 8.0 to 9.5 GB of working set, on a
+ * machine of 15.6 GB, with free memory under 300 MB, for up to 78 seconds; all
+ * six took its commit to between 35.9 and 84.2 GB. Each is now seen by a test
+ * that fails after one growth — two added by FIX-36, first in their own files,
+ * and for the sixth an existing test of `lane-layout.test.ts`, the first file
+ * to run — and `--bail=1` ends the run at that failure: the same six peaked at
+ * 113 MB of working set and 197 MB of commit in the largest process of the run,
+ * with isolation and without, where the healthy suite measured 110 MB. `--no-cache`
+ * is what makes that stop a bound. Without it vitest orders the files by the last
+ * run it recorded, in a file under `node_modules/.vite/` that all seven of
+ * Stryker's sandboxes share through their link to `node_modules`, so which file
+ * failed first, and so how much the run took first, depended on which mutant had
+ * finished last. Without the cache the order is the files' sizes, largest first,
+ * in every run and both modes. Neither flag can move a verdict to `Survived`: a
+ * run that fails no test runs every test, as before. What the first can move is
+ * a `Timeout` to `Killed`, when a test fails before the one that hangs. The
+ * measurements, and what moved, are in S12's slice document, *Kills that name no
+ * failing test*.
  *
  * ## The two clocks, and what the second clause actually counts
  *
@@ -242,6 +271,12 @@ import { repositoryRoot, report } from './tree.js';
  * the mutant, which would otherwise score 100 with nothing asserted. It does not
  * pretend to catch a handful, and the printed count is what makes a handful
  * visible — that being the lesson of the number nobody read for four rounds.
+ *
+ * A handful was then measured, by E01-M01-S12 and by review round 21: suites
+ * that could not get memory, or died before they ran a test, counted as kills
+ * at a few in a thousand while the cap passed them. Since E01-M01-FIX-36 the
+ * fifth clause re-measures every one of them, and this cap stays what it was, a
+ * validity bound over Stryker's own report, at the same number.
  *
  * ## Watching the clauses fail without paying for a run
  *
@@ -756,7 +791,7 @@ if (existsSync(json)) {
   const metrics = metricsOf(counted);
   describe(metrics, provenance);
   findings.push(...shapeFindings(metrics, counted.unknown));
-  const against = survivorFindings(files, readSurvivors());
+  const against = survivorFindings(await remeasure(files, LABEL, findings), readSurvivors());
   for (const note of against.notes) {
     process.stdout.write(note);
   }
