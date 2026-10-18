@@ -428,6 +428,20 @@ marked as such.
 20. **Answered by review round 22:** `launchBudgeted` refused one launch of the memory case under load in round
     21; no launch was refused in round 22's 14 free-machine runs.
 
+**From the first continuous-integration run (2026-10-18, run 39157409731 at `27498c8`): gates red on Linux**
+
+These two are defects of gates — red on an unchanged product — and so of `AGENTS.md` §7's blocking class; they
+were found after E01-M01's promotion, which a defect never reopens (§8), so **E03-M01's first wave repairs them
+before anything else that relies on CI**. Every other job of that run passed: build, unit, end to end,
+performance (Node pinned to 24.18.0, the allocation V8 pin), budgets, size.
+
+- **`gates:licences` refuses `lightningcss-linux-x64-gnu@1.33.0` (MPL-2.0)**, the Linux build of a package whose
+  Windows build this machine installs instead; the allow-list was only ever met with the Windows one.
+- **`gates:mutation` refuses its run on the runner:** "1314 of the 1314 killed mutants' recorded output names no
+  failing test", with counts equal to the local runs' (1 314 killed, 36 timeout, 3 survived). By the
+  orchestrator's inference — the log does not show a mutant's raw output — the test runner's output on that
+  runner is shaped differently from this machine's and the gate's reading of failing tests does not match it.
+
 **From review round 22: sentences**
 
 21. The re-measured layout median is given as 0.611 in `layoutMicrosecondsPerCommit.unit` (printed with every
