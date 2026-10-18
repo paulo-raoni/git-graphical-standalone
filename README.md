@@ -7,9 +7,15 @@ commit graph — and adds the extension's other features one at a time.
 
 ## Status
 
-**Pre-alpha. It does not read a repository yet.** The first milestone is being built: the application
-starts and opens a window, and the structure, the data contracts and the quality gates the rest stands on
-are in place. Nothing about a git repository is displayed so far.
+**Pre-alpha, version 0.1.0.** The first milestone, E01-M01 "First graph", is delivered: the application opens
+a git repository, named on the command line or chosen with **Open Repository**, and draws its commit graph — one
+row per commit with the graph, the description, the date, the author and the abbreviated hash; branch,
+remote-branch and tag labels on their commits; the uncommitted changes as the top row when the working tree
+is dirty; **Load More Commits** for the next page; and **Refresh**. It reads and never writes. Choosing which
+branches to show and a commit's details come next ([`docs/PLAN.md`](docs/PLAN.md) §4).
+
+Review round 22 compared the drawn rows with `git log` on this repository and on a 50 000-commit test repository
+and found no difference (2026-10-17).
 
 The stack is decided and is **Electron with TypeScript**, reading git through its command-line interface.
 The reasoning, including why a lighter shell was weighed and not taken, is in
@@ -19,8 +25,11 @@ The reasoning, including why a lighter shell was weighed and not taken, is in
 
 ```
 npm ci
-npm run gates    # every quality gate
-npm start        # open the application
+npm start                            # open the application
+npm start -- C:\path\to\a\repository  # open it on a repository
+npm run gates:quick                  # every gate but mutation, in minutes
+npm run gates                        # those plus mutation testing
+npm run gates:budgets                # the wall-clock budgets, on an otherwise idle machine
 ```
 
 Windows is the platform the application is built and verified on for now. The code is written
