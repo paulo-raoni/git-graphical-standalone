@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { remeasure } from './mutation-remeasure.js';
+import { plainFiles, remeasure } from './mutation-remeasure.js';
 import { repositoryRoot, report } from './tree.js';
 
 /**
@@ -24,8 +24,9 @@ import { repositoryRoot, report } from './tree.js';
  * So the score is not the only thing read back. Stryker's own JSON report carries
  * `testsCompleted` per mutant — one completed test per mutant whose suite reached
  * an exit status under this runner, and none for a mutant that timed out — and
- * `statusReason`, the runner's whole captured output. Five properties of the
- * report refuse the build on their own:
+ * `statusReason`, the runner's whole captured output, which every clause reads
+ * with its terminal escape sequences taken out (`mutation-output.js`, since
+ * E03-M01-S03). Five properties of the report refuse the build on their own:
  *
  * 1. **Every killed and every surviving mutant carries a completed test run.**
  *    Both verdicts are statements about what the tests did, so both need a test
@@ -786,7 +787,7 @@ const provenance =
 const findings = [];
 
 if (existsSync(json)) {
-  const { files } = JSON.parse(readFileSync(json, 'utf8'));
+  const files = plainFiles(JSON.parse(readFileSync(json, 'utf8')).files);
   const counted = tally(files);
   const metrics = metricsOf(counted);
   describe(metrics, provenance);
