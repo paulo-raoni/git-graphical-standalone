@@ -401,12 +401,11 @@ marked as such.
     without the label the S12 document gives it; "`gates:unit` … runs the same suite", which is
     `gates:unit:modules`.
 11. `vitest.config.js` header and the S09 document quote the per-mutant command without `--no-isolate`; S09
-    says the flag was not taken and predicted a quarter of an hour, where S12 measured 77.5 against 35.0 minutes;
-    this file's deferred-items table keeps that prediction.
-12. Stale since S11: `AGENTS.md` §11's sentence that `npm run gates` is the only entry point until S11 merges;
-    `MILESTONE.md` *Gates* ("run by every slice after it"); `README.md` ("`npm run gates` — every quality
-    gate"); this file's "fifteen gates behind one `npm run gates`". Unmeasured: `AGENTS.md` §11's "most fix lanes
-    after the fifth wave … changed no file it reads".
+    says the flag was not taken and predicted a quarter of an hour, where S12 measured 77.5 against 35.0 minutes.
+    (This file's deferred-items row was corrected by the orchestrator on 2026-10-23, `b67b360`.)
+12. **Done by the orchestrator, 2026-10-18 and 2026-10-23** (`27498c8`, `b67b360`): the stale sentences of
+    `AGENTS.md` §11, E01-M01's `MILESTONE.md` *Gates*, `README.md` and this file, and §11's unmeasured "most fix
+    lanes", which now carries its count (19 of 24).
 13. S12 slice document: "on a free machine" there means no other project's run in minute samples, not §11's
     measured load; "this is the mutant and the load, not the flag" is an inference, unlabelled.
 
