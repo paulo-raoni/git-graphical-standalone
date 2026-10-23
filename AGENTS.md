@@ -167,8 +167,11 @@ so **each task file is written for a context that has no memory of anything else
 
 ### Lifecycle
 
-1. The orchestrator writes **every** slice task of the milestone at the root of the primary checkout
-   **before creating any worktree**. Writing them together is what surfaces collisions.
+1. The orchestrator writes **every** slice task of a wave at the root of the primary checkout **before creating
+   any of that wave's worktrees**. Writing them together is what surfaces collisions. A later wave's tasks may
+   be written while an earlier wave runs, and each is checked against every task of the milestone not yet
+   merged. (Amended 2026-10-23: E03-M01's later slices need the reference extension observed first, and its
+   first wave shares no file with them; holding the first wave for that observation bought nothing.)
 2. When it creates a lane's worktree, the orchestrator **copies** the task file into the worktree root. A new
    worktree is a clean checkout, so ignored files do not exist in it.
 3. The executor writes its audit at the worktree root as its last act. It does not edit or delete the task.

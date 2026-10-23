@@ -177,6 +177,8 @@ What the editor provided around the extension, rebuilt as a desktop application.
 | ID | title | outcome |
 | --- | --- | --- |
 | **E03-M01** | Branches dropdown | Show all, select, filter, remote toggle, persistence. **MVP** |
+
+E03-M01 is planned in `docs/plan/E03-branch-filtering-and-find/M01-branches-dropdown/MILESTONE.md` (2026-10-23).
 | E03-M02 | Find widget | Phrase search across the loaded commits with navigation. |
 
 ### E04 · Commit details, comparison and diff
