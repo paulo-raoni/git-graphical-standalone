@@ -483,7 +483,9 @@ wrong moment, against work already merged.
 ### Gate tiers: a lane runs the gates its change can move
 
 Every lane used to run every gate, and the mutation gate alone took 88 minutes in E01-M01-FIX-28's last run;
-most fix lanes after the fifth wave of the first milestone changed no file it reads. **The task file names the
+19 of the 24 fix lanes merged after the fifth wave of the first milestone (FIX-13 to FIX-37) changed no file it
+reads (the orchestrator's count of 2026-10-23 over each merge's diff, counting `src/core/`, `src/contracts/`,
+every `*.test.ts` under `src/`, `stryker.config.json`, `vitest.config.js` and `scripts/gates/mutation*`). **The task file names the
 lane's tier, and the tier is a boundary** like the mutation scope: an executor may not narrow it to pass or widen
 it to look thorough. (Owner's ruling, 2026-10-09.)
 
@@ -502,8 +504,7 @@ on an unchanged product (E01-M01-FIX-28, 2026-10-04).
 **The reviewer runs everything**, `npm run gates` and then `npm run gates:budgets` on a free machine, at the
 reviewed commit, every round. That is what bounds the exposure of a narrower tier to one round.
 
-These scripts are landed by E01-M01-S11; until it is merged, `npm run gates` is the only entry point and holds
-every gate.
+These scripts were landed by E01-M01-S11, merged on 2026-10-10.
 
 ### Where evidence comes from
 
