@@ -23,7 +23,8 @@ light / dark / follow-the-system theme selector the owner brought forward (owner
 | S03 | mutation gate on the runner | 1 | `gates:mutation` reads which test failed on the continuous-integration runner as it does on the development machine. |
 | S04 | carried sentences | 2 | Every committed sentence E01-M01's reviews found contradicted by the tree, corrected in one lane. |
 | S05 | test-harness checks | 2 | The end-to-end partition, the CI regime, the copied helpers and the fixture stores each held by a check of their own. |
-| S06 | mutation gate's remaining clauses | 2 | Kills resting on vitest's own clock re-measured like the others, and the gate's own sentences corrected. |
+| S06 | mutation gate's remaining clauses | 3 | Kills resting on vitest's own clock re-measured like the others, and the gate's own sentences corrected. |
+| S07 | commit range from the latest tag | 2 | `gates:commits` reads from the latest promotion's tag, as its header says, so a release commit of an earlier milestone no longer reddens every tier. |
 
 The Branches dropdown's slices are added once the reference extension's dropdown has been observed and
 recorded (`AGENTS.md` §1, §4); they take the next free numbers.
