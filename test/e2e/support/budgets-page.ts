@@ -43,10 +43,12 @@ import type { GitGraphicalBridge, GraphPage } from '../../../src/contracts/index
  *
  * **The state is read in the first callback, not the second**, because the
  * second can see a change made after the first update's paint, which nothing has
- * painted yet. That happened: in one cold start of 80 measured on 2026-10-03
- * (processor load 44 to 100 per cent), the document's first update painted the
- * empty page, the renderer had mounted its bar 3.5 ms after that paint, and a mark
- * read in the second callback showed the bar 1.9 ms before Chromium's
+ * painted yet. That happened: in 140 cold starts of the probe as it then was,
+ * measured by E01-M01-FIX-27 on 2026-10-03 (processor load 37 to 100 per cent;
+ * the slice document, *How each reading could be wrong*), three first marks came
+ * before Chromium's paint. In one of them the document's first update painted
+ * the empty page, the renderer had mounted its bar 3.5 ms after that paint, and a
+ * mark read in the second callback showed the bar 1.9 ms before Chromium's
  * `paintTime` for the first contentful paint, which was the paint of the bar.
  *
  * What a mark does not see is the compositor putting the frame on the screen.

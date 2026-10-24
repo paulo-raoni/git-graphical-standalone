@@ -35,9 +35,11 @@ import { fixture } from './support/fixtures';
  * 2026-10-03 ten runs of this file as it held the median of five went red seven
  * times on an unchanged product, with the processor load sampled at 17 to 100
  * per cent. Timed stage by stage with git's own trace, a Refresh is five git
- * processes started one after another; Refreshes of 1257 to 1813 ms spent their
- * extra time starting and running those, and from the last one's exit to the
- * rows painted took 23 to 53 ms, in the fast Refreshes and the slow ones alike.
+ * processes started one after another; in eight Refreshes E01-M01-FIX-27 timed
+ * so that day, at 23 to 100 per cent, the five that took 871 to 1813 ms spent
+ * their extra time over the three of 615 to 723 ms starting and running those,
+ * and from the last one's exit to the rows painted took 23 to 53 ms in all eight
+ * (the slice document, *Where a slow Refresh spends its time*).
  * A burst of load lasts seconds, so it moved three or five readings of five
  * together, and with them the median. The fastest of ten is moved only if all
  * ten readings, spread over fifteen seconds or more, met the load; and a
@@ -247,10 +249,12 @@ async function timedRefreshes(page: Page, count: number): Promise<readonly numbe
  * first in a window draws 10 000 rows over 300, the next four draw 10 000 over
  * 10 000, and each one's mark is the first after its press to show the control
  * back at rest over a painted page of 10 000. Two windows, because a Refresh runs
- * at one of two speeds about 120 ms apart, and in some windows every Refresh ran
- * at the slower (the slice document, *Two speeds, not one*); the fastest of one
- * window's ten could not get past that: on 2026-10-03 one window's ten read 642
- * to 789 ms at a sampled load of 17 to 65 per cent, and went red.
+ * at one of two speeds — fifty single Refreshes by E01-M01-FIX-27 on 2026-10-03
+ * fell at 418 to 457 ms or at 521 to 576, none between — and in some windows
+ * every Refresh ran at the slower (the slice document, *Two speeds, not one*);
+ * the fastest of one window's ten could not get past that: on 2026-10-03 one
+ * window's ten read 642 to 789 ms at a sampled load of 17 to 65 per cent, and
+ * went red.
  */
 async function refreshesInOneWindow(large: string, count: number): Promise<readonly number[]> {
   let runs: readonly number[] = [];
