@@ -116,11 +116,15 @@ async function framesAt(
  * 2026-10-17 E01-M01-FIX-37 kept six runs of the median of five at other load of
  * 21 to 37 per cent, and three were red on the worst frame (11.7, 11.7 and
  * 13.4 ms against 11.55) on a product unchanged since its baseline. Split into
- * its script and its rendering, a run's worst frame held the same work as its
- * median frame, each part about twice as long (50 runs, five kept). A burst of
- * load lasts seconds; the ten runs take about fifty, so it moves the lowest only
- * if it lasts through all ten, and a regression of the product moves every run,
- * the lowest included. What the lowest does not see is a slow frame the product
+ * its script and its rendering, in 50 runs that lane read from five kept runs
+ * of ten scrolls, a run's worst frame was 1.4 to 3.5 times its median frame, its
+ * script part 1.0 to 4.4 times the median frame's and its rendering 1.5 to 3.6
+ * times; that it was the same work done slower is an inference, because only
+ * the two parts were timed and nothing counted the work (the slice document,
+ * *Main-thread work per frame while scrolling*). A burst of load lasts
+ * seconds; the ten runs take about fifty, so it moves the lowest only if it
+ * lasts through all ten, and a regression of the product moves every run, the
+ * lowest included. What the lowest does not see is a slow frame the product
  * makes in some runs and not others; that is the price, and the start cases of
  * `budgets-start.spec.ts` pay it for the same reason.
  */

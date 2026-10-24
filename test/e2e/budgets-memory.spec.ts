@@ -70,8 +70,9 @@ const IDLE_MS = 5 * 60 * 1000;
  * reading is `fallBytes` or more below one before it and every reading holds
  * the same processes. A rise does not hold the rule back, so a leak is left for
  * the budgets to judge; a fall after a rise does. The tree is read every
- * `pauseMs` plus the time a reading takes. Past `capMs` after the paint the
- * case fails instead of reading.
+ * `pauseMs` plus the time a reading takes. The rule is tested on each reading
+ * before the cap is, so a reading past `capMs` after the paint that meets the
+ * rule is taken, and the first reading past it that does not fails the case.
  *
  * Why: the load's memory is not given back at once but in steps. Measured by
  * E01-M01-FIX-28 on 2026-10-03, 15:50 to 16:03, in five launches whose tree was
@@ -209,16 +210,17 @@ function stoppedFalling(readings: readonly Timed[]): boolean {
 /**
  * Read the application's processes every few seconds from `painted` until the
  * sum of their private bytes has stopped falling, and return the reading that
- * met the rule. Throws past the cap: a reading taken early is the defect this
- * replaces.
+ * met the rule. Throws at the first reading past the cap that does not meet it:
+ * a reading taken early is the defect this replaces.
  *
  * Why the same processes: 120 s after its GPU process starts, the main process
  * starts a second one (`--type=gpu-process --disable-gpu-sandbox
  * --use-gl=disabled` and the graphics card's identifiers) that soon ends.
- * Watched by E01-M01-FIX-28 on 2026-10-03 in six launches polled about every
- * 1.3 s: seen in four, created 119.99 to 120.01 s after the first, with a
- * working set of 71 to 99 MiB and 7 to 25 MiB of private bytes when read, and
- * gone by the next poll, 1.2 to 2.4 s after it was created. That falls about
+ * Watched by E01-M01-FIX-28 on 2026-10-03 through 26 launches polled about
+ * every 1.3 s (the slice document, *Which processes are counted*): seen in 18,
+ * created 119.92 to 120.02 s after the first, with a working set of 13.8 to
+ * 100.2 MiB and 4.1 to 25.4 MiB of private bytes at the poll that saw it, and
+ * gone at most 1.0 to 5.0 s after it was created. That falls about
  * when the rule is met: in one of five runs of this case that day, a reading
  * taken a second after the rule was met, 107 s after the paint, held it. A
  * reading that holds it measures those seconds and not the loaded application.
