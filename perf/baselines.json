@@ -33,14 +33,14 @@
     "ceiling": 50,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks; fastest of five runs after a warm-up, perf/parse.perf.test.ts, 2026-09-28"
+    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks; fastest of five runs after a warm-up, perf/parse.timed.perf.test.ts; the baseline is S07's reading of 2026-09-28, taken in that file under its first name, perf/parse.perf.test.ts, which E01-M01-S11 renamed on 2026-10-10 adding only a comment"
   },
   "layoutMicrosecondsPerCommit": {
     "baseline": 0.59,
     "ceiling": 5,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, perf/layout.timed.perf.test.ts; the reading is the fastest of 25 runs in five batches half a second apart since E01-M01-FIX-37; the baseline is S07's fastest of five after a warm-up, 2026-09-28, which is that file's first batch; re-measured as the fastest of 25 in six kept runs on 2026-10-17, 0.572 to 0.643, median 0.611, at other load of 19 to 39 per cent, and not raised to it"
+    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, perf/layout.timed.perf.test.ts; the reading is the fastest of 25 runs in five batches half a second apart since E01-M01-FIX-37; the baseline is S07's fastest of five after a warm-up, 2026-09-28, which is that file's first batch; re-measured as the fastest of 25 in six kept runs on 2026-10-17, 0.572 to 0.643, median 0.605 by review round 22's count of FIX-37's six, at other load of 19 to 39 per cent, and not raised to it"
   },
   "layoutWorkPerRow": {
     "baseline": 18.747,
@@ -146,7 +146,7 @@
     "baseline": 1.002,
     "ceiling": 1.02,
     "tolerance": 1.1,
-    "unit": "times the resident memory at the reading that met the settling rule of privateBytesAt50000, five real idle minutes after it: the median of five runs on 2026-10-03, which read 0.853 to 1.006, the lowest where the operating system trimmed 58.7 MiB of working sets while the private bytes stayed; the ceiling is the strict limit, as it was"
+    "unit": "times the resident memory at the reading that met the settling rule of privateBytesAt50000, five real idle minutes after it: the median of five runs by E01-M01-FIX-28 on 2026-10-03, which read 0.853 to 1.006, the lowest in a run whose working sets fell by 58.7 MiB while its private bytes rose by 0.2 MiB, the operating system taking resident pages back by that lane's inference; the ceiling is the strict limit, as it was"
   },
   "idleCpuPerCent": {
     "baseline": 0.063,
