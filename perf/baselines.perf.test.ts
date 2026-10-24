@@ -55,9 +55,20 @@ describe('regimeOf', () => {
     },
   );
 
-  it.each(['true', 'TRUE', ' true ', '1'])('reads CI=%j as the CI regime', (flag) => {
+  it.each(['true', 'TRUE', ' true ', '1', ' 1\n'])('reads CI=%j as the CI regime', (flag) => {
     expect(regimeOf({ CI: flag })).toBe('ci');
   });
+
+  it.each(['no', 'off', 'yes', 'on', 'ci', 'github', '2', '-1', '01', 't r u e', 'constructor'])(
+    'refuses CI=%j rather than guess which regime it meant',
+    (flag) => {
+      expect(() => regimeOf({ CI: flag })).toThrow(
+        `CI is set to ${JSON.stringify(flag)}, which perf/baselines.ts does not read: set it to ` +
+          'true or 1 for the wide limits of the CI regime, or to false or 0 (or leave it unset) ' +
+          'for the strict limits of the development machine.',
+      );
+    },
+  );
 
   it('reads no variable but CI', () => {
     expect(regimeOf({ ci: 'true', CONTINUOUS_INTEGRATION: 'true' })).toBe('strict');
