@@ -420,11 +420,15 @@ milestone.
 
 ```
 git switch main
-git merge --no-ff dev -m "chore(release): E<ee>-M<mm> <milestone title>"
+git merge --no-ff dev -m "chore(release): e<ee>-m<mm> <milestone title in lower case>"
 git tag -a v0.<minor>.<patch> -m "E<ee>-M<mm> <milestone title>"
 git switch dev
 git merge --ff-only main
 ```
+
+The merge subject is in lower case because §9's commit gate refuses an upper-case start (commitlint's
+`subject-case`): E01-M01's promotion used `E01-M01 First graph` and that commit, `f1e3db7`, fails the gate whenever
+a range includes it (measured by E03-M01-S03, 2026-10-24). Amended 2026-10-24.
 
 Then delete the sequence files from the root. Push `main`, `dev` and the tag **only when the owner explicitly
 asks for it in the current session**.
