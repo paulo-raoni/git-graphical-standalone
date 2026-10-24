@@ -11,7 +11,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -33,7 +34,12 @@ import { differenceFrom, verifiedCopy } from './shared-store';
  * store is asked for it again. It must hand out another copy, one that matches
  * its record and looks to git exactly as the damaged one did before the damage,
  * leave the damaged one where it is, as damaged as it was, and say on standard
- * error which directory it passed over and why.
+ * error which directory it passed over and why. The damaged one stays because
+ * this process was handed it and still runs; what happens once no such process
+ * runs is the last case's. Every damage case asks for a repository no other case
+ * names — the end-to-end store's by name, the adapter suite's by a set of its own
+ * — so that no case is handed what an earlier one damaged, and the cases pass in
+ * any order (E03-M01-S05 ran them shuffled; its slice document says how).
  */
 
 let privateRoot = '';
@@ -43,8 +49,19 @@ const written: string[] = [];
 
 const VARIABLES = ['TEMP', 'TMP', 'TMPDIR'] as const;
 
+/** Directories named as the stores before E01-M01-FIX-33 were, and two that only look like them. */
+const OLD_STORES = ['e2e', 'unit'].map(
+  (kind) => `git-graphical-standalone-${kind}-shared-0123456789ab`,
+);
+const LOOK_ALIKES = ['e2e-shared-0123456789ab-kept', 'e2e-verified-0123456789ab'].map(
+  (name) => `git-graphical-standalone-${name}`,
+);
+
 beforeAll(async () => {
   privateRoot = mkdtempSync(join(tmpdir(), 'gg-stores-'));
+  for (const name of [...OLD_STORES, ...LOOK_ALIKES]) {
+    mkdirSync(join(privateRoot, name, 'repositories', 'linear'), { recursive: true });
+  }
   const saved = VARIABLES.map((name) => process.env[name]);
   for (const name of VARIABLES) {
     process.env[name] = privateRoot;
@@ -109,122 +126,88 @@ interface Damage {
   readonly what: string;
   readonly shape: string;
   readonly commits: number;
-  readonly make: (repository: string) => void;
+  readonly make: (repository: string) => unknown;
   readonly said: RegExp;
 }
 
+/** The commits each shape is built with by the end-to-end store, where it is not two. */
+const COMMITS: Readonly<Record<string, number>> = { tags: 3, 'detached-head': 3, large: 50 };
+
+/** A damage named `what`, made to a repository of `shape`, that the check must report as `said`. */
+function damage(
+  what: string,
+  shape: string,
+  said: RegExp,
+): { by: (make: Damage['make']) => Damage } {
+  return { by: (make) => ({ what, shape, commits: COMMITS[shape] ?? 2, make, said }) };
+}
+
 const DAMAGES: readonly Damage[] = [
-  {
-    what: 'a tracked working-tree file removed',
-    shape: 'linear',
-    commits: 2,
-    make: (at) => {
-      unlinkSync(join(at, 'file.txt'));
-    },
-    said: /^file\.txt has gone$/,
-  },
-  {
-    what: 'a tracked file whose content changed',
-    shape: 'linear',
-    commits: 2,
-    make: (at) => {
-      writeFileSync(join(at, 'file.txt'), 'changed\n');
-    },
-    said: /^file\.txt has changed$/,
-  },
-  {
-    what: 'an untracked file removed',
-    shape: 'dirty-working-tree',
-    commits: 2,
-    make: (at) => {
+  damage('a tracked working-tree file removed', 'linear', /^file\.txt has gone$/).by((at) => {
+    unlinkSync(join(at, 'file.txt'));
+  }),
+  damage('a tracked file whose content changed', 'linear', /^file\.txt has changed$/).by((at) => {
+    writeFileSync(join(at, 'file.txt'), 'changed\n');
+  }),
+  // The working tree keeps the file, now untracked, so only the index's digest moves.
+  damage(
+    'a file removed from the index alone',
+    'linear',
+    /^the index, as git ls-files --stage lists it has changed$/,
+  ).by((at) => git(at, ['rm', '--cached', '--quiet', 'file.txt'])),
+  damage('an untracked file removed', 'dirty-working-tree', /^untracked\.txt has gone$/).by(
+    (at) => {
       unlinkSync(join(at, 'untracked.txt'));
     },
-    said: /^untracked\.txt has gone$/,
-  },
-  {
-    what: 'an untracked file added',
-    shape: 'linear',
-    commits: 2,
-    make: (at) => {
-      writeFileSync(join(at, 'added.txt'), 'added\n');
-    },
-    said: /^added\.txt was not there when it was published$/,
-  },
-  {
-    what: 'a branch moved',
-    shape: 'branch-and-merge',
-    commits: 2,
-    make: (at) => git(at, ['update-ref', 'refs/heads/feature', 'main~1']),
-    said: /refs\/heads\/feature has changed$/,
-  },
-  {
-    what: 'a branch removed',
-    shape: 'branch-and-merge',
-    commits: 2,
-    make: (at) => git(at, ['branch', '-D', 'feature']),
-    said: /refs\/heads\/feature has gone$/,
-  },
-  {
-    what: 'a tag moved',
-    shape: 'tags',
-    commits: 3,
-    make: (at) => git(at, ['update-ref', 'refs/tags/lightweight', 'HEAD']),
-    said: /^\.git\/refs\/tags\/lightweight has changed$/,
-  },
-  {
-    what: 'a tag removed',
-    shape: 'tags',
-    commits: 3,
-    make: (at) => git(at, ['tag', '--delete', 'annotated']),
-    said: /^\.git\/refs\/tags\/annotated has gone$/,
-  },
-  {
-    what: 'the stash gone',
-    shape: 'stash',
-    commits: 2,
-    make: (at) => git(at, ['stash', 'drop', '--quiet']),
-    said: /refs\/stash has gone$/,
-  },
-  {
-    what: 'HEAD moved',
-    shape: 'detached-head',
-    commits: 3,
-    make: (at) => git(at, ['update-ref', '--no-deref', 'HEAD', 'HEAD~1']),
-    said: /^\.git\/HEAD has changed$/,
-  },
-  {
-    what: 'an object file removed',
-    shape: 'linear',
-    commits: 2,
-    make: (at) => {
-      const blob = git(at, ['rev-parse', 'HEAD:file.txt']).trim();
-      unlinkSync(join(at, '.git', 'objects', blob.slice(0, 2), blob.slice(2)));
-    },
-    said: /^\.git\/objects\/[0-9a-f]{2}\/[0-9a-f]{38} has gone$/,
-  },
-  {
-    what: 'a pack rewritten',
-    // Enough commits that `fast-import` keeps its pack rather than unpack it to
-    // loose objects, which it does below a hundred objects.
-    shape: 'large',
-    commits: 50,
-    make: (at) => {
-      const packs = join(at, '.git', 'objects', 'pack');
-      const pack = join(packs, readdirSync(packs).find((name) => name.endsWith('.pack')) ?? '');
-      chmodSync(pack, 0o644);
-      writeFileSync(pack, 'not a pack any more');
-    },
-    said: /^\.git\/objects\/pack\/pack-[0-9a-f]+\.pack has changed$/,
-  },
-  {
-    what: 'the record removed',
-    shape: 'linear',
-    commits: 2,
-    make: (at) => {
-      unlinkSync(join(at, '.git', 'published-state.json'));
-    },
-    said: /^it has no readable record/,
-  },
+  ),
+  damage(
+    'an untracked file added',
+    'linear',
+    /^added\.txt was not there when it was published$/,
+  ).by((at) => {
+    writeFileSync(join(at, 'added.txt'), 'added\n');
+  }),
+  damage('a branch moved', 'branch-and-merge', /refs\/heads\/feature has changed$/).by((at) =>
+    git(at, ['update-ref', 'refs/heads/feature', 'main~1']),
+  ),
+  damage('a branch removed', 'branch-and-merge', /refs\/heads\/feature has gone$/).by((at) =>
+    git(at, ['branch', '-D', 'feature']),
+  ),
+  damage('a tag moved', 'tags', /^\.git\/refs\/tags\/lightweight has changed$/).by((at) =>
+    git(at, ['update-ref', 'refs/tags/lightweight', 'HEAD']),
+  ),
+  damage('a tag removed', 'tags', /^\.git\/refs\/tags\/annotated has gone$/).by((at) =>
+    git(at, ['tag', '--delete', 'annotated']),
+  ),
+  damage('the stash gone', 'stash', /refs\/stash has gone$/).by((at) =>
+    git(at, ['stash', 'drop', '--quiet']),
+  ),
+  damage('HEAD moved', 'detached-head', /^\.git\/HEAD has changed$/).by((at) =>
+    git(at, ['update-ref', '--no-deref', 'HEAD', 'HEAD~1']),
+  ),
+  damage(
+    'an object file removed',
+    'linear',
+    /^\.git\/objects\/[0-9a-f]{2}\/[0-9a-f]{38} has gone$/,
+  ).by((at) => {
+    const blob = git(at, ['rev-parse', 'HEAD:file.txt']).trim();
+    unlinkSync(join(at, '.git', 'objects', blob.slice(0, 2), blob.slice(2)));
+  }),
+  // Enough commits that `fast-import` keeps its pack rather than unpack it to
+  // loose objects, which it does below a hundred objects.
+  damage(
+    'a pack rewritten',
+    'large',
+    /^\.git\/objects\/pack\/pack-[0-9a-f]+\.pack has changed$/,
+  ).by((at) => {
+    const packs = join(at, '.git', 'objects', 'pack');
+    const pack = join(packs, readdirSync(packs).find((name) => name.endsWith('.pack')) ?? '');
+    chmodSync(pack, 0o644);
+    writeFileSync(pack, 'not a pack any more');
+  }),
+  damage('the record removed', 'linear', /^it has no readable record/).by((at) => {
+    unlinkSync(join(at, '.git', 'published-state.json'));
+  }),
 ];
 
 /** Damage what `ask` hands out, ask again, and hold the store to what it must do. */
@@ -295,11 +278,12 @@ describe('the adapter suite’s store, asked for a repository that has changed',
     }
   });
 
-  for (const damage of DAMAGES) {
+  DAMAGES.forEach((damage, index) => {
     it(`does not hand out a repository with ${damage.what}`, () => {
-      holdsTo(damage, () => unit.fixtureAt(damage.shape));
+      // A set of its own: what an earlier case damaged is never what this one is handed.
+      holdsTo(damage, () => unit.fixtureAt(damage.shape, `damage-${String(index)}`));
     });
-  }
+  });
 
   it('hands an unchanged repository out as it is, without building it again', () => {
     readsAsItIs(() => unit.fixtureAt('two-roots'));
@@ -318,5 +302,63 @@ describe('a copy that differs from its record the moment it is published', () =>
       `fixture ${published} differs from its record as soon as published: it has no readable record`,
     );
     expect(existsSync(`${published}.2`)).toBe(false);
+  });
+});
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+/** A process of its own: asks the store for `published`, prints the path it is handed, and exits. */
+const READER = [
+  'const [store, generator, published, staging] = process.argv.slice(1);',
+  'const { verifiedCopy } = await import(store);',
+  'const { generateRepository, readSpecification } = await import(generator);',
+  "const linear = { name: 'linear', shape: 'linear', commits: 2 };",
+  'const build = (at) => generateRepository(at, linear, readSpecification());',
+  'process.stdout.write(verifiedCopy(published, staging, build));',
+].join('\n');
+
+describe('what the stores leave behind', () => {
+  it('removes the stores before E01-M01-FIX-33 when they load, and nothing else', () => {
+    const left = (names: readonly string[]): string[] =>
+      names.filter((name) => existsSync(join(privateRoot, name, 'repositories', 'linear')));
+    expect(left(OLD_STORES)).toEqual([]);
+    expect(left(LOOK_ALIKES)).toEqual(LOOK_ALIKES);
+  });
+
+  // The other half, a changed copy kept while a process it was handed to runs, is
+  // `holdsTo`'s: this process was handed what it damages, and finds it still there.
+  it('removes a changed copy once every process it was handed to has exited', () => {
+    const published = join(privateRoot, 'handed', 'linear');
+    const staging = join(privateRoot, 'handed', 'staging');
+    const modules = ['shared-store.ts', 'generate.ts'].map((name) =>
+      pathToFileURL(join(here, name)),
+    );
+    const reader = [
+      '--input-type=module',
+      '-e',
+      READER,
+      ...modules.map(String),
+      published,
+      staging,
+    ];
+    expect(execFileSync(process.execPath, reader, { encoding: 'utf8' })).toBe(published);
+    unlinkSync(join(published, 'file.txt'));
+    catchStandardError();
+    const ask = (): string =>
+      verifiedCopy(published, staging, (directory) => {
+        generateRepository(
+          directory,
+          { name: 'linear', shape: 'linear', commits: 2 },
+          readSpecification(),
+        );
+      });
+    expect(ask()).toBe(`${published}.2`);
+    expect([existsSync(published), existsSync(`${published}.handed`)]).toEqual([false, false]);
+    expect(written.join('')).toContain(
+      `fixture ${published} is not what was published: file.txt has gone. No process it was handed to runs, so it is removed.`,
+    );
+    // No number is used twice: copy 1 is not built again while copy 2 matches its record.
+    expect(ask()).toBe(`${published}.2`);
+    expect(existsSync(published)).toBe(false);
   });
 });

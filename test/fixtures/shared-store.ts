@@ -8,9 +8,10 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 /**
  * What the two stores of shared fixture repositories have in common: how a
@@ -36,8 +37,8 @@ import { join } from 'node:path';
  * It holds a SHA-256 digest of every file of the repository, the working tree and
  * `.git` both, by its path relative to the repository, and a digest of what
  * `git ls-files --stage` lists. `shared-store.test.ts` makes each of these to a
- * repository of each store and sees it: a tracked file removed or changed, an
- * untracked file removed or added, a branch or a tag moved or removed, `HEAD`
+ * repository of each store and sees it: a tracked file removed or changed, a
+ * file removed from the index alone, an untracked file removed or added, a branch or a tag moved or removed, `HEAD`
  * moved, the stash dropped, a loose object removed, a pack rewritten, the record
  * removed. Two kinds of path are left out, because a reader writes them without
  * changing what the repository holds: `.git/index`, which `git status` writes
@@ -48,27 +49,55 @@ import { join } from 'node:path';
  * the index holds is what `ls-files` lists. A repository whose record is missing
  * or unreadable counts as changed.
  *
- * **A repository that differs is left where it is, and the next copy is used**:
- * copy 1 is the published name itself, copy 2 is that name with `.2` appended,
- * and so on. The first copy that matches its record is handed out; the first that
- * does not exist is built and published under the rule below. No run removes or
- * renames a published copy, changed or not, because another run may be reading
- * it. E01-M01-FIX-33 measured, with Node 24.18 on Windows 11, two trials each:
- * while another process has its working directory in a directory, a rename of it
- * is refused with `EBUSY` and a recursive removal with `EPERM`, removing nothing;
- * while another process holds a file open in it, a rename is refused with `EPERM`
- * but a recursive removal succeeds and the directory is gone; while nothing is
- * held, which is a run between two of its git processes, both succeed, and that
- * run's next `git -C` fails with `cannot change to`. A changed copy is reported
- * on standard error, with the first difference found, the first time a process
- * passes over it. A copy that differs from its record the moment it has been
- * published is a defect of this check, not damage, and the run fails at once
- * rather than build another.
+ * **A repository that differs is passed over, and another copy is used**: copy 1
+ * is the published name itself, copy 2 is that name with `.2` appended, and so
+ * on. Every copy that exists is checked, lowest number first, and the first that
+ * matches its record is handed out; when none does, the copy numbered one past the
+ * highest that exists is built and published under the rule below. No number is
+ * used twice, so a copy removed leaves a gap that nothing builds into again. A
+ * changed copy is reported on standard error, with the first difference found,
+ * the first time a process passes over it. A copy that differs from its record
+ * the moment it has been published is a defect of this check, not damage, and the
+ * run fails at once rather than build another.
+ *
+ * **A changed copy is removed once no process it was handed to is running**, by
+ * the first process that passes over it after that. A copy is handed out only
+ * while it matches its record, so whoever may still be reading a changed one was
+ * handed it before it changed. Beside each copy is a directory, its name with
+ * {@link HANDED} appended, holding one empty file for each process the copy was
+ * handed to, named by the process identifier and written before the check, so a
+ * process deciding whether to remove the copy sees every process about to read
+ * it. A file whose process has exited is removed by the next process that reads
+ * the directory. An identifier the system has since given to another running
+ * program keeps the copy until that program exits too. Removal waits for the
+ * readers rather than for an age because no bound is known on how long a run
+ * holds a path, and it does not happen while one runs because of what
+ * E01-M01-FIX-33 measured, with Node 24.18 on Windows 11, two trials each (not
+ * repeated by E03-M01-S05): while another process has its working directory in a
+ * directory, a rename of it is refused with `EBUSY` and a recursive removal with
+ * `EPERM`, removing nothing; while another process holds a file open in it, a
+ * rename is refused with `EPERM` but a recursive removal succeeds and the
+ * directory is gone; while nothing is held, which is a run between two of its git
+ * processes, both succeed, and that run's next `git -C` fails with `cannot
+ * change to`. A removal that fails is left for the next process that passes over.
+ * What this cannot see is a process of code older than the rule, which writes no
+ * file: a copy that changes while such a process reads it can be removed under it.
+ *
+ * **The stores of the protocol before E01-M01-FIX-33** (`ade2dd6`), published
+ * whole and with no record, are removed by {@link removeOldStores}, which each
+ * store calls when it loads. Only a checkout of code older than `ade2dd6` reads
+ * them, and that code takes no lease, so nothing can say when none of its runs is
+ * going. It is removed anyway, because that code builds a store it does not find
+ * (read in `ade2dd6^`: the end-to-end store's `fixture` builds a repository it
+ * does not find, the adapter suite's `ensureFixtures` the whole set), so what a
+ * removal can cost is one red run of that old code, if one is going at that
+ * moment and its git lands in the gap FIX-33 measured. No lane or review of this
+ * milestone runs code that old; an old checkout run on purpose is safe with a
+ * `TEMP` of its own.
  *
  * **What is not checked**: a repository is compared when it is asked for, and
  * not afterwards. A file removed while a case reads the repository is not seen by
- * that case, and is seen by the next ask. Changed copies are never removed by a
- * run, so each one stays on disk until someone removes it with no run going.
+ * that case, and is seen by the next ask.
  *
  * **No run ever builds into a directory another run can name.** A run builds into
  * a staging directory of its own, made by `mkdtemp` with its process identifier
@@ -99,6 +128,15 @@ const POLL_MS = 100;
 
 /** The changed copies this process has already reported, so that each is reported once. */
 const reported = new Set<string>();
+
+/** The copies this process has been handed, whose files in their {@link HANDED} directory stay. */
+const handedHere = new Set<string>();
+
+/** What a copy's name is followed by to name the directory of the processes it was handed to. */
+const HANDED = '.handed';
+
+/** The stores of the protocol before E01-M01-FIX-33, by their names under the temporary directory. */
+const OLD_STORE = /^git-graphical-standalone-(e2e|unit)-shared-[0-9a-f]{12}$/;
 
 /** What a repository is, as digests by name: one per file, and one for the index. */
 type State = Record<string, string>;
@@ -279,6 +317,79 @@ function copyName(published: string, copy: number): string {
   return copy === 1 ? published : `${published}.${String(copy)}`;
 }
 
+/** The numbers of the copies of `published` that exist, lowest first. */
+function copiesOf(published: string): number[] {
+  const base = basename(published);
+  return readdirSync(dirname(published))
+    .flatMap((entry) => {
+      if (entry === base) {
+        return [1];
+      }
+      const suffix = entry.startsWith(`${base}.`) ? entry.slice(base.length + 1) : '';
+      return /^[1-9][0-9]*$/.test(suffix) && suffix !== '1' ? [Number(suffix)] : [];
+    })
+    .sort((one, other) => one - other);
+}
+
+/** Record that `copy` is being handed to this process, before it is checked. */
+function takeLease(copy: string): void {
+  mkdirSync(`${copy}${HANDED}`, { recursive: true });
+  writeFileSync(join(`${copy}${HANDED}`, String(process.pid)), '');
+}
+
+/**
+ * The running processes `copy` was handed to. The file of every process that has
+ * exited is removed on the way; one that cannot be removed is left for the next.
+ */
+function runningHolders(copy: string): number[] {
+  const leases = `${copy}${HANDED}`;
+  const entries = existsSync(leases) ? readdirSync(leases) : [];
+  return entries.flatMap((entry) => {
+    const pid = Number(entry);
+    if (Number.isInteger(pid) && isRunning(pid)) {
+      return [pid];
+    }
+    try {
+      unlinkSync(join(leases, entry));
+    } catch {
+      // Already removed by another process, or held: left for the next.
+    }
+    return [];
+  });
+}
+
+/**
+ * Pass over a changed `copy`: remove it when no process it was handed to runs,
+ * and say so; otherwise leave it, and say so the first time.
+ */
+function passOver(copy: string, difference: string): void {
+  if (!handedHere.has(copy)) {
+    rmSync(join(`${copy}${HANDED}`, String(process.pid)), { force: true });
+  }
+  const said = `fixture ${copy} is not what was published: ${difference}.`;
+  const holders = runningHolders(copy).length;
+  if (holders === 0) {
+    try {
+      removeDirectory(copy);
+      removeDirectory(`${copy}${HANDED}`);
+      process.stderr.write(`${said} No process it was handed to runs, so it is removed.\n`);
+      return;
+    } catch {
+      // Held open: left, and reported below, for the next process that passes over it.
+    }
+  }
+  if (!reported.has(copy)) {
+    reported.add(copy);
+    const why =
+      holders === 0
+        ? 'its removal was refused'
+        : `${String(holders)} process(es) it was handed to still run`;
+    process.stderr.write(
+      `${said} It is left as it is and not read, because ${why}; another copy is used.\n`,
+    );
+  }
+}
+
 /**
  * The path of the first copy of `published` that matches its record, building
  * and publishing the next copy with `build` when every existing one differs.
@@ -289,27 +400,41 @@ export function verifiedCopy(
   stagingRoot: string,
   build: (directory: string) => void,
 ): string {
-  for (let copy = 1; ; copy += 1) {
+  mkdirSync(dirname(published), { recursive: true });
+  const copies = copiesOf(published);
+  for (const copy of copies) {
     const candidate = copyName(published, copy);
-    const fresh = !existsSync(candidate);
-    if (fresh) {
-      buildAndPublish(candidate, stagingRoot, build);
-    }
+    takeLease(candidate);
     const difference = differenceFrom(candidate);
     if (difference === undefined) {
+      handedHere.add(candidate);
       return candidate;
     }
-    if (fresh) {
-      throw new Error(
-        `fixture ${candidate} differs from its record as soon as published: ${difference}`,
-      );
-    }
-    if (!reported.has(candidate)) {
-      reported.add(candidate);
-      process.stderr.write(
-        `fixture ${candidate} is not what was published: ${difference}. ` +
-          `It is left as it is and not read; the next copy is used.\n`,
-      );
+    passOver(candidate, difference);
+  }
+  const fresh = copyName(published, (copies.at(-1) ?? 0) + 1);
+  buildAndPublish(fresh, stagingRoot, build);
+  takeLease(fresh);
+  const difference = differenceFrom(fresh);
+  if (difference !== undefined) {
+    throw new Error(`fixture ${fresh} differs from its record as soon as published: ${difference}`);
+  }
+  handedHere.add(fresh);
+  return fresh;
+}
+
+/**
+ * Remove the stores of the protocol before E01-M01-FIX-33 from
+ * `temporaryDirectory`, the directory a store keeps its own under. One that
+ * cannot be removed now is left for the next load.
+ */
+export function removeOldStores(temporaryDirectory: string): void {
+  const entries = existsSync(temporaryDirectory) ? readdirSync(temporaryDirectory) : [];
+  for (const entry of entries.filter((name) => OLD_STORE.test(name))) {
+    try {
+      removeDirectory(join(temporaryDirectory, entry));
+    } catch {
+      // Held by a run of the old code: left for the next load.
     }
   }
 }
