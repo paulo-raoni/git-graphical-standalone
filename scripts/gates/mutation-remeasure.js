@@ -12,7 +12,15 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
+import { plainOutput } from './mutation-output.js';
 import { GENERATED, repositoryRoot, walkFiles } from './tree.js';
+
+/**
+ * Re-exported for `mutation.js`, which reads the report through it before any
+ * clause does and is at its module's line limit, so it imports from this module
+ * alone.
+ */
+export { plainFiles } from './mutation-output.js';
 
 /**
  * The mutation gate's fifth clause: **no kill rests on a suite that could not get
@@ -79,6 +87,13 @@ import { GENERATED, repositoryRoot, walkFiles } from './tree.js';
  * `replacement` over its `location`; the rest of the copy is the working tree,
  * so a replay (`--check-report`) re-measures the mutants of the report it was
  * handed against the tests as they are now.
+ *
+ * Every output this clause reads is plain text: the kills it chooses from reach
+ * it with their recorded output already stripped of terminal escape sequences,
+ * and the output of each of its own runs is stripped the same way before
+ * `verdictOf` reads it. Without that, a run that printed in colour, as vitest
+ * does on a continuous-integration runner, names no failing test to any reading
+ * here. `mutation-output.js` holds the measurement.
  */
 
 /** Where the copy of the tree lives while the clause runs. Removed when it is done. */
@@ -203,7 +218,7 @@ function runAlone(command, budget) {
     child.on('error', (error) => chunks.push(Buffer.from(String(error))));
     child.on('close', (code) => {
       clearTimeout(clock);
-      resolveRun({ code, timedOut, output: Buffer.concat(chunks).toString('utf8') });
+      resolveRun({ code, timedOut, output: plainOutput(Buffer.concat(chunks).toString('utf8')) });
     });
   });
 }
