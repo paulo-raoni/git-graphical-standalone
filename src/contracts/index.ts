@@ -56,12 +56,14 @@ export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';
 
-export { CHANNELS } from './ipc';
+export { CHANNELS, ThemeChoice } from './ipc';
 export type {
   ApplicationInfo,
   ApplicationInfoResponse,
   ChannelName,
   ChooseFolderResponse,
+  ChooseThemeRequest,
+  ChooseThemeResponse,
   ChosenFolder,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
@@ -71,6 +73,8 @@ export type {
   RefreshResponse,
   StartupRepository,
   StartupRepositoryResponse,
+  ThemeChoiceResponse,
+  ThemeSetting,
 } from './ipc';
 
 export { RowFlag } from './layout';

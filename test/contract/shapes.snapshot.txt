@@ -13,11 +13,17 @@ type ApplicationInfoResponse = import("./result").Failure | import("./result").S
 
 value BRIDGE_GLOBAL_NAME: "gitGraphical"
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; }
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info"
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info" | "theme:choice" | "theme:choose"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
+
+interface ChooseThemeRequest {
+    readonly choice: "light" | "dark" | "system"
+}
+
+type ChooseThemeResponse = import("./result").Failure | import("./result").Success<import("./ipc").ThemeSetting>
 
 interface ChosenFolder {
     readonly path: string
@@ -52,10 +58,12 @@ value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository
 interface GitGraphicalBridge {
     readonly applicationInfo: () => Promise<ApplicationInfoResponse>
     readonly chooseFolder: () => Promise<ChooseFolderResponse>
+    readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>
     readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
     readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
     readonly startupRepository: () => Promise<StartupRepositoryResponse>
+    readonly themeChoice: () => Promise<ThemeChoiceResponse>
 }
 
 interface GraphPage {
@@ -135,6 +143,15 @@ type StartupRepositoryResponse = import("./result").Failure | import("./result")
 interface Success<TValue> {
     readonly ok: true
     readonly value: TValue
+}
+
+type ThemeChoice = "light" | "dark" | "system"
+value ThemeChoice: { readonly Light: "light"; readonly Dark: "dark"; readonly System: "system"; }
+
+type ThemeChoiceResponse = import("./result").Failure | import("./result").Success<import("./ipc").ThemeSetting>
+
+interface ThemeSetting {
+    readonly choice: "light" | "dark" | "system"
 }
 
 value UNKNOWN_INDEX: 4294967295

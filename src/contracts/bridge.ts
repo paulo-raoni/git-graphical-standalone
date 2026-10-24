@@ -9,7 +9,7 @@ import type {
   RefreshResponse,
   StartupRepositoryResponse,
 } from './ipc';
-
+import type { ChooseThemeRequest, ChooseThemeResponse, ThemeChoiceResponse } from './ipc';
 /** The property the preload attaches the bridge to on the renderer's global. */
 export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
 
@@ -38,6 +38,10 @@ export interface GitGraphicalBridge {
   readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>;
   /** Report the application's own versions. */
   readonly applicationInfo: () => Promise<ApplicationInfoResponse>;
+  /** Report the colour scheme in force. */
+  readonly themeChoice: () => Promise<ThemeChoiceResponse>;
+  /** Apply a colour scheme to the whole application and keep it for the next start. */
+  readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>;
 }
 
 declare global {

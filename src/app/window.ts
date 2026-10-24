@@ -1,4 +1,4 @@
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, nativeTheme, shell } from 'electron';
 import { join } from 'node:path';
 
 /** Initial window size, chosen to show a graph column and four text columns. */
@@ -9,8 +9,34 @@ const INITIAL_HEIGHT = 800;
 const MINIMUM_WIDTH = 720;
 const MINIMUM_HEIGHT = 420;
 
-/** Painted before the document loads, so the frame never flashes white. */
-const BACKGROUND_COLOUR = '#1f1f1f';
+/**
+ * Painted where the document has not painted yet: before it loads, and in the
+ * strip a resize uncovers before the page catches up. The two values are
+ * `--surface` of the two schemes in `src/ui/renderer.css`, so that strip is the
+ * colour of the page that is about to cover it, in either scheme.
+ */
+const BACKGROUND_DARK = '#1f1f1f';
+const BACKGROUND_LIGHT = '#ffffff';
+
+/** The background for the scheme in force, which `./theme.ts` set before any window. */
+function backgroundColour(): string {
+  return nativeTheme.shouldUseDarkColors ? BACKGROUND_DARK : BACKGROUND_LIGHT;
+}
+
+/**
+ * Keep the window's background on the scheme in force: a choice made in the
+ * window, or the operating system changing its preference while `system` is
+ * chosen, both arrive as the one `updated` event.
+ */
+function followScheme(window: BrowserWindow): void {
+  const follow = (): void => {
+    window.setBackgroundColor(backgroundColour());
+  };
+  nativeTheme.on('updated', follow);
+  window.once('closed', () => {
+    nativeTheme.off('updated', follow);
+  });
+}
 
 /**
  * Refuse every navigation and every attempt to open a second window.
@@ -53,7 +79,7 @@ export function createMainWindow(distDirectory: string): BrowserWindow {
     height: INITIAL_HEIGHT,
     minWidth: MINIMUM_WIDTH,
     minHeight: MINIMUM_HEIGHT,
-    backgroundColor: BACKGROUND_COLOUR,
+    backgroundColor: backgroundColour(),
     show: false,
     webPreferences: {
       preload: join(distDirectory, 'preload.cjs'),
@@ -70,6 +96,7 @@ export function createMainWindow(distDirectory: string): BrowserWindow {
   });
 
   refuseNavigation(window);
+  followScheme(window);
   window.once('ready-to-show', () => {
     window.show();
   });

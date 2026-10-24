@@ -1,4 +1,4 @@
-import { BRIDGE_GLOBAL_NAME, FailureKind } from '../contracts/index';
+import { BRIDGE_GLOBAL_NAME, FailureKind, ThemeChoice } from '../contracts/index';
 import type { Failure, GraphPage, Result } from '../contracts/index';
 
 import { mountGraphTable } from './graph-table';
@@ -214,6 +214,44 @@ async function open(
   receive(shell, view, session, reply, true);
 }
 
+/**
+ * Apply the colour scheme the control now shows, then tell the main process.
+ *
+ * The page changes first and at once, in the task of the `change` event, so the
+ * whole window is in the new scheme in the next frame whatever the bridge takes.
+ * The main process then moves what the page cannot — the frame, the menu bar
+ * and the preference the page sees — and keeps the choice for the next start
+ * (`src/app/theme.ts`). Its reply carries the choice back and is not shown: by
+ * the time it arrives a person may have chosen again, and the control already
+ * says what they chose last.
+ */
+function chooseTheme(shell: Shell): void {
+  const choice = Object.values(ThemeChoice).find((each) => each === shell.theme.value);
+  if (choice === undefined) {
+    return;
+  }
+  shell.showTheme(choice);
+  run(
+    shell,
+    (async (): Promise<void> => {
+      const reply = await window.gitGraphical.chooseTheme({ choice });
+      if (!reply.ok) {
+        report(shell, reply);
+      }
+    })(),
+  );
+}
+
+/** Show the colour scheme the main process applied before this window existed. */
+async function showStoredTheme(shell: Shell): Promise<void> {
+  const reply = await window.gitGraphical.themeChoice();
+  if (!reply.ok) {
+    report(shell, reply);
+    return;
+  }
+  shell.showTheme(reply.value.choice);
+}
+
 /** Wire every control to the bridge. Nothing here runs until something happens. */
 function connect(shell: Shell, view: GraphTableView, session: Session): void {
   shell.open.addEventListener('click', () => {
@@ -237,6 +275,10 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
         receive(shell, view, session, await window.gitGraphical.refresh({}));
       }),
     );
+  });
+
+  shell.theme.addEventListener('change', () => {
+    chooseTheme(shell);
   });
 
   view.onLoadMore(() => {
@@ -282,6 +324,7 @@ function start(): void {
   };
   const session: Session = { path: null, busy: new Set() };
   connect(shell, view, session);
+  run(shell, showStoredTheme(shell));
   run(shell, begin(shell, view, session));
 }
 

@@ -23,6 +23,10 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   refresh: 'repository:refresh',
   /** Report the application's own versions. Reads no repository. */
   applicationInfo: 'application:info',
+  /** Report the colour scheme in force. Reads no repository. */
+  themeChoice: 'theme:choice',
+  /** Apply a colour scheme to the application and keep it for the next start. */
+  chooseTheme: 'theme:choose',
 } as const);
 
 /** One of the channel names in {@link CHANNELS}. */
@@ -105,3 +109,44 @@ export interface ApplicationInfo {
 
 /** The application's versions. */
 export type ApplicationInfoResponse = Result<ApplicationInfo>;
+
+/**
+ * The colour schemes a person can choose. `System` follows the operating
+ * system's light or dark preference, including when it changes while the window
+ * is open, and is what the application starts on until a person chooses.
+ *
+ * The choice belongs to the application, not to a repository: opening another
+ * repository keeps it, and the main process keeps it across restarts.
+ */
+export const ThemeChoice = /* @__PURE__ */ Object.freeze({
+  /** The light scheme, whatever the operating system prefers. */
+  Light: 'light',
+  /** The dark scheme, whatever the operating system prefers. */
+  Dark: 'dark',
+  /** Whichever of the two the operating system prefers. */
+  System: 'system',
+} as const);
+
+/** One of the values of {@link ThemeChoice}. */
+export type ThemeChoice = (typeof ThemeChoice)[keyof typeof ThemeChoice];
+
+/** The colour scheme in force. */
+export interface ThemeSetting {
+  /** What the person chose, or `system` when they never chose. */
+  readonly choice: ThemeChoice;
+}
+
+/** The colour scheme in force. */
+export type ThemeChoiceResponse = Result<ThemeSetting>;
+
+/** Apply `choice` to the whole application, and keep it for the next start. */
+export interface ChooseThemeRequest {
+  /** The scheme to apply. A value outside {@link ThemeChoice} changes nothing. */
+  readonly choice: ThemeChoice;
+}
+
+/**
+ * The colour scheme in force after the request: the one asked for, or the one
+ * that stayed when the request named none of the three.
+ */
+export type ChooseThemeResponse = Result<ThemeSetting>;
