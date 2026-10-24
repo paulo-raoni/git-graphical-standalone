@@ -37,6 +37,7 @@
       "src/app/main.ts",
       "src/app/repository-client.ts",
       "src/app/startup.ts",
+      "src/app/theme.ts",
       "src/app/window.ts",
       "src/contracts/ipc.ts",
       "src/contracts/result.ts"
@@ -77,6 +78,7 @@
       "src/contracts/bridge.ts",
       "src/contracts/column-read.ts",
       "src/contracts/commit-columns.ts",
+      "src/contracts/ipc.ts",
       "src/contracts/layout.ts",
       "src/contracts/ref-list.ts",
       "src/contracts/refs.ts",

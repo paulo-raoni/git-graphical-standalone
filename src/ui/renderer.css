@@ -5,13 +5,21 @@
  * cannot disagree. Copied, not bundled: its budget weighs these comments too.
  */
 
+/*
+ * Each colour is written once, as light-dark(light, dark), and `color-scheme`
+ * picks the half. `light dark` follows the preference the page sees, which the
+ * main process sets from the person's choice; `data-theme`, which the bar's
+ * control writes, pins one scheme whatever that preference says. The same
+ * property moves the scrollbars and the native controls, so they and the
+ * colours below cannot disagree.
+ */
 :root {
   color-scheme: light dark;
 
-  --surface: #ffffff;
-  --text-primary: #1f1f1f;
-  --text-secondary: #5c5c5c;
-  --line: #e2e2e2;
+  --surface: light-dark(#ffffff, #1f1f1f);
+  --text-primary: light-dark(#1f1f1f, #e8e8e8);
+  --text-secondary: light-dark(#5c5c5c, #a0a0a0);
+  --line: light-dark(#e2e2e2, #333333);
 
   font-family:
     system-ui,
@@ -21,13 +29,12 @@
   font-size: 14px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #1f1f1f;
-    --text-primary: #e8e8e8;
-    --text-secondary: #a0a0a0;
-    --line: #333333;
-  }
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 * {
@@ -100,6 +107,21 @@ body {
 .bar__button:disabled,
 .graph__more:disabled {
   color: var(--text-secondary);
+}
+
+.bar__theme-label {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.bar__theme {
+  flex: none;
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
 }
 
 .stage {

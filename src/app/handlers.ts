@@ -5,25 +5,31 @@ import { CHANNELS, FailureKind } from '../contracts/index';
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
+  ChooseThemeRequest,
+  ChooseThemeResponse,
   GraphPage,
   LoadMoreCommitsRequest,
   OpenRepositoryRequest,
   Result,
   StartupRepositoryResponse,
+  ThemeChoiceResponse,
 } from '../contracts/index';
 import type { ReaderDescription } from '../ports/index';
 
 import type { RepositoryClient } from './repository-client';
+import type { ThemeStore } from './theme';
 
 /**
  * Every channel of `src/contracts/ipc.ts`, answered.
  *
  * This is the whole of what the main process does with a repository: it
- * forwards. Four of the six channels are a message to the utility process and
+ * forwards. Four of the eight channels are a message to the utility process and
  * its answer handed back unchanged; one is a folder dialog, which only a process
- * that owns a window can show; and one is a string read off the command line at
- * startup. No git process is started here, nothing is parsed here, and nothing
- * here waits on anything but another process's reply, which is what
+ * that owns a window can show; one is a string read off the command line at
+ * startup; and two read and set the colour scheme, which is the application's
+ * and not a repository's (`./theme.ts`). No git process is started here, nothing
+ * is parsed here, and nothing here waits on anything but another process's reply
+ * or the write of a few bytes of settings, which is what
  * `docs/ADR-0002-architecture-and-performance.md` decision 2 requires of the
  * process that owns the window.
  *
@@ -48,6 +54,8 @@ export interface HandlerContext {
   readonly startupPath: string | null;
   /** The window a modal dialog belongs to, looked up when one is shown. */
   readonly windowOf: () => BrowserWindow | null;
+  /** The colour scheme in force, already applied before the window was created. */
+  readonly theme: ThemeStore;
 }
 
 /** Show the folder chooser and report what the user picked. */
@@ -119,5 +127,20 @@ export function registerHandlers(context: HandlerContext): void {
 
   ipcMain.handle(CHANNELS.applicationInfo, (): Promise<ApplicationInfoResponse> =>
     applicationInfo(context),
+  );
+
+  ipcMain.handle(CHANNELS.themeChoice, (): ThemeChoiceResponse => {
+    return { ok: true, value: { choice: context.theme.current() } };
+  });
+
+  ipcMain.handle(
+    CHANNELS.chooseTheme,
+    async (
+      _event: unknown,
+      request: ChooseThemeRequest | undefined,
+    ): Promise<ChooseThemeResponse> => {
+      const choice = await context.theme.choose(request?.choice);
+      return { ok: true, value: { choice } };
+    },
   );
 }
