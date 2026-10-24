@@ -1,8 +1,6 @@
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
-  ChooseThemeRequest,
-  ChooseThemeResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenRepositoryRequest,
@@ -10,9 +8,8 @@ import type {
   RefreshRequest,
   RefreshResponse,
   StartupRepositoryResponse,
-  ThemeChoiceResponse,
 } from './ipc';
-
+import type { ChooseThemeRequest, ChooseThemeResponse, ThemeChoiceResponse } from './ipc';
 /** The property the preload attaches the bridge to on the renderer's global. */
 export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
 
