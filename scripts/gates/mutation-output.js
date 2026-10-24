@@ -37,15 +37,29 @@
  * one final byte, which is every code `tinyrainbow` writes), an operating-system
  * command ended by `BEL` or `ESC \`, and a two-character escape, and nothing
  * else: no character that is not part of an escape sequence is removed.
+ *
+ * A control sequence is also taken out when a line break interrupts it, line
+ * break included. Stryker's command runner records a run's output as the chunks
+ * it read from the pipe joined with `os.EOL` (`command-test-runner.js` of
+ * `@stryker-mutator/core` 10.0.0), so a chunk that ends inside a sequence leaves
+ * `ESC [`, a line break and the rest of it. Measured by E03-M01-S03 on its full
+ * run in the runner's environment: 2 of 1 316 kills' outputs held one such split
+ * sequence each, inside a long diff. A sequence never holds a line break of its
+ * own, so the one inside it is the join's and goes with it; left in, the rest of
+ * the sequence would start a line, and in front of `Tests` would hide the count.
  */
 
 /** Built from code points: a control character written in a pattern fails `no-control-regex`. */
 const ESC = String.fromCharCode(0x1b);
 const BEL = String.fromCharCode(0x07);
 
+/** The line break Stryker's join may have put inside a control sequence. See the header. */
+const JOIN = '\\r?\\n';
+
 /** **The line this module hinges on.** One terminal escape sequence. See the header. */
 const ESCAPE_SEQUENCE = new RegExp(
-  `${ESC}(?:\\[[0-?]*[ -/]*[@-~]|\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)|[@-Z\\\\-_])`,
+  `${ESC}(?:(?:${JOIN})?\\[(?:[0-?]|${JOIN})*(?:[ -/]|${JOIN})*[@-~]` +
+    `|\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)|[@-Z\\\\-_])`,
   'g',
 );
 
