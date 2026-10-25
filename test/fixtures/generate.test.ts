@@ -83,13 +83,14 @@ describe('generating the same repository twice', () => {
   });
 
   // Three shapes rather than all nine: between them they cover an ordinary
-  // commit, a branch, a merge, the commits git writes for a stash, and a
-  // `fast-import` stream that writes remote-tracking refs and an annotated tag
-  // beside a symbolic ref, and every shape is compared against its recorded
-  // object names by the suite above. Building all nine twice would add half a
-  // minute to every gate run to re-prove the same property; `remotes` was built
-  // in 1.5 seconds, wall clock, by one generation on the development machine
-  // under full load on 2026-10-25, which is why it is the third.
+  // commit, a branch, a merge, the commits git writes for a stash, and the
+  // remote-tracking refs, the annotated tag and the symbolic ref `remotes`
+  // writes, and every shape is compared against its recorded object names by
+  // the suite above. Building all nine twice would add half a minute to every
+  // gate run to re-prove the same property; `remotes` took 3.09 and 3.76
+  // seconds, wall clock, in two generations on the development machine,
+  // shared and its load not sampled, on 2026-10-25 (E03-M01-S09), which is why
+  // it is the third.
   const shapes = ['branch-and-merge', 'stash', 'remotes'];
 
   it('produces the same object names both times', () => {

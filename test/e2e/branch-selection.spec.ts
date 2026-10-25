@@ -25,7 +25,7 @@ import { fixture } from './support/fixtures';
  * looked at.
  *
  * The repository is the `remotes` fixture (`test/fixtures/generate.ts`): a trunk
- * of 700 commits on `main`, `feature` and `topic` cut from its end, `topic`
+ * of 5 000 commits on `main`, `feature` and `topic` cut from its end, `topic`
  * merged into `main`, a remote-tracking `origin/only-remote` no local branch
  * reaches, and `main` checked out over a dirty working tree. Every page is
  * compared, object name for object name, with what `git log` itself prints for
@@ -35,6 +35,9 @@ import { fixture } from './support/fixtures';
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const SLOW_TEST_MS = 180_000;
+
+/** More commits than the fixture holds, so a Load More of this many reads all of it. */
+const WHOLE_HISTORY = 100_000;
 
 const MORE = '.graph__more';
 
@@ -202,7 +205,7 @@ test.beforeAll(() => {
   if (!existsSync(join(repositoryRoot, 'dist', 'main.cjs'))) {
     throw new Error('run `npm run build` before the end-to-end gate');
   }
-  where = fixture('remotes', 'remotes', 700);
+  where = fixture('remotes', 'remotes', 5000);
 });
 
 test('each selection reads the histories it names, labelled, and decides the uncommitted row', async () => {
@@ -280,14 +283,26 @@ test('a selection racing a load more and a refresh ends on the selection asked f
   test.setTimeout(SLOW_TEST_MS);
   const info = test.info();
   const more: Step = { call: 'loadMore', count: FURTHER_PAGE_COMMITS };
+  // The whole history, which is what makes the last two orders below catch a
+  // Load More applied under a selection it was not read for: asked after the
+  // selection, its read is of all 5 008 commits and the selection's of a first
+  // page. Measured by E03-M01-S09 on 2026-10-25: its reply came back after the
+  // selection had been applied in each of those orders in every run watched —
+  // answered Cancelled in two runs, and drawn last, failing this case, in two
+  // runs with the drop check of `loadMore` planted out. The first three orders
+  // are races whose outcome varies from run to run.
+  const everything: Step = { call: 'loadMore', count: WHOLE_HISTORY };
   const orders: readonly (readonly Step[])[] = [
     [more, { call: 'refresh' }, select(FEATURE), more, select(TOPIC)],
     [select(FEATURE), more, select(TOPIC), more],
     [select(TOPIC), { call: 'refresh' }, more],
+    [select(TOPIC), everything],
+    [select(TOPIC), everything],
   ];
   const histories = [
     gitLog(EVERY, FIRST_PAGE_COMMITS),
     gitLog(EVERY, FIRST_PAGE_COMMITS + FURTHER_PAGE_COMMITS),
+    gitLog(EVERY, WHOLE_HISTORY),
     gitLog([FEATURE], FIRST_PAGE_COMMITS),
     gitLog([TOPIC], FIRST_PAGE_COMMITS),
   ].map((names) => names.join());
