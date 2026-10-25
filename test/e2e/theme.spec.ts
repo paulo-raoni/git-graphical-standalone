@@ -300,6 +300,18 @@ test('the choice survives a relaunch and is the scheme of the first paint', asyn
   await withApplication(home, options, async (launched) => {
     const { page } = launched;
     await expect(control(page)).toHaveValue(against);
+    // The control shows the choice from an IPC reply that does not wait for a
+    // frame, so the first frame's callback may not have run yet: in 6 of 20
+    // runs measured by E03-M01-FIX-01 at 70 to 100 % processor load it had not,
+    // and its two values were there at most 170 ms later. The poll's limit is
+    // the configured `expect` timeout. The callback writes both values once, so
+    // waiting for them reads what the first frame took, never a later frame's.
+    await expect
+      .poll(async () => {
+        const record = await page.evaluate(readFirstFrame);
+        return record !== undefined && 'paintsBefore' in record && 'surface' in record;
+      })
+      .toBe(true);
     expect(await page.evaluate(readFirstFrame)).toEqual({
       dark: against === 'dark',
       beforeRenderer: true,
