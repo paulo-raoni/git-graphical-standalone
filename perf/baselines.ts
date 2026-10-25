@@ -131,21 +131,64 @@ export function compareWithBaseline(
  * flag would be a gate whose CI behaviour lived in the workflow, which
  * `AGENTS.md` §11 forbids.
  *
- * The failure it can have is one-sided and loud. A runner that does not set the
- * variable is held to the strict limits and goes red, which is seen; a
- * development shell that sets it is held to the wide ones and stays green,
- * which would not be — so every message {@link compareInRegime} prints begins
- * with the regime it was held to, and the transcript says which a run was.
- * `CI` empty, `0` or `false` is the strict regime, as it is for the tools that
- * read the same variable.
+ * **Four spellings are read, and every other value is refused.** `CI` unset,
+ * empty or blank, `0` or `false` is the strict regime; `true` or `1` is the
+ * CI regime; case and surrounding white space are ignored. Anything else —
+ * `yes`, `no`, `on`, `off`, a provider's name — throws, and the case that
+ * asked fails with the value in its message. The argument, made by
+ * E03-M01-S05:
+ *
+ * - GitHub Actions sets `true`: its variables reference, read on 2026-10-24,
+ *   gives `CI` as "Always set to `true`". `.github/workflows/ci.yml` does not
+ *   set it. So the CI regime needs `true` and nothing more from the runner.
+ * - Nothing set it on the development machine when that was read the same day,
+ *   neither in a Bash nor in a PowerShell session, for the process, the user or
+ *   the machine. A value there is a person's, typed by hand.
+ * - What a person types decides which way a wrong reading goes, and the two
+ *   ways are not alike. Read as the CI regime, a value meant as "not CI" holds
+ *   the run to limits four times wider (the `ciTolerance` of all eight entries
+ *   of `perf/baselines.json` that have one, read on 2026-10-24) and **stays
+ *   green**, which nobody sees; until this slice `no` and `off` were read that
+ *   way. Read as the strict regime, a value meant as "CI" goes red on a
+ *   runner, which is seen but blames the product. Refusing is the one reading
+ *   that is wrong in neither direction, and it costs a person one retype.
+ * - `1` is kept beside `true` because it is the other spelling of yes a
+ *   shell user reaches for, and this code read it as the CI regime before.
+ *
+ * What is left is one-sided and loud: a runner that does not set the variable
+ * is held to the strict limits and goes red, which is seen. Every message
+ * {@link compareInRegime} prints begins with the regime it was held to, so the
+ * transcript says which a run was. `perf/baselines.perf.test.ts` holds every
+ * spelling named here.
  */
 export type Regime = 'strict' | 'ci';
+
+/**
+ * What each accepted spelling of `CI`, trimmed and in lower case, selects. A
+ * `Map` and not an object, so that `constructor` or `toString` is not found
+ * on a prototype and read as a regime.
+ */
+const REGIMES: ReadonlyMap<string, Regime> = new Map([
+  ['', 'strict'],
+  ['0', 'strict'],
+  ['false', 'strict'],
+  ['1', 'ci'],
+  ['true', 'ci'],
+]);
 
 export function regimeOf(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Regime {
-  const flag = (environment['CI'] ?? '').trim().toLowerCase();
-  return flag === '' || flag === '0' || flag === 'false' ? 'strict' : 'ci';
+  const value = environment['CI'] ?? '';
+  const regime = REGIMES.get(value.trim().toLowerCase());
+  if (regime === undefined) {
+    throw new Error(
+      `CI is set to ${JSON.stringify(value)}, which perf/baselines.ts does not read: set it to ` +
+        `true or 1 for the wide limits of the CI regime, or to false or 0 (or leave it unset) ` +
+        `for the strict limits of the development machine.`,
+    );
+  }
+  return regime;
 }
 
 /**
