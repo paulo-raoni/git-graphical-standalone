@@ -57,9 +57,10 @@ export { plainFiles } from './mutation-output.js';
  * or because the machine was too busy for it to finish inside the clock, is no
  * statement about the mutant either. What the second run says is the verdict:
  *
- * - **vitest's own test timeout again**, alone, with no sign of starving:
- *   killed, by a test the mutant itself keeps from finishing, which is a
- *   detection on a clock exactly as Stryker's `Timeout` is;
+ * - **vitest's own test timeout again**, alone, with no sign of starving, or,
+ *   for a kill chosen for the clock alone, **past the outer clock**: killed, by
+ *   a test the mutant itself keeps from finishing, which is a detection on a
+ *   clock exactly as Stryker's `Timeout` is;
  * - **a failing test**, with no sign of starving: killed, as Stryker said;
  * - **a failed test file and an error that names the mutated file**, with no
  *   failing test and no sign of starving: killed, by its own module breaking on
@@ -68,8 +69,9 @@ export { plainFiles } from './mutation-output.js';
  *   as a survivor, so an unlisted one refuses the build exactly as it would have
  *   if the run had measured it;
  * - **anything else** — starved again, no test and no crash of its own module,
- *   nothing printed, or past the outer clock — refuses the build, naming the
- *   mutant, because neither run says anything about it.
+ *   nothing printed, or past the outer clock for a kill chosen for anything but
+ *   the clock — refuses the build, naming the mutant, because neither run says
+ *   anything about it.
  *
  * The fourth clause is not replaced and its number does not move: it is a
  * validity bound over Stryker's own report, read before this clause and over
@@ -106,6 +108,25 @@ export { plainFiles } from './mutation-output.js';
  * exactly what Stryker's `Timeout` is; it stays a kill and the clock clause goes
  * on counting it, since that clause reads the report as Stryker wrote it. What
  * the clock clause does not do, and this one now does, is run such a kill again.
+ *
+ * **A kill chosen for the clock alone that runs past the outer clock alone is a
+ * kill too**, and a kill chosen for any other reason that does so still refuses.
+ * The first form of S06's change refused it, and S06's first full run at its
+ * head, at `663d720`, was refused for it: `hash-index.ts` 120:7
+ * `ConditionalExpression` to `true`, whose recorded output was one test of
+ * `commit-store.test.ts` timing out on vitest's 15 000 ms clock and nothing
+ * else, ran alone for the whole of `timeoutMS`, 120 000 ms, without ending,
+ * while a review's mutation run of this project held the machine. Replayed
+ * minutes later over the same report, the same mutant alone failed a test. So
+ * it is a mutant that makes that test slow, slow enough to cross either clock
+ * on a busy machine: at FIX-36's base Stryker reported it `Timeout`, as S12's
+ * document records, and the gate has always counted a `Timeout` as a detection.
+ * A mutant the tests do not kill has no such reason to be slow: S09 measured
+ * the healthy suite's worst run at 77.6 s under a deliberately tripled load,
+ * beside six other copies. Refusing it would turn the gate red on unchanged
+ * source for a mutant the tests detect. A kill whose output named no failing
+ * test or said its suite starved is not given the same reading, because nothing
+ * in its first run says a clock was involved.
  *
  * **The line this clause hinges on is `chosen`**, the predicate that picks the
  * kills to re-measure. Narrow it and a starved kill, or one that rests on the
@@ -271,15 +292,26 @@ function runAlone(command, budget) {
   });
 }
 
+/**
+ * A second run past the outer clock: a kill when the first was chosen for vitest's clock and for
+ * nothing else, unmeasured otherwise. See the header.
+ */
+function pastTheOuterClock(suspect, clock) {
+  const reason = String(suspect.mutant.statusReason ?? '');
+  return clock.test(reason) && FAILING_TESTS.test(reason) && !STARVED.test(reason)
+    ? { verdict: 'clock', why: 'ran past the outer clock, alone, as Stryker reports a Timeout' }
+    : { verdict: 'unmeasured', why: 'ran past the outer clock, alone' };
+}
+
 /** What the second run says about the mutant, read in the order the header gives. */
-function verdictOf({ code, timedOut, output }, file, clock) {
-  if (timedOut) return { verdict: 'unmeasured', why: 'ran past the outer clock, alone' };
+function verdictOf({ code, timedOut, output }, suspect, clock) {
+  if (timedOut) return pastTheOuterClock(suspect, clock);
   if (code === 0) return { verdict: 'survived', why: 'every test passed' };
   if (STARVED.test(output)) return { verdict: 'unmeasured', why: 'could not get memory again' };
   if (clock.test(output))
     return { verdict: 'clock', why: "a test ran out of vitest's clock again" };
   if (FAILING_TESTS.test(output)) return { verdict: 'assertion', why: 'a test failed' };
-  if (FAILING_FILES.test(output) && output.includes(`${file}:`)) {
+  if (FAILING_FILES.test(output) && output.includes(`${suspect.file}:`)) {
     return { verdict: 'own crash', why: 'its own module broke a test file on import' };
   }
   return { verdict: 'unmeasured', why: 'no test failed and no error names the mutated file' };
@@ -304,7 +336,7 @@ async function rerunAll(suspects, clock) {
       writeFileSync(target, mutatedSource(suspect.source, suspect.mutant));
       const run = await runAlone(command, budget);
       writeFileSync(target, suspect.source);
-      results.push({ ...suspect, ...run, ...verdictOf(run, suspect.file, clock) });
+      results.push({ ...suspect, ...run, ...verdictOf(run, suspect, clock) });
     }
   } finally {
     removeSandbox();
@@ -343,7 +375,7 @@ function unmeasuredFinding(result) {
 function describeResults(label, results) {
   const count = (verdict) => results.filter((one) => one.verdict === verdict).length;
   const lines = [
-    `${label}: re-measured alone after the run, ${String(results.length)} killed mutants whose recorded output names no failing test, says the suite could not get memory or lost its worker, or carries vitest's own test timeout — ${String(count('assertion'))} failed a test, ${String(count('clock'))} ran out of vitest's clock again, ${String(count('own crash'))} broke their own module on import, ${String(count('survived'))} survived, ${String(count('unmeasured'))} could not be measured\n`,
+    `${label}: re-measured alone after the run, ${String(results.length)} killed mutants whose recorded output names no failing test, says the suite could not get memory or lost its worker, or carries vitest's own test timeout — ${String(count('assertion'))} failed a test, ${String(count('clock'))} ran out of a clock again, ${String(count('own crash'))} broke their own module on import, ${String(count('survived'))} survived, ${String(count('unmeasured'))} could not be measured\n`,
   ];
   for (const result of results) {
     lines.push(
