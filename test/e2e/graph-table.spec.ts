@@ -23,8 +23,8 @@ import { rowViewAt } from '../../src/ui/row-model';
  * The three counters the window is judged on are installed **by the driver, in
  * the page**, so that nothing ships to a user for the sake of a test:
  * `clearRect` runs once per repaint, `requestAnimationFrame` once per frame the
- * view asks for, and `setTimeout` and `setInterval` are what an idle window must
- * not touch at all.
+ * view asks for (and its callback once more when that frame has run), and
+ * `setTimeout` and `setInterval` are what an idle window must not touch at all.
  *
  * The pure arithmetic under this view is in `graph-geometry.spec.ts`, which says
  * why neither file is a colocated `src/ui/*.test.ts`.
@@ -165,7 +165,7 @@ function fixturePage(count: number, dirty: boolean, hasMore: boolean): GraphPage
   };
 }
 
-type Counters = Record<'frames' | 'draws' | 'strokes' | 'timers' | 'asked', number>;
+type Counters = Record<'frames' | 'ran' | 'draws' | 'strokes' | 'timers' | 'asked', number>;
 
 type Timer = (callback: () => void, ms?: number) => number;
 
@@ -231,30 +231,36 @@ function measureViewport(): number {
 }
 
 /**
- * Runs in the page: count frames, repaints, strokes and timer registrations.
+ * Runs in the page: count frames asked for and run, repaints, strokes and timer
+ * registrations.
  *
  * Installed through `addInitScript` and a reload, so that it is in place
  * **before** `renderer.js` runs. Installed afterwards it would miss whatever the
  * view registered while mounting, which is exactly where a polling loop would be
  * written, and `timers` would then be zero for a window that wakes ten times a
  * second.
+ *
+ * `frames` counts the frames the view asks for, when it asks; `ran` counts them
+ * again once their callback has returned, and `readCounters` reports the
+ * difference as `due`. No frame the view asked for is still to run when `due`
+ * is 0, which is what a case waits for before it reads a count a frame changes.
  */
 function installCounters(): void {
   const scope = globalThis as unknown as PageScope;
-  const counters: Counters = { frames: 0, draws: 0, strokes: 0, timers: 0, asked: 0 };
+  const counters: Counters = { frames: 0, ran: 0, draws: 0, strokes: 0, timers: 0, asked: 0 };
   scope.fixtureCounters = counters;
   const counted =
     (original: Timer, key: 'frames' | 'timers'): Timer =>
     (callback, ms): number => {
       counters[key] += 1;
-      return original(callback, ms);
+      // A frame is counted again, in `ran`, once its callback has returned.
+      return original(() => (callback(), (counters.ran += Number(key === 'frames'))), ms);
     };
   scope.requestAnimationFrame = counted(scope.requestAnimationFrame.bind(scope), 'frames');
   scope.setTimeout = counted(scope.setTimeout.bind(scope), 'timers');
   scope.setInterval = counted(scope.setInterval.bind(scope), 'timers');
   const prototype = scope.CanvasRenderingContext2D.prototype;
-  const clear = prototype.clearRect;
-  const stroke = prototype.stroke;
+  const { clearRect: clear, stroke } = prototype;
   prototype.clearRect = function counting(this: ContextLike, ...box: number[]): void {
     counters.draws += 1;
     clear.call(this, box[0] ?? 0, box[1] ?? 0, box[2] ?? 0, box[3] ?? 0);
@@ -265,10 +271,13 @@ function installCounters(): void {
   };
 }
 
-/** Runs in the page: what the counters say now, and whether the intent arrived. */
-function readCounters(): Counters {
-  const scope = globalThis as unknown as PageScope;
-  return { ...scope.fixtureCounters, asked: scope.loadMoreAsked ? 1 : 0 };
+/**
+ * Runs in the page: what the counters say now, whether the intent arrived, and
+ * how many frames the view asked for are still to run.
+ */
+function readCounters(): Counters & { due: number } {
+  const { fixtureCounters: counted, loadMoreAsked } = globalThis as unknown as PageScope;
+  return { ...counted, asked: loadMoreAsked ? 1 : 0, due: counted.frames - counted.ran };
 }
 
 /**
@@ -356,14 +365,20 @@ test('the window draws a page: rows, labels, lines and the Load More control', a
 
 test('live row elements stay inside the budget, at page sizes an order apart', async () => {
   await withWindow(async (page) => {
+    // The rows are made and written by the frame the view asks for, so a count
+    // read before that frame has run reads the rows of the page before, or none.
+    // Every count waits until no frame the view asked for is still to run, never
+    // for a time; the poll's limit is the configured `expect` one.
+    await page.addInitScript(installCounters);
+    await page.reload();
     await page.evaluate(handPage, fixturePage(1000, false, true));
-    await page.waitForTimeout(200);
+    await expect.poll(() => page.evaluate(readCounters)).toMatchObject({ due: 0 });
     const bound = visibleRowCount(await page.evaluate(measureViewport)) + 2 * OVERSCAN_ROWS;
     const small = await page.locator('.row').count();
     await page.evaluate(handPage, fixturePage(10000, false, true));
     for (const offset of [40000, 120000, 239000, 0]) {
       await page.evaluate(scrollTo, [offset]);
-      await page.waitForTimeout(120);
+      await expect.poll(() => page.evaluate(readCounters)).toMatchObject({ due: 0 });
     }
     const large = await page.locator('.row').count();
     process.stdout.write(
@@ -380,19 +395,30 @@ test('scroll events in one task cost one redraw, and an idle window costs none',
     await page.addInitScript(installCounters);
     await page.reload();
     await page.evaluate(handPage, fixturePage(10000, false, true));
-    await page.waitForTimeout(400);
+    // Wait for what is counted, never for a time: under load the reviewer of
+    // E03-M01's round 02 read no draw at all 800 ms after the page was handed.
+    // First no frame the handed page asked for is still to run, which is after
+    // it was drawn, so the burst asks for a frame of its own; then no frame the
+    // burst asked for is still to run. The burst asks for all of its frames in
+    // one task, so they all run in one frame and `after` holds every one of them,
+    // as many as a renderer over its bound asks for. A poll's limit is the
+    // configured `expect` one.
+    await expect.poll(() => page.evaluate(readCounters)).toMatchObject({ due: 0 });
     const settled = await page.evaluate(readCounters);
     const burst = Array.from({ length: 25 }, (_unused, step) => (step + 1) * 53);
     expect(await page.evaluate(scrollTo, burst)).toBe(25 * 53);
-    await page.waitForTimeout(400);
+    await expect.poll(() => page.evaluate(readCounters)).toMatchObject({ due: 0 });
     const after = await page.evaluate(readCounters);
-    process.stdout.write(
-      `burst of 25 offsets: ${String(after.draws - settled.draws)} redraws in ` +
-        `${String(after.frames - settled.frames)} frames\n`,
-    );
+    const [drew, ask] = [after.draws - settled.draws, after.frames - settled.frames];
+    process.stdout.write(`burst of 25 offsets: ${String(drew)} redraws in ${String(ask)} frames\n`);
+    expect(settled.draws).toBeGreaterThan(0);
     expect(after.draws).toBeGreaterThan(settled.draws);
     expect(after.draws - settled.draws).toBeLessThanOrEqual(2);
     expect(after.draws).toBeLessThanOrEqual(after.frames);
+    // The idle stretch holds an absence, so it is a time by nature, kept at the
+    // two seconds it had. A timer is counted from the page's first script,
+    // whatever its period, so the length bounds only frames: a frame loop asks
+    // again from inside a frame that runs, and `frames` counts it when it asks.
     await page.waitForTimeout(2000);
     const idle = await page.evaluate(readCounters);
     expect(idle.frames).toBe(after.frames);
