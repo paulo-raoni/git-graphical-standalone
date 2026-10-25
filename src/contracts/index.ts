@@ -60,6 +60,7 @@ export { CHANNELS, ThemeChoice } from './ipc';
 export type {
   ApplicationInfo,
   ApplicationInfoResponse,
+  BranchSelection,
   ChannelName,
   ChooseFolderResponse,
   ChooseThemeRequest,

@@ -10,6 +10,7 @@ import type {
   GraphPage,
   LoadMoreCommitsRequest,
   OpenRepositoryRequest,
+  RefreshRequest,
   Result,
   StartupRepositoryResponse,
   ThemeChoiceResponse,
@@ -32,6 +33,12 @@ import type { ThemeStore } from './theme';
  * or the write of a few bytes of settings, which is what
  * `docs/ADR-0002-architecture-and-performance.md` decision 2 requires of the
  * process that owns the window.
+ *
+ * An open and a refresh are forwarded **whole**, the request spread into the
+ * question with its `kind` written over it, rather than field by field: the
+ * branch selection they can carry is the utility process's to read
+ * (`./repository-host.ts`), and naming its fields here would be bytes of the
+ * process that owns the window spent on a decision it does not take.
  *
  * The handlers are registered once, for the application rather than for a
  * window, because `ipcMain.handle` is keyed by channel and a second registration
@@ -110,7 +117,7 @@ export function registerHandlers(context: HandlerContext): void {
   ipcMain.handle(
     CHANNELS.openRepository,
     (_event: unknown, request: OpenRepositoryRequest): Promise<Result<GraphPage>> =>
-      context.client.ask<GraphPage>({ kind: 'open', path: request.path }),
+      context.client.ask<GraphPage>({ ...request, kind: 'open' }),
   );
 
   ipcMain.handle(CHANNELS.chooseFolder, (): Promise<ChooseFolderResponse> => chooseFolder(context));
@@ -121,8 +128,10 @@ export function registerHandlers(context: HandlerContext): void {
       context.client.ask<GraphPage>({ kind: 'load-more', count: request.count }),
   );
 
-  ipcMain.handle(CHANNELS.refresh, (): Promise<Result<GraphPage>> =>
-    context.client.ask<GraphPage>({ kind: 'refresh' }),
+  ipcMain.handle(
+    CHANNELS.refresh,
+    (_event: unknown, request: RefreshRequest): Promise<Result<GraphPage>> =>
+      context.client.ask<GraphPage>({ ...request, kind: 'refresh' }),
   );
 
   ipcMain.handle(CHANNELS.applicationInfo, (): Promise<ApplicationInfoResponse> =>

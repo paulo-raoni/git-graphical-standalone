@@ -13,6 +13,11 @@ type ApplicationInfoResponse = import("./result").Failure | import("./result").S
 
 value BRIDGE_GLOBAL_NAME: "gitGraphical"
 
+interface BranchSelection {
+    readonly branches: readonly string[] | null
+    readonly showRemoteBranches: boolean
+}
+
 value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
 
 type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info" | "theme:choice" | "theme:choose"
@@ -96,6 +101,7 @@ type LoadMoreCommitsResponse = import("./result").Failure | import("./result").S
 
 interface OpenRepositoryRequest {
     readonly path: string
+    readonly showRemoteBranches?: boolean
 }
 
 type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
@@ -116,7 +122,9 @@ value RefFlag: { readonly CheckedOut: 1; readonly AnnotatedTag: 2; readonly Deta
 type RefKind = 0 | 1 | 2 | 4 | 3
 value RefKind: { readonly LocalHead: 0; readonly RemoteBranch: 1; readonly Tag: 2; readonly RemoteSymbolicHead: 3; readonly Stash: 4; }
 
-type RefreshRequest = { [x: string]: never; }
+interface RefreshRequest {
+    readonly selection?: BranchSelection
+}
 
 type RefreshResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
 

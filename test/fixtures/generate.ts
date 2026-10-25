@@ -116,13 +116,14 @@ interface Workspace {
   readonly clock: Clock;
 }
 
-/** Run git without creating an object, so the clock does not move. */
-function git(workspace: Workspace, args: readonly string[], input?: string): string {
-  const environment = environmentFor(
-    workspace.identity,
-    stampOf(workspace.clock),
-    workspace.directory,
-  );
+/** Run git in the workspace with every identity and stamp set to `stamp`. */
+function gitStamped(
+  workspace: Workspace,
+  stamp: string,
+  args: readonly string[],
+  input?: string,
+): string {
+  const environment = environmentFor(workspace.identity, stamp, workspace.directory);
   const configured = CONFIGURATION.flatMap((setting) => ['-c', setting]);
   return execFileSync('git', [...configured, ...args], {
     cwd: workspace.directory,
@@ -132,19 +133,14 @@ function git(workspace: Workspace, args: readonly string[], input?: string): str
   });
 }
 
+/** Run git without creating an object, so the clock does not move. */
+function git(workspace: Workspace, args: readonly string[], input?: string): string {
+  return gitStamped(workspace, stampOf(workspace.clock), args, input);
+}
+
 /** Run git to create an object, consuming this commit's slot on the clock. */
 function gitAt(workspace: Workspace, args: readonly string[]): string {
-  const environment = environmentFor(
-    workspace.identity,
-    takeStamp(workspace.clock),
-    workspace.directory,
-  );
-  const configured = CONFIGURATION.flatMap((setting) => ['-c', setting]);
-  return execFileSync('git', [...configured, ...args], {
-    cwd: workspace.directory,
-    env: environment,
-    encoding: 'utf8',
-  });
+  return gitStamped(workspace, takeStamp(workspace.clock), args);
 }
 
 function writeFile(workspace: Workspace, name: string, content: string): void {
@@ -240,6 +236,51 @@ function largeHistory(workspace: Workspace, count: number): void {
   git(workspace, ['reset', '--quiet', '--hard', 'main']);
 }
 
+/** The branches `remotes` cuts from the trunk: name, how far below `main`, how many commits. */
+const BRANCHED_OFF = ['only-remote 8 2', 'feature 5 3', 'topic 3 2'];
+
+/**
+ * Remote-tracking branches beside several local ones: the shape a branch
+ * selection is read from.
+ *
+ * `count` commits of trunk on `main`, written as `largeHistory` writes them so
+ * that a trunk long enough for a selected branch to need a Load More costs one
+ * process. Then, each cut near the trunk's end and each committed to a file of
+ * its own by `linearCommits`:
+ * `origin/only-remote`, two commits that a remote-tracking branch reaches and
+ * no local branch does; `feature`, three commits, with `origin/feature` one
+ * behind it; and `topic`, two commits, merged into `main` by a merge commit that
+ * `origin/main` does not have yet. `release` is a local branch inside the
+ * trunk, `refs/remotes/origin/HEAD` names `origin/main`, the lightweight tag
+ * `light` and the annotated tag `annotated` sit on the trunk, and `main` is
+ * checked out with a modified file and an untracked one, as `dirtyWorkingTree`
+ * leaves it, so the uncommitted row has something to show.
+ *
+ * The remote-tracking refs are written with `update-ref`, which is all a fetch
+ * leaves behind that a page reads: no remote is configured, because nothing
+ * here asks git about one. `only-remote` is a local branch only while it is
+ * built, and is deleted in the same transaction that gives its commits to
+ * `origin/only-remote`.
+ */
+function remotes(workspace: Workspace, count: number): void {
+  largeHistory(workspace, count);
+  git(workspace, ['branch', 'release', 'main~30']);
+  git(workspace, ['tag', 'light', 'main~20']);
+  gitAt(workspace, ['tag', '--annotate', '-m', 'a described release', 'annotated', 'main~1']);
+  for (const branch of BRANCHED_OFF) {
+    const [name = '', back = '', commits = ''] = branch.split(' ');
+    git(workspace, ['switch', '--quiet', '--create', name, `main~${back}`]);
+    linearCommits(workspace, Number(commits), `${name}.txt`);
+  }
+  git(workspace, ['switch', '--quiet', 'main']);
+  gitAt(workspace, ['merge', '--quiet', '--no-ff', '-m', 'merge the topic', 'topic']);
+  const origin = 'update refs/remotes/origin/';
+  const moves = `${origin}main main^1\n${origin}feature feature~1\n${origin}only-remote only-remote\n`;
+  git(workspace, ['update-ref', '--stdin'], `${moves}delete refs/heads/only-remote\n`);
+  git(workspace, ['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main']);
+  dirtyWorkingTree(workspace, 0);
+}
+
 const SHAPES = new Map<string, (workspace: Workspace, count: number) => void>([
   ['linear', linearCommits],
   ['branch-and-merge', branchAndMerge],
@@ -249,6 +290,7 @@ const SHAPES = new Map<string, (workspace: Workspace, count: number) => void>([
   ['detached-head', detachedHead],
   ['dirty-working-tree', dirtyWorkingTree],
   ['large', largeHistory],
+  ['remotes', remotes],
 ]);
 
 /** Where this generator's own specification lives. */

@@ -87,6 +87,7 @@ const SHAPES = [
   'detached-head',
   'dirty-working-tree',
   'large',
+  'remotes',
 ];
 
 let empty = '';

@@ -60,6 +60,7 @@
       "src/core/page/continues-block.ts",
       "src/core/page/graph-page.ts",
       "src/core/page/row-block.ts",
+      "src/core/page/shown-working-tree.ts",
       "src/core/parse/bytes.ts",
       "src/core/parse/commit-log.ts",
       "src/core/parse/commit-lookup.ts",

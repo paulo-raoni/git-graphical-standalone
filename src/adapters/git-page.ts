@@ -20,6 +20,7 @@ import {
   resolveCommitRows,
 } from '../core/parse/index';
 import type { ReferenceList, StatusFacts } from '../core/parse/index';
+import { shownWorkingTree } from '../core/page/index';
 import { appendCommit, buildCommitColumns, createCommitStoreBuilder } from '../core/store/index';
 import type { PageRequest, RepositoryPage } from '../ports/index';
 
@@ -27,6 +28,7 @@ import {
   commitLogArgs,
   referenceArgs,
   repositoryProbeArgs,
+  selectsAnyRevision,
   stashArgs,
   statusArgs,
 } from './git-commands';
@@ -58,6 +60,10 @@ interface PagedCommits {
  * dropped rather than stored: it is how "are there more" is answered without a
  * second walk of the history, and it is the only reason this function counts at
  * all.
+ *
+ * A selection that names no branch to read runs no log at all and reads an empty
+ * page, because a log given no revision walks HEAD (`selectsAnyRevision` in
+ * `./git-commands.ts`).
  */
 async function readCommits(
   executable: string,
@@ -65,6 +71,9 @@ async function readCommits(
 ): Promise<Result<PagedCommits>> {
   const builder = createCommitStoreBuilder(request.pageSize);
   let seen = 0;
+  if (!selectsAnyRevision(request.selection)) {
+    return { ok: true, value: { columns: buildCommitColumns(builder), hasMore: false } };
+  }
   const parser = createCommitLogParser((commit) => {
     seen += 1;
     if (seen <= request.pageSize) {
@@ -73,7 +82,7 @@ async function readCommits(
   });
   const outcome = await runGit({
     executable,
-    args: commitLogArgs(request.repositoryPath, request.pageSize + 1),
+    args: commitLogArgs(request.repositoryPath, request.pageSize + 1, request.selection),
     onOutput: (chunk) => {
       pushCommitLog(parser, chunk);
     },
@@ -91,13 +100,14 @@ async function readCommits(
 /** Read the references and the stash entries into one list. */
 async function readReferences(
   executable: string,
-  repositoryPath: string,
+  request: PageRequest,
 ): Promise<Result<ReferenceList>> {
+  const { repositoryPath } = request;
   const list = createReferenceList();
   const references = createReferenceParser(list);
   const named = await runGit({
     executable,
-    args: referenceArgs(repositoryPath),
+    args: referenceArgs(repositoryPath, request.selection?.showRemoteBranches),
     onOutput: (chunk) => {
       pushReferences(references, chunk);
     },
@@ -157,8 +167,13 @@ function targetsWithHead(list: ReferenceList, facts: StatusFacts): Uint8Array {
   return targets;
 }
 
-/** Join the four readings into the page the port promises. */
-function assemble(commits: PagedCommits, list: ReferenceList, facts: StatusFacts): RepositoryPage {
+/** Join the four readings into the page the port promises, under the selection it was read for. */
+function assemble(
+  request: PageRequest,
+  commits: PagedCommits,
+  list: ReferenceList,
+  facts: StatusFacts,
+): RepositoryPage {
   const targets = targetsWithHead(list, facts);
   const rows = resolveCommitRows(
     targets,
@@ -171,7 +186,7 @@ function assemble(commits: PagedCommits, list: ReferenceList, facts: StatusFacts
   return {
     commits: commits.columns,
     refs: buildRefs(list, rows),
-    workingTree: buildWorkingTree(facts, headRow),
+    workingTree: shownWorkingTree(buildWorkingTree(facts, headRow), request.selection),
     hasMore: commits.hasMore,
   };
 }
@@ -198,7 +213,7 @@ export async function readGitPage(
   if (!commits.ok) {
     return commits;
   }
-  const references = await readReferences(executable, request.repositoryPath);
+  const references = await readReferences(executable, request);
   if (!references.ok) {
     return references;
   }
@@ -206,5 +221,5 @@ export async function readGitPage(
   if (!status.ok) {
     return status;
   }
-  return { ok: true, value: assemble(commits.value, references.value, status.value) };
+  return { ok: true, value: assemble(request, commits.value, references.value, status.value) };
 }
