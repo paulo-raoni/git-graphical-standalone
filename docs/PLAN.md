@@ -511,6 +511,27 @@ sentences in the orchestrator's own documents, were corrected in `bd9c65e`.)
     every local gate green, and only a hand-made coloured replay caught it. A committed coloured fixture replayed by
     a check would hold it.
 
+From E03-M01's review round 02 (2026-10-25, at `bcfef2e`):
+
+11. `scripts/gates/commits.js`'s range selection is held by no committed check: round 02's mutation of it (removing
+    `--no-contains=HEAD`) kept every gate green and would leave each promotion's release merge read by no range. At
+    `main`'s tip `f1e3db7` the default range is `v0.0.0..HEAD` and red on that commit's subject, as before
+    E03-M01-S07; a CI run on `main` before the next promotion would show it.
+12. `test/fixtures/shared-store.ts`'s "one past the highest" copy numbering is held by no case (round 02's mutation of
+    it survived 36 of 36).
+13. `test/fixtures/shared-store.test.ts` is at 298 of the 300 lines `max-lines` allows, so the next store case needs
+    the file split first.
+14. `vitest.fixtures.config.js`'s header says two suites live there; it now also collects `test/e2e-partition.test.ts`.
+15. "No number is used twice" (`shared-store.ts` header, the S05 slice document, the last case's comment) overstates
+    the code: by round 02's reading, a process that lists the copies after another removed the only copy, and
+    before that one publishes the next, builds copy 1 again.
+16. Under saturated load the application project's waits run out (round 02 and E03-M01-S07 saw 60 s test timeouts in
+    `open-repository.spec.ts` and `graph-table.spec.ts`, and a 10 s `expect` in `stale-load-more.spec.ts`). Whether
+    `gates:e2e` needs a load rule of its own or longer limits is the owner's call.
+17. `gates:e2e` took 20.0 minutes at 100 % load against round 01's 3.1 minutes; the quick tier's cost on a loaded
+    machine is dominated by it.
+18. `gates:budgets` had no kept reading in round 02; the last kept one is E03-M01-S05's. Owed on a free machine.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
