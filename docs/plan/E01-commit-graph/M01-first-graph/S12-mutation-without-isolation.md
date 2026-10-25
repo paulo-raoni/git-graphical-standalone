@@ -20,7 +20,12 @@ Every measurement below was taken by this lane on 2026-10-10 and 2026-10-11, on 
 machine, with times in UTC. The base is `ef3981f`; the commit that adds the flag is `ab6dc36`.
 
 **What it bought, on a free machine:** the gate took **77.5 minutes** with isolation and **35.0 minutes**
-without, two runs taken one after the other with nothing else in the process table. **What it cost** is in
+without, two runs taken one after the other with nothing else in the process table. *Free* in this document
+means what *How long it takes now* defines: no other work in any of the process table's minute samples. It is
+not `AGENTS.md` §11's measured state, the load of everything but the reading's own process tree under 40 %
+in samples every five seconds or oftener: this lane sampled the processor every ten seconds and for the
+whole machine, its own run included, so its samples cannot say whether §11's rule held. The distinction is
+review round 21's finding, written here by E03-M01-S06. **What it cost** is in
 *Kills that name no failing test* below, and should be read before this is relied on.
 
 ## Why it could not simply be switched on
@@ -220,8 +225,9 @@ killed by an assertion in the same output — the segment buffer's own test fail
 reports — so the status did not move; the gate's clock clause counted them, 49 of 1 350 and 3.6 % in place of
 47 and 3.5 %.
 
-This is the mutant and the load, not the flag. With the first of those mutants planted by hand and the
-suite run directly, on 2026-10-11 at 01:56:
+By this lane's reading, this is the mutant and the load, not the flag: an inference from the table below,
+which shows the test crossing the clock with the flag and without, and not a measurement that separates the
+three. With the first of those mutants planted by hand and the suite run directly, on 2026-10-11 at 01:56:
 
 | the command, mutant planted | copies at once | that test took | crossed 15 000 ms |
 | --- | --- | --- | --- |
