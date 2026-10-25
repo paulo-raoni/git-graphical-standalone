@@ -1,6 +1,6 @@
 import { createGitRepositoryReader } from '../adapters/git-repository-reader';
 import { FailureKind } from '../contracts/index';
-import type { GraphPage, Result } from '../contracts/index';
+import type { BranchSelection, GraphPage, Result } from '../contracts/index';
 import { createLayoutState, layoutPage } from '../core/layout/index';
 import type { LayoutState } from '../core/layout/index';
 import { addPage, continuesBlock, createRowBlock, FIRST_PAGE_COMMITS } from '../core/page/index';
@@ -21,11 +21,11 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * file is that process's whole program. It imports no Electron module — a
  * utility process has none — and talks over `process.parentPort` alone.
  *
- * It owns exactly four things for as long as a repository is open: the reader,
- * the accumulated row block, the layout state, and the object names the block
- * was laid out from — and, for as long as it runs,
- * a count of the opens asked for, which is how a late reply is recognised (see
- * *What can be in flight at once* below). The commit store is inside
+ * It owns exactly five things for as long as a repository is open: the reader,
+ * the branch selection every read is made under, the accumulated row block, the
+ * layout state, and the object names the block was laid out from — and, for as
+ * long as it runs, a count of the opens and selections asked for, which is how a
+ * late reply is recognised (see *What can be in flight at once* below). The commit store is inside
  * the reader's answer and is rebuilt by every read; see *How a further page is
  * read* below.
  *
@@ -68,20 +68,31 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
 const reader = createGitRepositoryReader();
 
 /**
- * Everything one open repository needs between pages.
+ * Everything one open repository needs between pages, under one branch selection.
  *
- * **Its identity is the repository's identity.** An open makes a new one and
- * nothing else does: a Refresh replaces the block and the layout *inside* it,
- * and a Load More appends to them or, when the repository has changed, replaces
- * them too. So `open` still being the object a request captured before its read
- * is exactly "nothing was opened meanwhile", which is what *What can be in flight
- * at once* below turns on.
+ * **Its identity is the identity of the repository and of the selection.** An
+ * open makes a new one, and so does applying a selection; nothing else does: a
+ * Refresh replaces the block and the layout *inside* it, and a Load More appends
+ * to them or, when the repository has changed, replaces them too. So `open`
+ * still being the object a request captured before its read is exactly "nothing
+ * was opened and no selection was applied meanwhile", which is what *What can be
+ * in flight at once* below turns on — and it is what keeps a page read under one
+ * selection from being appended to a block laid out under another: every read is
+ * made under the `selection` of the object it will be applied to, and is applied
+ * only while that object is still `open`.
  */
 interface OpenRepository {
   /** The path the repository was opened by, which every later read repeats. */
   readonly path: string;
-  /** Which open made this, counted in the order opens were asked for. */
+  /**
+   * Which open made this, counted in the order opens and selections were asked
+   * for. A selection applied later keeps it, because it is the same open.
+   */
   readonly ticket: number;
+  /** The branches every read of this state is made under. */
+  readonly selection: BranchSelection;
+  /** Which request applied `selection`, on the same count: the open's own ticket until one is. */
+  readonly selectedBy: number;
   /** Every row laid out so far, appended to while the history stays the same. */
   block: RowBlock;
   /** The open lanes the next page continues from. */
@@ -96,8 +107,8 @@ interface OpenRepository {
 
 let open: OpenRepository | null = null;
 
-/** How many opens have been asked for, which is the ticket the next one takes. */
-let opensAsked = 0;
+/** How many opens and selections have been asked for; the next one takes the next number. */
+let asked = 0;
 
 /**
  * ### What can be in flight at once
@@ -116,7 +127,12 @@ let opensAsked = 0;
  * succeeded or failed, because a failure of the repository that was replaced
  * shown over the one that replaced it is the same defect in another form. An
  * Open takes a ticket before its read and is dropped the same way if an open
- * asked for after it has already been applied.
+ * asked for after it has already been applied. A selection takes a ticket on the
+ * same count and is dropped if a different repository is open by then, or if a
+ * selection asked for after it has already been applied; applying one replaces
+ * the state, so every Load More and Refresh read under the selection before it
+ * is dropped as well. So whatever order the reads finish in, the window ends on
+ * the folder opened last and, within it, on the selection asked for last.
  *
  * A Refresh and a Load More of the **same** repository are not dropped for
  * overtaking each other, and do not need to be: both are a whole page of the
@@ -128,7 +144,8 @@ let opensAsked = 0;
 function superseded(): Result<never> {
   return failed(
     FailureKind.Cancelled,
-    'Another repository was opened while this one was being read, so this reply was dropped.',
+    'Another repository was opened, or another branch selection applied, while this page ' +
+      'was being read, so this reply was dropped.',
   );
 }
 
@@ -148,6 +165,24 @@ function assemble(repository: OpenRepository, read: RepositoryPage): Result<Grap
   return { ok: true, value: page };
 }
 
+/** The state of a repository about to be laid out from nothing, under `selection`. */
+function laidOutNothing(
+  path: string,
+  ticket: number,
+  selection: BranchSelection,
+  selectedBy: number,
+): OpenRepository {
+  return {
+    path,
+    ticket,
+    selection,
+    selectedBy,
+    block: createRowBlock(),
+    layout: createLayoutState(),
+    laidOutFrom: new Uint8Array(0),
+  };
+}
+
 /** Forget every row laid out, so that the next reading is laid out whole. */
 function startOver(repository: OpenRepository): void {
   repository.block = createRowBlock();
@@ -164,24 +199,29 @@ function startOver(repository: OpenRepository): void {
  * An open whose read returns after an open asked for **later** has been applied
  * is dropped, succeeded or not: the window must end on the folder chosen last,
  * and the reads of two folders finish in whatever order git finishes them.
+ *
+ * It opens on every branch, with remote-tracking branches shown unless the
+ * request says `false`.
  */
-async function openRepository(path: string): Promise<Result<GraphPage>> {
-  opensAsked += 1;
-  const ticket = opensAsked;
-  const read = await reader.readPage({ repositoryPath: path, pageSize: FIRST_PAGE_COMMITS });
+async function openRepository(
+  path: string,
+  showRemoteBranches: boolean | undefined,
+): Promise<Result<GraphPage>> {
+  asked += 1;
+  const ticket = asked;
+  const selection = { branches: null, showRemoteBranches: showRemoteBranches !== false };
+  const read = await reader.readPage({
+    repositoryPath: path,
+    pageSize: FIRST_PAGE_COMMITS,
+    selection,
+  });
   if (open !== null && open.ticket > ticket) {
     return superseded();
   }
   if (!read.ok) {
     return read;
   }
-  const repository: OpenRepository = {
-    path,
-    ticket,
-    block: createRowBlock(),
-    layout: createLayoutState(),
-    laidOutFrom: new Uint8Array(0),
-  };
+  const repository = laidOutNothing(path, ticket, selection, ticket);
   open = repository;
   return assemble(repository, read.value);
 }
@@ -202,7 +242,11 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
     return failed(FailureKind.Cancelled, 'No repository is open, so there is nothing to add to.');
   }
   const pageSize = repository.block.rowCount + count;
-  const read = await reader.readPage({ repositoryPath: repository.path, pageSize });
+  const read = await reader.readPage({
+    repositoryPath: repository.path,
+    pageSize,
+    selection: repository.selection,
+  });
   if (open !== repository) {
     return superseded();
   }
@@ -228,14 +272,24 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
  * It asks for as many commits as were loaded, and never for fewer than a first
  * page: a repository with five commits loaded and six commits in it would
  * otherwise answer with five and hide the newest one behind a Load More.
+ *
+ * It reads under the selection in force. With a `selection` it applies that one
+ * instead, which is {@link select}.
  */
-async function refresh(): Promise<Result<GraphPage>> {
+async function refresh(selection: BranchSelection | undefined): Promise<Result<GraphPage>> {
   const repository = open;
   if (repository === null) {
     return failed(FailureKind.Cancelled, 'No repository is open, so there is nothing to refresh.');
   }
+  if (selection !== undefined) {
+    return select(repository, selection);
+  }
   const pageSize = Math.max(repository.block.rowCount, FIRST_PAGE_COMMITS);
-  const read = await reader.readPage({ repositoryPath: repository.path, pageSize });
+  const read = await reader.readPage({
+    repositoryPath: repository.path,
+    pageSize,
+    selection: repository.selection,
+  });
   if (open !== repository) {
     return superseded();
   }
@@ -246,15 +300,48 @@ async function refresh(): Promise<Result<GraphPage>> {
   return assemble(repository, read.value);
 }
 
+/**
+ * Apply `selection` to the open repository and answer its first page, laid out
+ * from a fresh block and a fresh layout state, in a state of its own.
+ *
+ * A first page, whatever was loaded before: the rows loaded under the old
+ * selection say nothing about how many the new one should show. The state is
+ * replaced only once the read has succeeded, so a failed read leaves the
+ * selection that was in force still in force, and still loaded. The reply is
+ * dropped if a different repository is open by then, or if a selection asked for
+ * after this one has already been applied.
+ */
+async function select(
+  repository: OpenRepository,
+  selection: BranchSelection,
+): Promise<Result<GraphPage>> {
+  asked += 1;
+  const ticket = asked;
+  const read = await reader.readPage({
+    repositoryPath: repository.path,
+    pageSize: FIRST_PAGE_COMMITS,
+    selection,
+  });
+  if (open?.ticket !== repository.ticket || open.selectedBy > ticket) {
+    return superseded();
+  }
+  if (!read.ok) {
+    return read;
+  }
+  const selected = laidOutNothing(repository.path, repository.ticket, selection, ticket);
+  open = selected;
+  return assemble(selected, read.value);
+}
+
 /** The answer to one request, as a value; nothing here throws at the caller. */
 async function answer(request: RepositoryRequest): Promise<Result<GraphPage | ReaderDescription>> {
   switch (request.kind) {
     case 'open':
-      return openRepository(request.path);
+      return openRepository(request.path, request.showRemoteBranches);
     case 'load-more':
       return loadMore(request.count);
     case 'refresh':
-      return refresh();
+      return refresh(request.selection);
     case 'describe':
       return reader.describe();
   }
