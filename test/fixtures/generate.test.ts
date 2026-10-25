@@ -45,13 +45,14 @@ describe('the fixture repositories', () => {
     expect(generated).toEqual(expected);
   });
 
-  it('include every shape wave three needs', () => {
+  it('include every shape wave three and E03-M01-S09 need', () => {
     expect(Object.keys(generated).sort()).toEqual([
       'branch-and-merge',
       'detached-head',
       'dirty-working-tree',
       'large',
       'linear',
+      'remotes',
       'stash',
       'tags',
       'two-roots',
@@ -81,12 +82,15 @@ describe('generating the same repository twice', () => {
     rmSync(scratch, { recursive: true, force: true });
   });
 
-  // Two shapes rather than all eight: between them they cover an ordinary
-  // commit, a branch, a merge and the commits git writes for a stash, and every
-  // shape is compared against its recorded object names by the suite above.
-  // Building all eight twice would add half a minute to every gate run to
-  // re-prove the same property.
-  const shapes = ['branch-and-merge', 'stash'];
+  // Three shapes rather than all nine: between them they cover an ordinary
+  // commit, a branch, a merge, the commits git writes for a stash, and a
+  // `fast-import` stream that writes remote-tracking refs and an annotated tag
+  // beside a symbolic ref, and every shape is compared against its recorded
+  // object names by the suite above. Building all nine twice would add half a
+  // minute to every gate run to re-prove the same property; `remotes` was built
+  // in 1.5 seconds, wall clock, by one generation on the development machine
+  // under full load on 2026-10-25, which is why it is the third.
+  const shapes = ['branch-and-merge', 'stash', 'remotes'];
 
   it('produces the same object names both times', () => {
     for (const repository of specification.repositories.filter((one) =>

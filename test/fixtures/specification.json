@@ -16,6 +16,7 @@
     { "name": "stash", "shape": "stash", "commits": 2 },
     { "name": "detached-head", "shape": "detached-head", "commits": 3 },
     { "name": "dirty-working-tree", "shape": "dirty-working-tree", "commits": 2 },
-    { "name": "large", "shape": "large", "commits": 10000 }
+    { "name": "large", "shape": "large", "commits": 10000 },
+    { "name": "remotes", "shape": "remotes", "commits": 700 }
   ]
 }
