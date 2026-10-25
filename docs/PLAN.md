@@ -531,6 +531,27 @@ From E03-M01's review round 02 (2026-10-25, at `bcfef2e`):
 17. `gates:e2e` took 20.0 minutes at 100 % load against round 01's 3.1 minutes; the quick tier's cost on a loaded
     machine is dominated by it.
 18. `gates:budgets` had no kept reading in round 02; the last kept one is E03-M01-S05's. Owed on a free machine.
+    **Closed** by round 03 (at `4c7ff80`): every case had a kept reading, every kept reading green, across two
+    invocations (the round's own record).
+
+From E03-M01's review round 03 (2026-10-25, at `4c7ff80`, verdict PASS):
+
+19. E03-M01-S06 was merged with its audit `INCOMPLETE` on its three dedicated `npm run gates:mutation` runs, which
+    `AGENTS.md` §4 sends to a new executor instead. Round 03 took the runs (0 refusals of unchanged code in 5
+    draws). Whether a lane whose only open item is a measurement may be merged with it recorded as owed is the
+    owner's to rule, written into §4, or it is not done again.
+20. `scripts/gates/mutation-remeasure.js`'s verdicts are held by no committed check: round 03's mutation of
+    `pastTheOuterClock` (the starvation guard removed) kept every committed check green and was seen only by an
+    uncommitted doctored replay. A committed fixture report replayed by a check would hold them (as item 10 asks
+    for `mutation-output.js`).
+21. The row-budget case of `test/e2e/graph-table.spec.ts` (line 366) stayed green 5 of 5 with E03-M01-FIX-02's waits
+    removed (round 03, 67 % load): no red seen depends on its new poll.
+22. `test/e2e/budgets-frames.spec.ts:183/186/190` and `:59` read counts after fixed 300 ms and 100 ms waits. Their
+    verdicts are upper bounds, so a regression (a frame per scroll event) can pass when its frame misses the wait.
+    Wait on the probe's `registered`/`fired` frame counts instead (round 03 measured 11 of 11 green).
+23. The re-measure clause's outer clock is `timeoutMS` alone (120 s), below Stryker's own per-mutant budget
+    (1.5 × the dry run + `timeoutMS`): in two of round 03's four draws a re-run went past it (`hash-index.ts` 120:7)
+    and counted only through `01fb07d`'s reading.
 
 ### What shapes the plan rather than the code
 
