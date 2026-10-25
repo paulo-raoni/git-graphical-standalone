@@ -26,6 +26,9 @@ light / dark / follow-the-system theme selector the owner brought forward (owner
 | S06 | mutation gate's remaining clauses | 3 | Kills resting on vitest's own clock re-measured like the others, and the gate's own sentences corrected. |
 | S07 | commit range from the latest tag | 2 | `gates:commits` reads from the latest promotion's tag, as its header says, so a release commit of an earlier milestone no longer reddens every tier. |
 | S08 | the Node engine pin | 3 | `package.json`'s `engines` and the lockfile's copy of it name the Node the gates compare under, 24.18.0. |
+| S09 | branch selection reaches git | 4 | A page request names the branches to show and whether remotes show, and git, the processes and the working-tree row follow it; the default reads what it reads today. |
+| S10 | the Branches dropdown | 5 | The Branches dropdown and the Show Remote Branches checkbox in the bar, as observed in the reference extension, with the remotes choice remembered per repository. |
+| S11 | very many branches and refs | 5 | Repositories with over a thousand branches or very many tags open and list as any other; colour codes from git configuration never reach a name; svn remote branches show. |
 
 **Owed by S06** (merged 2026-10-25 with its audit `INCOMPLETE` on this one item, all its code and `npm run gates` green
 at `01fb07d`): its scope item 2's three dedicated runs of `npm run gates:mutation`, measuring how often the
@@ -33,8 +36,8 @@ re-measure clause chooses kills, re-runs them, and refuses unchanged source. It 
 (3 and 2 kills chosen, all clock-only; no second run starved), which is not a rate. The next review or a later
 slice takes the measurement.
 
-The Branches dropdown's slices are added once the reference extension's dropdown has been observed and
-recorded (`AGENTS.md` §1, §4); they take the next free numbers.
+The Branches dropdown's slices, S09 to S11, were written from the reference extension observed by an observer
+session on 2026-10-25 (`AGENTS.md` §1, §7).
 
 Scope and boundary of each slice live **only** in its task file (`AGENTS.md` §3).
 
