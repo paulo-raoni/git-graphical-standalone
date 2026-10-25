@@ -177,9 +177,9 @@ What the editor provided around the extension, rebuilt as a desktop application.
 | ID | title | outcome |
 | --- | --- | --- |
 | **E03-M01** | Branches dropdown | Show all, select, filter, remote toggle, persistence. **MVP** |
+| E03-M02 | Find widget | Phrase search across the loaded commits with navigation. |
 
 E03-M01 is planned in `docs/plan/E03-branch-filtering-and-find/M01-branches-dropdown/MILESTONE.md` (2026-10-23).
-| E03-M02 | Find widget | Phrase search across the loaded commits with navigation. |
 
 ### E04 · Commit details, comparison and diff
 
@@ -342,7 +342,7 @@ remembers. Each is scheduled into the milestone that follows E01-M01 and is not 
 | --- | --- | --- |
 | **Give `src/ui/` colocated unit tests, and move the two pure suites home.** S05 had to put the renderer's pure tests on the end-to-end runner because the dependency rule had no carve-out for a test file beside the renderer. S06 adds the carve-out; moving the two existing suites is separate work. | The suites work where they are, so nothing is wrong today. What it costs is that they sit outside the unit gate's coverage report and run in the slowest gate instead of the fastest. | Two files, `test/e2e/graph-geometry.spec.ts` and the pure half of `test/e2e/graph-table.spec.ts`, as listed by review round 14. |
 | **Taken up as E01-M01-S09, no longer deferred.** Decide the two clocks the mutation gate runs under. The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | Detections resting on a clock rather than an assertion were **73, 82, 88 and 100 across four runs of the configured scope on identical source**, against a runner timeout count that sat at 44 to 46 in the same four. The quantity moves with machine load and the single figure of 83 that an earlier draft of this row carried was one draw from that range, not the value. |
-| **Taken up as E01-M01-S12, no longer deferred.** Run the unit suite with `isolate: false` under the mutation gate. S09 measured it and did not take it. | It shares one module registry across every test file, so it changes what a test sees; taking it needs evidence that no file depends on another's module state. | S09's measurement, recorded in its slice document: seven concurrent copies of the gate's command in 5.7 s with it against 25–30 s without, about four times the throughput, from which S09 predicted about a quarter of an hour for `gates:mutation`. S12 measured the gate itself at 77.5 minutes with isolation and 35.0 without, back to back on a free machine. |
+| **Taken up as E01-M01-S12, no longer deferred.** Run the unit suite with `isolate: false` under the mutation gate. S09 measured it and did not take it. | It shares one module registry across every test file, so it changes what a test sees; taking it needs evidence that no file depends on another's module state. | S09's measurement, recorded in its slice document: seven concurrent copies of the gate's command in 5.7 s with it against 25–30 s without, about four times the throughput, from which S09 predicted about a quarter of an hour for `gates:mutation`. S12 measured the gate itself at 77.5 minutes with isolation and 35.0 without, back to back, with no other project's run in its minute samples (not `AGENTS.md` §11's measured load). |
 
 ### Raised during E01-M01, placement open for the owner
 

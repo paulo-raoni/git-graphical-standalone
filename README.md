@@ -14,8 +14,9 @@ remote-branch and tag labels on their commits; the uncommitted changes as the to
 is dirty; **Load More Commits** for the next page; and **Refresh**. It reads and never writes. Choosing which
 branches to show and a commit's details come next ([`docs/PLAN.md`](docs/PLAN.md) §4).
 
-Review round 22 compared the drawn rows with `git log` on this repository and on a 50 000-commit test repository
-and found no difference (2026-10-17).
+Review round 22 compared the drawn rows with `git log` on every row of this repository and on the first 1 200
+rows of a 50 000-commit test repository, loaded page by page with Load More, and found no difference
+(2026-10-17).
 
 The stack is decided and is **Electron with TypeScript**, reading git through its command-line interface.
 The reasoning, including why a lighter shell was weighed and not taken, is in
