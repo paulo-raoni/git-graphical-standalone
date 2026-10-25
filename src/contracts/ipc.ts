@@ -19,7 +19,7 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   chooseFolder: 'repository:choose-folder',
   /** Append the next block of commits to the open repository's page. */
   loadMoreCommits: 'repository:load-more-commits',
-  /** Re-read the open repository and return the page again. */
+  /** Re-read the open repository, or apply a branch selection, and return the page. */
   refresh: 'repository:refresh',
   /** Report the application's own versions. Reads no repository. */
   applicationInfo: 'application:info',
@@ -48,10 +48,48 @@ export interface StartupRepository {
 /** The startup folder, or why it could not be reported. */
 export type StartupRepositoryResponse = Result<StartupRepository>;
 
-/** Open the repository rooted at, or containing, `path`. */
+/**
+ * Which branches a page shows, and whether remote-tracking branches are shown at
+ * all.
+ *
+ * - `branches: null` is **every branch**: every local branch, every
+ *   remote-tracking branch while they are shown, every tag, and HEAD. It is what
+ *   a repository opens on and what the window showed before a selection existed.
+ * - `branches: [...]` is **the union of the histories of the branches named**,
+ *   and nothing else: no tag, no HEAD, no branch that is not named. Each name is
+ *   a full reference name as git spells it, `refs/heads/<branch>` for a local
+ *   branch and `refs/remotes/<remote>/<branch>` for a remote-tracking one — the
+ *   prefix is what tells a local branch called `origin/main` from the
+ *   remote-tracking `origin/main`, and what keeps a tag of the same name from
+ *   being read instead. A name with neither prefix is not read. A name git does
+ *   not resolve, such as a branch deleted since it was chosen, is skipped, and a
+ *   list whose every name is skipped reads no commit at all. An empty list reads
+ *   no commit either; it is not a second spelling of every branch.
+ * - `showRemoteBranches: false` reads no remote-tracking branch and labels no
+ *   commit with one, whatever `branches` names; local branches and tags stay.
+ *
+ * Every reference that is read still labels the commits it points at, so a
+ * branch that is not selected keeps its label on a commit a selected one reaches.
+ */
+export interface BranchSelection {
+  /** Full reference names of the branches shown, or `null` for every branch. */
+  readonly branches: readonly string[] | null;
+  /** Whether remote-tracking branches are read and labelled. */
+  readonly showRemoteBranches: boolean;
+}
+
+/**
+ * Open the repository rooted at, or containing, `path`.
+ *
+ * A repository always opens on every branch. Whether remote-tracking branches
+ * are shown is the request's to say, and they are when it does not say; Refresh
+ * and Load More keep it, as they keep any selection applied later.
+ */
 export interface OpenRepositoryRequest {
   /** An absolute path to a working tree or to a directory inside one. */
   readonly path: string;
+  /** Whether remote-tracking branches are shown. Absent means they are. */
+  readonly showRemoteBranches?: boolean;
 }
 
 /** The first page, or why the repository could not be opened. */
@@ -78,8 +116,22 @@ export interface LoadMoreCommitsRequest {
 /** The whole page again, grown. Not a delta; see {@link GraphPage}. */
 export type LoadMoreCommitsResponse = Result<GraphPage>;
 
-/** Re-read the open repository from disk. Carries no argument yet. */
-export type RefreshRequest = Record<string, never>;
+/**
+ * Re-read the open repository from disk, under the selection last applied — or,
+ * with `selection`, apply that selection and read its first page.
+ *
+ * Without `selection` it re-reads as many commits as are loaded, under the
+ * selection the repository was opened or last refreshed with. With it, the
+ * selection replaces that one for every later Refresh and Load More, and the
+ * reply is a first page under it, laid out from nothing. A reply read under a
+ * selection that was replaced while it was being read is dropped, answered as a
+ * `FailureKind.Cancelled` failure, so the window ends on the selection asked
+ * for last.
+ */
+export interface RefreshRequest {
+  /** The selection to apply, or absent to keep the one in force. */
+  readonly selection?: BranchSelection;
+}
 
 /** The whole page again, re-read. */
 export type RefreshResponse = Result<GraphPage>;

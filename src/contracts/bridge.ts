@@ -34,7 +34,10 @@ export interface GitGraphicalBridge {
   readonly chooseFolder: () => Promise<ChooseFolderResponse>;
   /** Append more commits to the open repository's page. */
   readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>;
-  /** Re-read the open repository from disk. */
+  /**
+   * Re-read the open repository from disk under the branch selection in force,
+   * or apply the selection the request carries and answer its first page.
+   */
   readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>;
   /** Report the application's own versions. */
   readonly applicationInfo: () => Promise<ApplicationInfoResponse>;

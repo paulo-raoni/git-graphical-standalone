@@ -1,4 +1,4 @@
-import type { CommitColumns, Refs, Result, WorkingTree } from '../contracts/index';
+import type { BranchSelection, CommitColumns, Refs, Result, WorkingTree } from '../contracts/index';
 
 /**
  * What the application needs from a repository, said without naming git.
@@ -29,6 +29,16 @@ export interface PageRequest {
    * where a delta would cost the consumer a merge step.
    */
   readonly pageSize: number;
+  /**
+   * Which branches the page shows, and whether remote-tracking branches are
+   * read. Absent is every branch with remote-tracking branches shown, which is
+   * exactly what a page read before selections existed held.
+   *
+   * It decides the page's working tree as well as its commits and references: a
+   * page under a selection whose commits do not include HEAD's commit carries the
+   * working tree withheld (`src/contracts/working-tree.ts`).
+   */
+  readonly selection?: BranchSelection;
 }
 
 /** One page of a repository, as the contract holds it. */
