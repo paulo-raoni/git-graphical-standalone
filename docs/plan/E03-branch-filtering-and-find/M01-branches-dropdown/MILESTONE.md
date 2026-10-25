@@ -27,6 +27,12 @@ light / dark / follow-the-system theme selector the owner brought forward (owner
 | S07 | commit range from the latest tag | 2 | `gates:commits` reads from the latest promotion's tag, as its header says, so a release commit of an earlier milestone no longer reddens every tier. |
 | S08 | the Node engine pin | 3 | `package.json`'s `engines` and the lockfile's copy of it name the Node the gates compare under, 24.18.0. |
 
+**Owed by S06** (merged 2026-10-25 with its audit `INCOMPLETE` on this one item, all its code and `npm run gates` green
+at `01fb07d`): its scope item 2's three dedicated runs of `npm run gates:mutation`, measuring how often the
+re-measure clause chooses kills, re-runs them, and refuses unchanged source. It had two draws inside full gate runs
+(3 and 2 kills chosen, all clock-only; no second run starved), which is not a rate. The next review or a later
+slice takes the measurement.
+
 The Branches dropdown's slices are added once the reference extension's dropdown has been observed and
 recorded (`AGENTS.md` §1, §4); they take the next free numbers.
 
