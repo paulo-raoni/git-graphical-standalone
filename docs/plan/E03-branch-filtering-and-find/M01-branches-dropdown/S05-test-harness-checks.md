@@ -197,7 +197,22 @@ boundary. What is left is the two lines, `package.json` and `package-lock.json`,
 ## The budgets gate
 
 The task requires `npm run gates:budgets` once on a free machine, because the timed benchmarks now call
-`perf/workloads.ts`. The readings, kept and discarded, are in this slice's audit.
+`perf/workloads.ts`. Load was sampled every five seconds from Windows' system processor times, with the process
+table and the reading's own process tree read every second, so a process of the tree that lived over a second
+was taken out of the load; one that lived less was counted as other load, which can only discard a reading.
+Between 19:51 and 22:44, 25 runs were started, each after a minute averaging under 40 per cent; 24 met a sample
+over 75 per cent and were stopped there (this lane's own tree only) and discarded. The other load in them came
+from another project's end-to-end and review runs, a review of this milestone, and the virus scanner and
+search indexer, by the busiest processes the sampler named.
+
+**The kept run, 22:34:55 to 22:44:12, exit 0**: other load 38.3 per cent over the minute before, 24.4 per cent
+mean and 65.4 per cent highest over 109 samples during. Every case green: layout 0.583 microseconds a commit
+(baseline 0.59), parse 16.652 (baseline 14.579), store build 43.743 milliseconds per ten thousand commits (baseline 300),
+frame work 5.159 milliseconds mean and 8.5 worst, private memory at 50 000 commits 161 079 296 bytes, cold
+starts 1066 and 1176 milliseconds, one load of ten thousand commits 472.1 milliseconds, and the idle and
+closing counters at their baselines. In the discarded runs, which are not verdicts, layout read 0.571 to 0.916
+in all 24 and parse 14.923 to 20.821 in the 23 that reached it; so moving the helpers into a module of their
+own did not, by these readings, move the timed benchmarks, though one kept run is not a distribution.
 
 ## What nothing checks
 
