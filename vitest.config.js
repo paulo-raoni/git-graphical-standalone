@@ -29,13 +29,16 @@ import { defineConfig } from 'vitest/config';
  *
  * ## The inner clock, and why this suite runs its files one at a time
  *
- * This suite is run two ways. `gates:unit` runs it once, alone. The mutation
- * gate runs it **once per mutant**, seven copies at a time, which is Stryker's
- * default concurrency on the eight-core development machine. Everything below is
- * about the second way, and E01-M01-S09 measured all of it here by running the
- * gate's own per-mutant command — `node node_modules/vitest/vitest.mjs run
- * --reporter=dot --fsModuleCache` — in seven concurrent copies, which is that
- * condition exactly.
+ * This suite is run two ways. `gates:unit:modules` runs it once, alone. The
+ * mutation gate runs it **once per mutant**, seven copies at a time, which is
+ * Stryker's default concurrency on the eight-core development machine.
+ * Everything below is about the second way, and E01-M01-S09 measured all of it
+ * here by running the gate's per-mutant command as it then was — `node
+ * node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache` — in seven
+ * concurrent copies, which was that condition exactly. The command is now
+ * `commandRunner.command` of `stryker.config.json`, with `--no-isolate` added
+ * by E01-M01-S12 and `--bail=1 --no-cache` by E01-M01-FIX-36; S09's figures
+ * below were not taken again with it.
  *
  * **`testTimeout` was never set, so every test ran under the framework's default
  * of 5 000 ms, which nobody chose, and it fired.** Each copy runs its files in
@@ -65,8 +68,8 @@ import { defineConfig } from 'vitest/config';
  * unchanged at 26 s, because the machine was the bottleneck either way. Under a
  * deliberately tripled load (eight spinning processes beside the seven copies) it
  * was **1.92 s** over a further 14 runs. What it costs is this suite run alone,
- * where seven workers do help: the gate's own command goes from 3.8–5.2 s to
- * 8.4–9.4 s, and `gates:unit:modules`, which adds coverage, from 6.3 s to
+ * where seven workers do help: the gate's command as S09 ran it went from
+ * 3.8–5.2 s to 8.4–9.4 s, and `gates:unit:modules`, which adds coverage, from 6.3 s to
  * 11.3–14.0 s. That is about six seconds on a pipeline of an hour, paid so that
  * both ways of running this suite are the same run.
  *
@@ -76,7 +79,7 @@ import { defineConfig } from 'vitest/config';
  * that an asynchronously hung test is caught here, by the clock that names the
  * test, rather than there, by the clock that names nothing. It is one value for
  * every run of this suite and not a mutation-only value: the mutation gate exists
- * to measure what `gates:unit` runs, and two configurations would mean the two
+ * to measure what `gates:unit:modules` runs, and two configurations would mean the two
  * disagree about which test is hung. Alone, a generous inner clock costs one
  * timeout on a test that hangs and nothing on any other run.
  *

@@ -31,8 +31,8 @@ crosses it, the suite exits non-zero, and Stryker records the mutant as `Killed`
 about the mutant.
 
 That is reproduced here directly, without running Stryker at all, by running **the gate's own per-mutant
-command** — `node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache` — in **seven concurrent
-copies**, which is Stryker's default concurrency on this eight-core machine and therefore the condition every
+command** as it then was — `node node_modules/vitest/vitest.mjs run --reporter=dot --fsModuleCache` — in
+**seven concurrent copies**, which is Stryker's default concurrency on this eight-core machine and therefore the condition every
 mutant is measured under. Three batches of seven, on an otherwise idle machine:
 
 | batch | per-copy wall clock | copies that exited non-zero | slowest test that passed | slowest test overall |
@@ -269,12 +269,18 @@ mutants and no survivor.
 
 ## What would make someone revisit this
 
-- **The gate's hour.** `isolate: false` was measured and deliberately **not** taken: seven concurrent copies
+- **The gate's hour.** `isolate: false` was measured and **not** taken by this lane: seven concurrent copies
   of the gate's command finish in **5.7 s** with it against 25–30 s without, which is about four times the
-  throughput and would take `gates:mutation` from an hour to roughly a quarter of one. It is left alone
-  because it shares one module registry across the suite's 21 files, so it changes what a test sees, and this
-  lane's remit is the clocks. It is the first thing to measure if the hour becomes the constraint, and what
-  it needs is evidence that no file of this suite depends on another's module state.
+  throughput, and this lane predicted it would take `gates:mutation` from an hour to roughly a quarter of
+  one. It was left alone because it shares one module registry across the suite's 21 files, so it changes
+  what a test sees, and this lane's remit was the clocks. **E01-M01-S12 has since taken it**, as `--no-isolate`
+  on the per-mutant command in `stryker.config.json` and not in `vitest.config.js`, with that evidence, and
+  measured the gate at 77.5 minutes with isolation and 35.0 without, two runs back to back with no other work
+  in any of its minute samples of the process table (`S12-mutation-without-isolation.md`). That is 2.2
+  times faster, not the four the prediction above assumed; S12 puts the gap down, by arithmetic on the outer
+  clock and not by measurement, to the mutants that never finish. Since E01-M01-FIX-36 the command also
+  carries `--bail=1 --no-cache`. This lane's figures were taken with the command quoted above and were not
+  taken again with the present one.
 - **A hook, or a slower test.** Both clocks are chosen against a measured distribution whose slowest healthy
   member is about a second. A test that legitimately takes ten would leave the inner clock with no margin at
   all, and the measurement to repeat is the seven-copy one in this document, not a guess at a bigger number.
