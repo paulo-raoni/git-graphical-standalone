@@ -479,6 +479,38 @@ performance (Node pinned to 24.18.0, the allocation V8 pin), budgets, size.
     CI is pinned to 24.18.0 (FIX-35).
 32. Kills resting on vitest's own per-test clock are not re-measured by the mutation gate's re-measure clause.
 
+### Carried into E04-M01 from E03-M01's reviews
+
+Classed as **carried** under `AGENTS.md` §7 by E03-M01's review round 01 (2026-10-25, at `6cc54f9`); E04-M01's
+first wave takes them. Stated in full because review files are deleted at promotion. (Round 01's items 11 to 13,
+sentences in the orchestrator's own documents, were corrected in `bd9c65e`.)
+
+1. `scripts/gates/mutation-survivors.json` names the `BRIDGE_GLOBAL_NAME` mutant by line and column, so E03-M01-S01
+   shaped `src/contracts/bridge.ts` for the gate (an import on the line where a blank line was, to keep the constant
+   on line 14). Any line added above it reddens the gate while the guarantee is unchanged. Key the entry by
+   something that survives a moved line, then restore the blank line.
+2. `main.cjs` is at 5 095 of its 5 120-byte budget (round 01's gate run): 25 bytes for the next lane that adds
+   main-process code. Plan the budget question before such a lane, under `AGENTS.md` §11's ratchet.
+3. A failed write of the theme choice is reported only on the main process's standard error, so a person who did
+   not start the application from a terminal never learns the choice will not be kept. Whether the window should
+   say so is the owner's product choice.
+4. Every end-to-end suite but `theme.spec.ts` launches on the default user-data directory, so a stored theme choice
+   a person leaves there carries into their runs. None reads a colour today (round 01 searched).
+5. The window's background following the scheme is held by no check: round 01's mutation of it stayed green in all
+   five cases.
+6. Owed observations: the title-bar pixels under each choice, and a live change of the operating system's
+   preference with System chosen.
+7. Owed by the first push the owner asks for: E03-M01-S02's inference that `windows-latest` installs the win32-x64
+   binary, and E03-M01-S03's whole guarantee on the runner, with `gates:licences` and `gates:commits` in the
+   static job.
+8. Two loose sentences of the licences gate: `licences.js` prints "which is not on the allow-list" also for a package
+   refused despite an exception under another licence; the allow-list's `comment` does not mention the exceptions.
+9. Not measured: how often Stryker's `os.EOL` join splits plain text, `Tests` line included, and whether the
+   re-measure clause then always recovers the kill.
+10. No check that runs on this machine exercises `scripts/gates/mutation-output.js`: round 01's mutation of it kept
+    every local gate green, and only a hand-made coloured replay caught it. A committed coloured fixture replayed by
+    a check would hold it.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
