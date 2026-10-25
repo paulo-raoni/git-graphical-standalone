@@ -553,6 +553,21 @@ From E03-M01's review round 03 (2026-10-25, at `4c7ff80`, verdict PASS):
     (1.5 × the dry run + `timeoutMS`): in two of round 03's four draws a re-run went past it (`hash-index.ts` 120:7)
     and counted only through `01fb07d`'s reading.
 
+From E03-M01's review round 04 (2026-10-25, at `e81a68c`, reworded since as `e88e08f` with the identical tree):
+
+24. The sentences that no tag, `HEAD` or `refs/stash` can ride in under a branch's name (`isReadBranch`'s comment in
+    `src/adapters/git-commands.ts`, `src/contracts/ipc.ts`, the S09 slice document) are contradicted: round 04
+    measured `refs/heads/side...refs/stash` and `refs/heads/side..HEAD` passing the prefix check, and git reading the
+    stash's and HEAD's commits. No branch git can create has such a name. Refuse what git's ref-name rules refuse,
+    or narrow the sentences; E03-M01-S10 builds names only from the page's refs.
+25. `revisionArgs`'s comment says `git-page.spec.ts` holds the default argument list; `git-selection.spec.ts`
+    (lines 96–127 at round 04) holds it.
+26. The clause of `select` in `src/app/repository-host.ts` that drops a selection overtaken by a later one
+    (`open.selectedBy > ticket`) is held by no deciding check: removed, `branch-selection.spec.ts` stayed green
+    12 of 12 (round 04).
+27. `gates:budgets` owed at E03-M01-S09's head for the memory case's idle and closing verdicts and the four start
+    cases: neither S09's lane nor round 04 had a kept reading of them.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
