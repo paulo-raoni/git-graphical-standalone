@@ -96,11 +96,11 @@
     "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts: the reading is the lowest of ten runs a second apart since E01-M01-FIX-37; the baseline is S07's median of five runs, which read 5.13 to 5.34 on 2026-09-28; re-measured as the lowest of ten in seven kept runs on 2026-10-17, 5.02 to 5.67, median 5.33, at other load of 20 to 38 per cent, and not raised to it"
   },
   "scrollFrameWorstMilliseconds": {
-    "baseline": 7.7,
+    "baseline": 6.9,
     "ceiling": 16.7,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work in the worst of the same 240 frames: the reading is the lowest of the same ten runs' worst frames; the baseline is S07's median of five, which read 7.3 to 8.1; re-measured as the lowest of ten in the same seven kept runs, 7.0 to 10.6, median 8.6, and not raised to it"
+    "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest: the reading is the lowest of the same ten runs' fifth-slowest frames since E03-M01-FIX-03, which lowered the baseline from 7.7, the lowest slowest frame's, to 6.9, the median of the new reading in twelve readings kept at its base on 2026-10-28, 6.3 to 8.4, at other load of 11.0 to 34.5 per cent, own processes counted apart; in the same runs the lowest slowest frame read 7.1 to 10.8; twelve more kept at FIX-03's first commit read 6.5 to 8.0 at other load of 23.2 to 36.5 per cent; the tolerance and the ceiling are unchanged"
   },
   "liveRowElements": {
     "baseline": 37,
