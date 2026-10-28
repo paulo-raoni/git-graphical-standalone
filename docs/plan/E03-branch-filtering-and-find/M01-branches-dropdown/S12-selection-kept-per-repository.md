@@ -32,7 +32,8 @@ other point of the control is as `S10-branches-dropdown.md` describes it.
   on the page fails.
 
 Before the first page of a repository arrives, the window shows what it showed before, and the disabled checkbox its
-default, checked; the kept choice appears with the first page, in the same frame as the graph (below).
+default, checked. The kept choice is given to the control in the same task as the first page is handed to the table,
+and no page under another selection is drawn before it (below).
 
 ## What is kept, where, and in what form
 
@@ -132,8 +133,8 @@ cover both modules at 100 % of statements, branches, functions and lines.
 read from the page's references, and the renderer already reads them for its list. Done in the main process, the
 same rule pulled the references' decoders and the list into `main.cjs`, which measured 8 130 production bytes that
 way against 6 506 with the rule in the renderer, before the rename retry above (`npm run gates:size`, 2026-10-28);
-and it would have run, in the
-process that owns the window, a sort of every branch name at every open, which the renderer runs anyway.
+and it would have run, in the process that owns the window, a sort of every branch name at every open, which the
+renderer runs anyway.
 
 **What the renderer does with a gone branch.** `open` in `src/ui/renderer.ts` asks `survivingSelection` of the
 reply's selection and references. When the answer differs from the reply's selection, the page read under the kept
@@ -169,7 +170,8 @@ directory of a running first: from its launch to its first page drawn and its co
 `localStorage`, and 1 295 to 2 240 ms with it in IndexedDB. The processor load was not sampled during these three
 readings, so they are readings and not a budget.
 
-Watched by hand, by this lane on 2026-10-28, two built instances on one fresh user-data directory: the first on the
+Watched by this lane on 2026-10-28, outside the spec, through a throwaway script that drove two built instances on
+one fresh user-data directory and photographed both windows, the photographs then looked at: the first on the
 `remotes` fixture, the second on the `tags` fixture; in the first, Show Remote Branches unchecked and `release`
 checked; then, in the second, Open Repository answered with the `remotes` fixture. The second showed `release` in
 the box, the checkbox unchecked, and the graph of `release` alone, its first row `release`'s commit 4970, as the
@@ -181,8 +183,8 @@ first did.
 spelled. Read from the code, not measured:
 
 - **A repository that moves** is a new path: it opens on Show All with remote branches shown, and the record of the
-  old path stays behind, 43 bytes when it holds every branch and more for each branch it names, which nobody reads and
-  nothing removes.
+  old path stays behind — 43 or 44 bytes when it holds every branch, more for each branch it names — which nobody
+  reads and nothing removes.
 - **One repository opened once from its root and once from a folder inside it** has two records, one per path, and
   each opening shows what was applied through that path. So does a path spelled two ways, such as with a drive
   letter in another case on Windows: nothing normalises it.
@@ -245,9 +247,10 @@ The rules themselves are held by their unit tests and by the mutation gate, whos
 ## What it costs, and what it leaves
 
 - **Time.** An open reads one small file before it asks for the page, and an applied selection's page waits for one
-  small write. Measured by this lane on 2026-10-28 with a script that bundled `src/app/selections.ts` and ran it
-  against a fresh directory, thirty writes and thirty reads of one record: a write took 2.04 ms at the least, 3.86
-  at the median and 14.18 at the most; a read 10.59, 15.04 and 26.14. The processor load was not sampled.
+  small write. Measured by this lane on 2026-10-28 with a script that bundled `src/app/selections.ts`, before the
+  rename retry above was added, and ran it against a fresh directory, thirty writes and thirty reads of one record: a
+  write took 2.04 ms at the least, 3.86 at the median and 14.18 at the most; a read 10.59, 15.04 and 26.14. The
+  processor load was not sampled.
 - **A gone branch costs one open a second read**, as argued above.
 - **Size.** `main.cjs` measured 6 674 production bytes against 5 106 at this slice's base (`npm run gates:size`,
   2026-10-28), of which, by the build's own attribution, `src/app/selections.ts` 789, `src/contracts/kept-selection.ts`
