@@ -52,6 +52,32 @@ export type { Person } from './commit-columns';
  */
 export { refCommitOf, refCount, refFlagsOf, refKindOf, refNameOf } from './ref-list';
 
+/**
+ * The rules of the bar's Branches dropdown, over a {@link Refs} block and a
+ * {@link BranchSelection}.
+ *
+ * Here rather than in `src/core/` because the renderer is the only caller and it
+ * may import this ring and nothing else (`ui-only-contracts`), while every rule
+ * in it is a decision that `docs/ADR-0002-architecture-and-performance.md`
+ * decision 1 keeps out of `src/ui/`. This ring is the one inside both the
+ * renderer's reach and the mutation gate's scope.
+ */
+export {
+  boxText,
+  branchEntries,
+  isChecked,
+  matchingEntries,
+  pressShowAll,
+  sameEntries,
+  sameSelection,
+  selectionOf,
+  SHOW_ALL,
+  SHOW_ALL_LABEL,
+  showingRemotes,
+  toggleBranch,
+} from './branch-menu';
+export type { BranchEntry, BranchMenu } from './branch-menu';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';

@@ -76,6 +76,7 @@
       "src/core/store/pending-parents.ts"
     ],
     "renderer.js": [
+      "src/contracts/branch-menu.ts",
       "src/contracts/bridge.ts",
       "src/contracts/column-read.ts",
       "src/contracts/commit-columns.ts",
@@ -84,10 +85,12 @@
       "src/contracts/ref-list.ts",
       "src/contracts/refs.ts",
       "src/contracts/result.ts",
+      "src/ui/branch-control.ts",
       "src/ui/geometry.ts",
       "src/ui/graph-canvas.ts",
       "src/ui/graph-table.ts",
       "src/ui/palette.ts",
+      "src/ui/remotes-store.ts",
       "src/ui/renderer.ts",
       "src/ui/row-element.ts",
       "src/ui/row-model.ts",

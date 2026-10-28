@@ -109,12 +109,14 @@ body {
   color: var(--text-secondary);
 }
 
-.bar__theme-label {
+.bar__theme-label,
+.bar__label {
   flex: none;
   color: var(--text-secondary);
 }
 
-.bar__theme {
+.bar__theme,
+.branches__box {
   flex: none;
   padding: 3px 4px;
   border: 1px solid var(--line);
@@ -122,6 +124,71 @@ body {
   background: var(--surface);
   color: inherit;
   font: inherit;
+}
+
+/* The Branches dropdown; src/ui/branch-control.ts writes --branches-width. */
+.branches {
+  position: relative;
+  flex: none;
+}
+
+.branches__box {
+  display: flex;
+  width: calc(var(--branches-width, 56px) + 44px);
+  max-width: 320px;
+  padding-right: 18px;
+}
+
+.branches__box::after {
+  position: absolute;
+  right: 6px;
+  content: '▾';
+}
+
+.branches__text,
+.branches__option {
+  overflow: hidden;
+  user-select: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branches__popup {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  right: 0;
+  left: 0;
+  overflow-y: auto;
+  max-height: 220px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.branches__filter {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 3px 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.branches__option {
+  padding: 2px 6px 2px 20px;
+  line-height: 18px;
+}
+
+.branches__option:hover,
+.branches__option:focus {
+  outline: none;
+  background: var(--line);
+}
+
+.branches__option[aria-selected='true']::before {
+  margin-left: -14px;
+  content: '✓ ';
 }
 
 .stage {
