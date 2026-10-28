@@ -81,7 +81,10 @@ const shown = (...branches: string[]): BranchSelection => ({ branches, showRemot
 
 describe('every branch, as the arguments that were run before selections existed', () => {
   // Today's argument lists, written out by hand from the base of this slice
-  // (4c7ff80), so that the default changing in any way fails here by name.
+  // (4c7ff80), so that the default changing in any way fails here by name. The
+  // one change since is `color.diff=never`, which E03-M01-S11 added to the
+  // configuration every invocation carries, and which no format read today
+  // answers to (`git-colour.spec.ts`).
   const before = [
     '--no-pager',
     '--no-optional-locks',
@@ -91,6 +94,8 @@ describe('every branch, as the arguments that were run before selections existed
     'log.showSignature=false',
     '-c',
     'i18n.logOutputEncoding=UTF-8',
+    '-c',
+    'color.diff=never',
   ];
 
   it('runs exactly the log it ran before, with remote-tracking branches shown', () => {
