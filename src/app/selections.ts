@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { keptSelection } from '../contracts/index';
 import type { BranchSelection } from '../contracts/index';
@@ -37,6 +38,36 @@ import type { BranchSelection } from '../contracts/index';
 /** The folder the records are in, inside the user-data directory. */
 const FOLDER = 'branch-selections';
 
+/**
+ * How many times a rename is tried, and how long apart, before the write is given
+ * up as failed.
+ *
+ * **Windows refuses a rename over a file another process holds open**, and an
+ * instance reading the record holds it open for the length of its read. Measured
+ * by E03-M01-S12 on 2026-10-28 with two Node processes on Windows 11, one
+ * renaming a fresh file over a record as fast as it could and the other reading
+ * that record as fast as it could, for five seconds: 51 of 98 renames were refused
+ * with `EPERM`, and none of 210 reads failed or read half a record. So a refused
+ * rename is tried again; the reads need nothing.
+ */
+const RENAME_ATTEMPTS = 10;
+const RENAME_PAUSE_MS = 20;
+
+/** Rename `from` over `to`, trying again while it is refused, up to {@link RENAME_ATTEMPTS} times. */
+async function replace(from: string, to: string): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error: unknown) {
+      if (attempt === RENAME_ATTEMPTS) {
+        throw error;
+      }
+      await delay(RENAME_PAUSE_MS);
+    }
+  }
+}
+
 /** The selections kept, by the path each repository was opened by. */
 export interface SelectionStore {
   /** The selection kept for `path`, or `null` when nothing usable is kept. */
@@ -71,7 +102,7 @@ export function openSelectionStore(directory: string): SelectionStore {
           await writeFile(written, JSON.stringify(selection));
           // The line a whole record hinges on: until this rename, readers see the
           // previous record; after it, the new one, never a part of it.
-          await rename(written, file);
+          await replace(written, file);
         })
         .catch((error: unknown) => {
           // The selection holds in this window whatever happens here; what is
