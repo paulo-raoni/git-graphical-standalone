@@ -42,6 +42,7 @@ const COMPARED_ROWS = 8;
 const RECORDS = 'branch-selections';
 
 const EVERY = ['--branches', '--tags', '--remotes', 'HEAD'];
+const EVERY_LOCAL = ['--branches', '--tags', 'HEAD'];
 const [FEATURE, TOPIC] = ['refs/heads/feature', 'refs/heads/topic'];
 const ONLY_REMOTE = 'refs/remotes/origin/only-remote';
 const LOCALS = ['Show All', 'main', 'feature', 'release', 'topic'];
@@ -301,19 +302,29 @@ test('each repository keeps its own selection', async () => {
   await withWindow(other, home, (page) => expect(remotes(page)).not.toBeChecked());
 });
 
-test('a second instance at once opens on what the first applied, without a stall', async () => {
+test('a second instance open at once opens on what the first applied, without a stall', async () => {
   const home = freshHome();
   const first = await launch(remotesRepository, home);
   try {
-    await apply(first.page, 'uncheck', 'topic');
-    const topic = { ...FEATURE_AND_TOPIC_LOCAL, box: 'topic', checked: ['topic'] };
-    await expectShown(first.page, remotesRepository, { ...topic, revisions: [TOPIC] });
-    const second = await launch(remotesRepository, home);
+    // Running before the choice is made, on another repository.
+    const second = await launch(fixture('tags', 'tags', 3), home);
     try {
+      await apply(first.page, 'uncheck', 'topic');
+      const topic = { ...FEATURE_AND_TOPIC_LOCAL, box: 'topic', checked: ['topic'] };
+      await expectShown(first.page, remotesRepository, { ...topic, revisions: [TOPIC] });
+      // The second opens the repository now, through Open Repository, its
+      // folder chooser answered in its main process.
+      await second.application.evaluate(({ dialog }, path) => {
+        const answer = { canceled: false, filePaths: [path] };
+        (dialog as unknown as { showOpenDialog: unknown }).showOpenDialog = () =>
+          Promise.resolve(answer);
+      }, remotesRepository);
+      await second.page.getByRole('button', { name: 'Open Repository' }).click();
       await expectShown(second.page, remotesRepository, { ...topic, revisions: [TOPIC] });
       // The first does not pick up a choice the second makes in the same repository.
       await apply(second.page, 'Show All');
-      await expect(text(second.page)).toHaveText('Show All');
+      const everyLocal = { revisions: EVERY_LOCAL, uncommitted: true, labels: false };
+      await expectGraph(second.page, remotesRepository, everyLocal);
       await expect(text(first.page)).toHaveText('topic');
       const reading = `second instance's first page after ${String(second.firstPageMs)} ms`;
       test.info().annotations.push({ type: 'reading', description: reading });
