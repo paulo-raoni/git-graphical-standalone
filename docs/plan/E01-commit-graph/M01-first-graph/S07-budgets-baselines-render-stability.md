@@ -489,6 +489,37 @@ not see is a slow frame the product makes in some runs and not others. The basel
 medians of the seven kept readings are 5.33 and 8.6, higher, and a baseline moves only down; the lowest of
 ten is never above the median of any five of them. The tolerances and the ceilings are unchanged.
 
+**Since E03-M01-FIX-03 (2026-10-28) each run's worst frame is read with its four slowest frames set aside**,
+its fifth-slowest of 240, and the lowest of the ten is compared; the mean is held as FIX-37 left it. The lowest
+of ten slowest frames had flapped: it read 12.5 ms against 11.55 at E03-M01-S09's head on 2026-10-25, other
+load about 20 per cent, on a renderer that lane and review round 04 found byte-identical (SHA-256) to the one
+rounds 03 and 04 read green at 10.1, 8.3 and 8.3 ms; those are their readings, and FIX-03 did not reproduce them.
+
+FIX-03 took fourteen readings of the case alone at its base, `34a245e`, on 2026-10-28 from 02:31 to 02:51, each
+judged by `AGENTS.md` §11 with the lane's own processes, run and sampler, counted apart through a Windows job
+object, the machine sampled once a second from its idle, kernel and user times and its peak taken over
+five-second blocks. Twelve were kept, at other load of 10.5 to 39.6 per cent in the minute before and 11.0 to
+34.5 during; one was discarded for a five-second peak of 76 per cent, and one because its load record was lost
+to a file lock in the sampler. On the twelve kept, raw frames recorded: the lowest slowest frame read 7.1 to
+10.8 ms, green on all twelve, the highest 1.30 times their median of 8.3 and 0.75 ms under 11.55; the lowest
+mean 4.90 to 5.69, green on all twelve, so the mean verdict was left as it was. Read from the same frames, the
+lowest k-th slowest frame had its highest reading 1.29 times its median for the second-slowest, 1.20 for the
+third, 1.24 for the fourth and 1.22 for the fifth, and 1.19 to 1.26 for the sixth to the twelfth, which read
+further from the worst frame for no better ratio. The third-slowest, held to 1.5 times its median, would sit
+2.20 ms under its limit and need 4.40 ms added to every frame to turn all twelve red; the fifth-slowest 1.95
+and 4.05. The fifth was taken for the smaller regression it sees. It read 6.3 to 8.4 ms, median 6.9.
+
+**The baseline went down from 7.7 to 6.9**, the median of the new reading, as FIX-37 re-measured its own;
+the tolerance stays 1.5 and the ceiling 16.7, so the limit is 10.35 and the highest of the twelve sits 1.95 ms
+under it. This is not a loosening, measured as the regression a verdict needs to go red: adding a constant to
+every recorded frame of the twelve readings, an additive model and an inference, turns all twelve red at
+4.05 ms for the new verdict against 4.45 ms for the old one at its limit of 11.55. Planted at the top of the
+view's `paint` and rebuilt, a busy-wait of 4 ms in every frame read a lowest fifth-slowest of 10.4 to 12.4, red
+in three kept readings of three; of 3 ms, 9.7 to 11.8, red in two of three; of 6 ms in every tenth frame only,
+10.9 to 11.3, red in three of three while the mean verdict stayed green at 5.48 to 5.64. By construction, and
+not measured, the new reading cannot see a regression that slows four or fewer frames of every run; the old
+reading could, and that is what the four set aside cost.
+
 ### Live row elements
 
 37 row elements with 300 commits loaded, and 37 with 10 000 loaded after scrolling to four offsets across the

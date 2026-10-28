@@ -80,27 +80,36 @@ test('live row elements: a function of the window, not of the commits loaded', a
 /** Runs of the 1 200 px scroll the budget is held on, and the pause between two of them. */
 const HELD_RUNS = 10;
 const HELD_PAUSE_MILLISECONDS = 1_000;
+/** The slowest frames of a run set aside before its worst is read: the fifth-slowest of 240 is read. */
+const SET_ASIDE_FRAMES = 4;
 
-/** The mean and the worst frame of each run, at one scroll step, `pause` ms between runs. */
+/**
+ * The mean, the worst frame and the worst frame once the {@link SET_ASIDE_FRAMES}
+ * slowest are set aside, of each run, at one scroll step, `pause` ms between runs.
+ */
 async function framesAt(
   page: Page,
   step: number,
   runs: number,
   pause: number,
-): Promise<{ means: number[]; worsts: number[] }> {
+): Promise<{ means: number[]; worsts: number[]; trimmed: number[] }> {
   const means: number[] = [];
   const worsts: number[] = [];
+  const trimmed: number[] = [];
   for (let run = 0; run < runs; run += 1) {
     if (run > 0 && pause > 0) await page.waitForTimeout(pause);
     const sample = await page.evaluate(sampleScrollFrames, { frames: 240, step });
+    const slowestFirst = [...sample.work].sort((left, right) => right - left);
     means.push(sample.work.reduce((all, one) => all + one, 0) / sample.work.length);
-    worsts.push(Math.max(...sample.work));
+    worsts.push(slowestFirst[0] ?? Number.NaN);
+    trimmed.push(slowestFirst[SET_ASIDE_FRAMES] ?? Number.NaN);
   }
   process.stdout.write(
     `  ${String(step)} px a frame, 240 frames a run: mean ${described(means, 2)} ms, ` +
-      `worst ${described(worsts, 1)} ms\n`,
+      `worst ${described(worsts, 1)} ms, ` +
+      `fifth-slowest ${described(trimmed, 1)} ms\n`,
   );
-  return { means, worsts };
+  return { means, worsts, trimmed };
 }
 
 /**
@@ -108,8 +117,9 @@ async function framesAt(
  * back to back, and 1 200 pixels a frame, fifty rows, more than the whole pool,
  * so that every frame rewrites every row element and redraws every line — the
  * most a frame of this view can be asked to do. **The budget is held on the
- * second**, ten runs a second apart. The mean of a run is its work per frame and
- * its worst frame is its worst; **the lowest of the ten of each is compared.**
+ * second**, ten runs a second apart. The mean of a run is its work per frame, and
+ * its worst frame is read **with its four slowest frames set aside**: the
+ * fifth-slowest of its 240. **The lowest of the ten of each is compared.**
  *
  * The lowest, and not the median of five as S07 held it, because the machine is
  * shared and what other programs do to a frame only ever adds to it. On
@@ -127,6 +137,24 @@ async function framesAt(
  * lowest included. What the lowest does not see is a slow frame the product
  * makes in some runs and not others; that is the price, and the start cases of
  * `budgets-start.spec.ts` pay it for the same reason.
+ *
+ * **The four slowest frames of a run are set aside since E03-M01-FIX-03**
+ * (2026-10-28), because the lowest of ten slowest frames flapped too: it went red
+ * at E03-M01-S09's head on 2026-10-25, 12.5 ms against 11.55, on a renderer that
+ * lane and review round 04 found byte-identical to the one rounds 03 and 04 read
+ * green at 10.1, 8.3 and 8.3 ms (their readings, not reproduced by FIX-03).
+ * FIX-03 kept twelve readings of this case at its base on 2026-10-28, other load
+ * 11.0 to 34.5 per cent over each, its own processes counted apart through a
+ * Windows job object: the lowest slowest frame read 7.1 to 10.8 ms, none red,
+ * the highest 1.30 times their median of 8.3; in the same runs the lowest
+ * fifth-slowest read 6.3 to 8.4, the highest 1.22 times their median of 6.9,
+ * which is now the baseline, so the limit is 10.35. The highest reading sits
+ * 1.95 ms under its limit where the slowest's sat 0.75 ms under 11.55. Planted at
+ * the top of the view's `paint`, a busy-wait of 4 ms in every frame read 10.4 to
+ * 12.4, red in three kept readings of three; of 3 ms, 9.7 to 11.8, red in two of
+ * three; of 6 ms in every tenth frame, 10.9 to 11.3, red in three of three while
+ * the mean stayed green at 5.48 to 5.64. By construction, and not measured, it
+ * cannot see a regression that slows four or fewer frames of every run.
  */
 test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);
@@ -143,8 +171,8 @@ test('main-thread work per frame while scrolling @budgets', async () => {
       ).failed,
       holdToBaseline(
         'scrollFrameWorstMilliseconds',
-        'worst main-thread frame of a run',
-        Math.min(...jumping.worsts),
+        'worst main-thread frame of a run, its four slowest set aside',
+        Math.min(...jumping.trimmed),
       ).failed,
     ];
     expect(verdicts).toEqual([false, false]);
