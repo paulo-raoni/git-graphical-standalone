@@ -134,7 +134,7 @@ body {
 
 .branches__box {
   display: flex;
-  width: calc(var(--branches-width, 56px) + 24px);
+  width: calc(var(--branches-width, 56px) + 44px);
   max-width: 320px;
   padding-right: 18px;
 }
@@ -148,6 +148,7 @@ body {
 .branches__text,
 .branches__option {
   overflow: hidden;
+  user-select: none;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
