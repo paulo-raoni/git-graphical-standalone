@@ -94,13 +94,14 @@ gesture. `pressShowAll` records it on the menu it answers (`pressedFromEvery`), 
 `detail` of 2) reads it: from every entry checked the gesture ends on Show All alone, from anything else on every
 entry checked.
 
-The remembered checkbox has its own hinge: the call of `storeRemotes` in the checkbox's `change` handler of
-`src/ui/renderer.ts`.
+The remembered checkbox has two hinges: the call of `storeRemotes` in the checkbox's `change` handler of
+`src/ui/renderer.ts`, and the line of `readRemotes` in `src/ui/remotes-store.ts` that answers a stored boolean,
+`done(typeof request.result === 'boolean' ? request.result : null)`.
 
 What the renderer holds is state, not rules: `src/ui/branch-control.ts` builds the elements, keeps whether the list
 is open, the filter's text and which row has the focus, and reports which row was pressed and how many times;
 `src/ui/renderer.ts` keeps the menu, the entries and the checkbox's value, and turns each press into the module's
-answer and that answer into a request.
+answer and that answer into a request; `src/ui/remotes-store.ts` reads and writes the remembered checkbox.
 
 The module's exports, all through `src/contracts/index.ts`: `branchEntries`, `sameEntries`, `matchingEntries`,
 `isChecked`, `toggleBranch`, `pressShowAll`, `showingRemotes`, `selectionOf`, `sameSelection`, `boxText`,
@@ -109,25 +110,42 @@ bridge method changed; `test/contract/shapes.snapshot.txt` gained those lines an
 
 ## Where the remotes choice is kept
 
-In the renderer's own storage (`localStorage`), under `show-remote-branches:` and the path the repository was
-opened by, holding `true` or `false`. `open` in `src/ui/renderer.ts` reads it before it asks for the repository and
-passes it as `showRemoteBranches`; the checkbox writes it when it changes. The storage is the browser profile in
-the application's user-data directory, so it outlives closing the repository and a restart: the end-to-end case
-below unchecks it, closes the application, and finds it unchecked on the next launch on the same user-data
-directory.
+In the renderer's own IndexedDB (`src/ui/remotes-store.ts`): a database `git-graphical-standalone` with one store,
+`show-remote-branches`, keyed by the path the repository was opened by, holding `true` or `false`. The checkbox
+writes it when it changes. `open` in `src/ui/renderer.ts` reads it before it asks for the repository and passes it
+as `showRemoteBranches`, waiting **at most 250 ms** (`REMOTES_WAIT_MS`); an answer that comes later, saying
+"hidden" for the repository still open while the checkbox is still checked, unchecks it then, as a click would.
+The database is in the browser profile in the application's user-data directory, so the choice outlives closing
+the repository and a restart: the end-to-end case below unchecks it, closes the application, and finds it
+unchecked on the next launch on the same user-data directory.
 
-Why there and not in the main process: the choice is only ever read by this page, on the way to a request the page
-makes itself, and `main.cjs` measured 5 106 production bytes of its 5 120 at this lane's head (`npm run
-gates:size`, 2026-10-27). A file the main process kept, as the theme's is, would have to be read before the page
-asks for the repository anyway, so it would buy nothing a page-side store does not.
+**Why the renderer, and not the main process.** The task directs it, so that the main process does not grow:
+`main.cjs` measured 5 106 production bytes of its 5 120 at this lane's head (`npm run gates:size`, 2026-10-27),
+and `src/app/` is outside this lane. What that costs is the next point, and a file kept by the main process, as
+the theme's is, would not pay it.
+
+**Why IndexedDB, not `localStorage`, and why the wait is bounded.** The first version kept the choice in
+`localStorage`. A second instance of the application launched on the same user-data directory as a running one
+finds the profile held. Measured by this lane on 2026-10-28 in the built application, with a first instance
+running: the second instance's first `localStorage` call blocked its page for 5 440 ms (3 ms with no first
+instance), freezing the whole window, and the second instance showed its repository 7 505 to 9 709 ms after its
+launch over four launches, where the code at this slice's base took 1 109 to 2 091 ms. IndexedDB under the same
+condition answered with an error after 5 873 and 5 927 ms, and blocked nothing. So the store moved to IndexedDB, and
+the open stopped waiting for it beyond a bound: a fresh window opening the store and reading one stored path took
+20.6 to 47.9 ms over ten launches, and 250 ms is about five times the slowest. With it, a second instance beside a
+first showed its repository in 1 295 to 2 240 ms over three launches.
 
 What it costs, said rather than hidden:
 
+- **A second instance on the same user-data directory cannot read the choice.** It opens with remote branches
+  shown and its checkbox checked, as measured in the three launches above, and what it stores is not kept.
 - **A repository that moves is a new path.** It opens with remote branches shown, and the old path's entry stays
   behind, a few bytes nobody reads. The same holds for one repository opened by two paths, such as its root and a
   folder inside it: the renderer knows only the path it opened by.
-- **Storage that throws**, as a profile that cannot be written can, means the choice is not remembered; it still
-  holds until the repository is closed.
+- **A store that cannot be opened or written** means the choice is not remembered; it still holds until the
+  repository is closed.
+- **The late answer** — a "hidden" arriving after 250 ms — is applied by code no case of the spec reaches: no
+  launch measured here took that long to read the store.
 
 ## A thousand branches
 
@@ -136,8 +154,9 @@ one attribute per row rather than the rows, so a closed list of any size costs t
 
 The end-to-end case builds, privately, a repository of two commits and 1 000 local branches (`main` on the second
 commit and 999 on the root, one of them with an 87-character name) and measures inside the page, from the click to the frame after the result is
-shown. Readings by this lane on 2026-10-27, three runs, with a sampler reading the processor load of everything
-but this lane's own processes every two seconds:
+shown. Readings by this lane on 2026-10-27 at `eb7f23f`, before the remembered checkbox moved to IndexedDB (neither
+the click that opens the list nor a selection reads it), three runs, with a sampler reading the processor load of
+everything but this lane's own processes every two seconds:
 
 | run | open the list (1 001 rows) | one selection applied and drawn | other load during the run |
 | --- | --- | --- | --- |
@@ -183,7 +202,7 @@ revisions — whether the uncommitted row is above them, and whether any remote 
    short with its title, reopening at the top, the filter, one selection; its two readings are written to the run's
    output.
 
-Watched failing, by this lane on 2026-10-27, against the built application each time:
+Watched failing, by this lane on 2026-10-27 and 2026-10-28, against the built application each time:
 
 - With the source at `Base`, which has no control, all seven fail.
 - With `toggleBranch` never returning to Show All, case 2 fails and the other six pass. Case 4 was predicted to
@@ -192,7 +211,9 @@ Watched failing, by this lane on 2026-10-27, against the built application each 
 - With `showingRemotes` keeping remote names, case 4 alone fails.
 - With the entries in plain name order (the checked-out branch not first), cases 1, 2, 3, 4 and 6 fail; 5 and 7
   pass, as predicted.
-- With the call of `storeRemotes` taken out, case 5 alone fails.
+- With the call of `storeRemotes` taken out, case 5 alone fails: once with the choice in `localStorage`, and
+  again with it in IndexedDB.
+- With `readRemotes` answering nothing for a stored path, case 5 alone fails.
 
 The rules' own tests, `src/contracts/branch-menu.test.ts`, cover the module at 100 % of statements, branches,
 functions and lines; a mutation run of that file alone, by this lane on 2026-10-27, killed all 136 mutants with a
@@ -200,12 +221,13 @@ failing test, none by timeout.
 
 ## Size
 
-`renderer.js` measured 18 339 production bytes at this lane's head against 11 847 at its base (`npm run
-gates:size`, 2026-10-27): `src/ui/branch-control.ts` 3 752, `src/contracts/branch-menu.ts` 1 603, and the wiring.
-Under the orchestrator's ruling in this slice's task its budget was reset once, to 19 456 (the measured size plus
-the margin rule of `scripts/gates/size-budget.json`), and the total by the same 7 168 bytes, to 61 440.
-`renderer.css` stayed within its 6 144 bytes, at 6 107. `main.cjs` moved from 5 096 to 5 106 bytes without a
-change to `src/app/`: the two builds differ only in minified identifier names, the same 831 identifier tokens with
-every token longer than two characters identical (compared by this lane). That esbuild chose those names
-differently because `src/contracts/index.ts`, which every bundle reads, gained re-exports is an inference, not a
-measurement.
+`renderer.js` measured 18 339 production bytes at `105b3c8`, the commit that added the control, against 11 847 at
+this lane's base (`npm run gates:size`, 2026-10-27): `src/ui/branch-control.ts` 3 752, `src/contracts/branch-menu.ts`
+1 603, and the wiring. Under the orchestrator's ruling in this slice's task its budget was reset once, to 19 456
+(that size plus the margin rule of `scripts/gates/size-budget.json`), and the total by the same 7 168 bytes, to
+61 440. At the lane's head, with `src/ui/remotes-store.ts` (597 bytes), it measured 18 951 on 2026-10-28, inside
+that budget; it was not reset again. `renderer.css` stayed within its 6 144 bytes, at 6 107. `main.cjs` moved from
+5 096 to 5 106 bytes without a change to `src/app/`: the two builds differ only in minified identifier names, the
+same 831 identifier tokens with every token longer than two characters identical (compared by this lane). That
+esbuild chose those names differently because `src/contracts/index.ts`, which every bundle reads, gained re-exports
+is an inference, not a measurement.
