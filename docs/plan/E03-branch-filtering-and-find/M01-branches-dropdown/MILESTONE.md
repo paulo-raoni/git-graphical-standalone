@@ -29,6 +29,12 @@ light / dark / follow-the-system theme selector the owner brought forward (owner
 | S09 | branch selection reaches git | 4 | A page request names the branches to show and whether remotes show, and git, the processes and the working-tree row follow it; the default reads what it reads today. |
 | S10 | the Branches dropdown | 5 | The Branches dropdown and the Show Remote Branches checkbox in the bar, as observed in the reference extension, with the remotes choice remembered per repository. |
 | S11 | very many branches and refs | 5 | Repositories with over a thousand branches or very many tags open and list as any other; colour codes from git configuration never reach a name; svn remote branches show. |
+| S12 | selection kept per repository | 6 | The branch selection and Show Remote Branches are kept per repository by the main process, across restarts and between instances open at once. |
+
+**S12** was added on 2026-10-28 by the owner's ruling on review round 05's questions: keep the remotes choice in the
+main process, so that a second instance open at once keeps it too, and keep the branch selection per repository as
+the goal above says, although the reference extension was observed opening a reopened repository on Show All
+(the owner's words: an improvement over the original).
 
 **Owed by S06** (merged 2026-10-25 with its audit `INCOMPLETE` on this one item, all its code and `npm run gates` green
 at `01fb07d`): its scope item 2's three dedicated runs of `npm run gates:mutation`, measuring how often the

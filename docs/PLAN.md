@@ -165,9 +165,12 @@ What the editor provided around the extension, rebuilt as a desktop application.
 - A Branches dropdown offers Show All, multi-selection of branches, a filter box, and predefined glob
   patterns (`customBranchGlobPatterns`); double-clicking Show All toggles every branch; a branch's context
   menu can select or unselect it; the selection persists per repository. → M01 **MVP** (all but glob
-  patterns and the context-menu action, which need E05-M01)
+  patterns and the context-menu action, which need E05-M01). The reference extension was observed on
+  2026-10-25 opening a reopened repository on Show All; the owner ruled on 2026-10-28 that this application
+  keeps the selection per repository all the same, as an improvement over the original (E03-M01-S12).
 - A Show Remote Branches checkbox, persisted per repository (`showRemoteBranches`), and per-remote
-  visibility from the repository settings (E06-M01). → M01 **MVP** (checkbox)
+  visibility from the repository settings (E06-M01). → M01 **MVP** (checkbox; kept by the main process so that
+  instances open at once share it, owner's ruling of 2026-10-28)
 - Repositories with over a thousand branches or very many tags load; colour codes from `color.branch=always`
   never leak into names; remote svn branches display. → M01 **MVP**
 - A Find widget (shortcut, or button on the control bar) matches a phrase against message, date, author,
@@ -566,7 +569,35 @@ From E03-M01's review round 04 (2026-10-25, at `e81a68c`, reworded since as `e88
     (`open.selectedBy > ticket`) is held by no deciding check: removed, `branch-selection.spec.ts` stayed green
     12 of 12 (round 04).
 27. `gates:budgets` owed at E03-M01-S09's head for the memory case's idle and closing verdicts and the four start
-    cases: neither S09's lane nor round 04 had a kept reading of them.
+    cases: neither S09's lane nor round 04 had a kept reading of them. **Closed by review round 05**, whose full
+    run F1 at `d31361f` kept every one of those verdicts green.
+
+From E03-M01's review round 05 (2026-10-28, at `d31361f`):
+
+28. The S07 slice document's table row gives the worst-frame baseline as 7.7 ms (6.9 since E03-M01-FIX-03), and
+    *Two regimes* says that verdict is the lowest of ten worst frames (it is the lowest of ten fifth-slowest
+    frames). E03-M01-FIX-04's boundary holds both lines; if it corrects them, this item is closed by it.
+29. The fifth-slowest frame verdict cannot see a slowdown of four or fewer frames in every run; FIX-03's commit
+    `c6edf89` says "Not a loosening" without that exception; and ADR-0002's "no frame over 16.7 ms" is checked
+    literally by no verdict. **The owner ruled on 2026-10-28 that a check of it is wanted, in E04-M01.**
+30. The reset of the branch selection when a repository opens is held by no check (round 05's mutation M1).
+    E03-M01-S12 replaces the reset with the restored selection and holds that by checks; if it does, this item is
+    closed by it.
+31. The colour override is held for `PARSING_CONFIGURATION` and the two hand-written argument lists, not for
+    `stashArgs`, `statusArgs` or `repositoryProbeArgs` (round 05's mutation M3: `stashArgs` without it kept the
+    fixtures suite green).
+32. "code-unit order … is also the order git itself lists references in" (`src/contracts/branch-menu.ts`, the S10
+    slice document) is contradicted for names mixing supplementary characters with U+E000 to U+FFFF.
+33. `perf/refs.perf.test.ts` attributes the `many-refs` fixture to `test/fixtures/generate.ts`; it is built in
+    `src/adapters/reference-fixtures.spec-support.ts`.
+34. A second instance on the same user-data directory opened with Show Remote Branches checked whatever was stored.
+    **Taken by E03-M01-S12** (owner's ruling, 2026-10-28).
+35. The plan and E03-M01's goal say the branch selection persists per repository; the observed reference and the
+    product did not. **Taken by E03-M01-S12** (owner's ruling, 2026-10-28: keep it per repository).
+36. The check mark drawn by `.branches__option[aria-selected='true']::before` becomes part of each checked row's
+    accessible name ("✓ main"); `aria-selected` already says it.
+37. Short wall-clock readings are judged on samples longer than the reading: the parse benchmark takes about 3 s and
+    `AGENTS.md` §11 allows sampling every 5 s.
 
 ### What shapes the plan rather than the code
 
