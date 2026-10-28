@@ -53,7 +53,7 @@ whichever process opens it.
   kept and what is read.
 - **A write never leaves a half-written record.** It writes a file of its own beside the record — the record's name,
   a dot and this process's id, so two instances never share one — and renames it over the record. The line that
-  hinges on is `await rename(from, to);` in `replace` of `src/app/selections.ts`: until it runs a reader finds the
+  hinges on is `renameSync(from, to);` in `replace` of `src/app/selections.ts`: until it runs a reader finds the
   previous record, and after it the new one, whole. Writes from one instance are chained, so they reach the disk in
   the order they were applied, and the record ends holding the last. Two instances writing the same repository: the
   last write wins.
@@ -64,6 +64,15 @@ whichever process opens it.
   210 reads failed or read half a record. With the retry, through the store itself against the same reader (3 328
   reads in five seconds), 1 of 83 writes was given up after its ten attempts. An instance reads a record once per
   open, so a reader that holds it that often is far beyond the case it guards.
+- **The file calls are synchronous**, as `src/app/theme.ts` reads its file. The first asynchronous file call the main
+  process makes costs it about 32 MiB of private memory for as long as it runs. `npm run gates:budgets` found it:
+  the 50 000-commit private-memory verdict read 178.1 to 189.3 MiB in three readings at this slice's head with the
+  record read through `fs/promises`, against 152.7 and 154.5 MiB in two at its base, the main process alone 65.7 to
+  71.3 MiB against 39.8 and 41.9 (none of the five was taken on a free machine). Bisected by this lane on 2026-10-28
+  on a three-commit repository, the main process's private bytes twenty seconds after the first page, three
+  launches each: 67.6 to 71.6 MiB with the record read through `fs/promises`, and 35.7 to 38.6 MiB with it read by
+  `readFileSync`, or not read at all as at the base. What the synchronous calls cost the window is under *What it
+  costs* below.
 - **A record is read at each open**, not once at start, which is what lets an instance open on what another applied
   while it was running. An instance's read waits for its own writes still in flight, so it reads what it applied
   last.
@@ -246,14 +255,17 @@ The rules themselves are held by their unit tests and by the mutation gate, whos
 
 ## What it costs, and what it leaves
 
-- **Time.** An open reads one small file before it asks for the page, and an applied selection's page waits for one
-  small write. Measured by this lane on 2026-10-28 with a script that bundled `src/app/selections.ts`, before the
-  rename retry above was added, and ran it against a fresh directory, thirty writes and thirty reads of one record: a
-  write took 2.04 ms at the least, 3.86 at the median and 14.18 at the most; a read 10.59, 15.04 and 26.14. The
-  processor load was not sampled.
+- **Time, in the process that owns the window.** An open reads one small file before it asks for the page, and an
+  applied selection's page waits for one small write, both synchronous. Measured by this lane on 2026-10-28 with a
+  script that bundled `src/app/selections.ts` as it now is and ran it against a fresh directory: a read of a record,
+  or of one that is not there, took 0.05 to 0.77 ms over fifty of each, the median 0.07 to 0.10; a read just after
+  the record was renamed into place took 7.98 to 20.74 ms over fifty, the median 10.87 (a scanner reading the new
+  file is an inference, not a measurement); a whole write took 1.11 to 2.02 ms over fifty, the median 1.48. The
+  processor load was not sampled. An open reads right after a write only when a repository is reopened at once
+  after a selection was applied to it.
 - **A gone branch costs one open a second read**, as argued above.
-- **Size.** `main.cjs` measured 6 674 production bytes against 5 106 at this slice's base (`npm run gates:size`,
-  2026-10-28), of which, by the build's own attribution, `src/app/selections.ts` 789, `src/contracts/kept-selection.ts`
+- **Size.** `main.cjs` measured 6 661 production bytes against 5 106 at this slice's base (`npm run gates:size`,
+  2026-10-28), of which, by the build's own attribution, `src/app/selections.ts` 776, `src/contracts/kept-selection.ts`
   420 and the two prefixes of `src/contracts/branch-menu.ts` 38; the rest is the wiring. Under the orchestrator's
   ruling in this slice's task its budget was reset once, to 8 192, and the total by the same 3 072 bytes, to 64 512
   (`comment-e03-m01-s12` in `scripts/gates/size-budget.json`). `renderer.js` went from 18 951 to 18 568 bytes and
