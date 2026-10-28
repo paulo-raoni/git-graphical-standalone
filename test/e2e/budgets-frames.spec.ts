@@ -153,8 +153,12 @@ async function framesAt(
  * the top of the view's `paint`, a busy-wait of 4 ms in every frame read 10.4 to
  * 12.4, red in three kept readings of three; of 3 ms, 9.7 to 11.8, red in two of
  * three; of 6 ms in every tenth frame, 10.9 to 11.3, red in three of three while
- * the mean stayed green at 5.48 to 5.64. By construction, and not measured, it
- * cannot see a regression that slows four or fewer frames of every run.
+ * the mean stayed green at 5.48 to 5.64. Twelve more readings kept at FIX-03's
+ * first commit, other load 23.2 to 36.5 per cent, read 6.5 to 8.0, all green; in
+ * neither series did the slowest frame go red, so the flap was not reproduced,
+ * and the case for the change is the margin above. By construction, and not
+ * measured, it cannot see a regression that slows four or fewer frames of every
+ * run.
  */
 test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);

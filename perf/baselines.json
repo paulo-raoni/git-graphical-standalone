@@ -100,7 +100,7 @@
     "ceiling": 16.7,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest: the reading is the lowest of the same ten runs' fifth-slowest frames since E03-M01-FIX-03, which lowered the baseline from 7.7, the lowest slowest frame's, to 6.9, the median of the new reading in twelve readings kept at its base on 2026-10-28, 6.3 to 8.4, at other load of 11.0 to 34.5 per cent, own processes counted apart; in the same runs the lowest slowest frame read 7.1 to 10.8; the tolerance and the ceiling are unchanged"
+    "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest: the reading is the lowest of the same ten runs' fifth-slowest frames since E03-M01-FIX-03, which lowered the baseline from 7.7, the lowest slowest frame's, to 6.9, the median of the new reading in twelve readings kept at its base on 2026-10-28, 6.3 to 8.4, at other load of 11.0 to 34.5 per cent, own processes counted apart; in the same runs the lowest slowest frame read 7.1 to 10.8; twelve more kept at FIX-03's first commit read 6.5 to 8.0 at other load of 23.2 to 36.5 per cent; the tolerance and the ceiling are unchanged"
   },
   "liveRowElements": {
     "baseline": 37,

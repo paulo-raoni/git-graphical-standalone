@@ -516,7 +516,18 @@ every recorded frame of the twelve readings, an additive model and an inference,
 4.05 ms for the new verdict against 4.45 ms for the old one at its limit of 11.55. Planted at the top of the
 view's `paint` and rebuilt, a busy-wait of 4 ms in every frame read a lowest fifth-slowest of 10.4 to 12.4, red
 in three kept readings of three; of 3 ms, 9.7 to 11.8, red in two of three; of 6 ms in every tenth frame only,
-10.9 to 11.3, red in three of three while the mean verdict stayed green at 5.48 to 5.64. By construction, and
+10.9 to 11.3, red in three of three while the mean verdict stayed green at 5.48 to 5.64. Readings of the
+planted regressions were judged as the others were: nine kept, four discarded.
+
+A second series at FIX-03's first commit, `c6edf89`, whose view and build are those of its base (the built
+`renderer.js`, `renderer.css` and `index.html` hashed identical), took twenty-two readings from 03:34 to 04:32;
+twelve were kept, at other load of 23.9 to 39.9 per cent in the minute before and 23.2 to 36.5 during, and ten
+discarded: one for a minute before of 40.2 per cent, nine for their load during the reading, averaging 38.5 to
+74.7 per cent with five-second peaks of 71.6 to 100. The busiest processes outside the lane over those readings
+were the operating system's malware scanner and Node processes that were not the lane's. The new verdict read 6.5 to
+8.0 ms, green on all twelve; the lowest slowest frame 7.3 to 9.7 and the lowest mean 5.09 to 5.33. **In neither
+series did the old verdict go red**, so FIX-03 did not reproduce the flap it repairs: the case for the change
+is the margin, 0.75 ms under the old limit on the worst of the first twelve against 1.95 under the new. By construction, and
 not measured, the new reading cannot see a regression that slows four or fewer frames of every run; the old
 reading could, and that is what the four set aside cost.
 
