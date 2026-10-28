@@ -13,6 +13,17 @@ type ApplicationInfoResponse = import("./result").Failure | import("./result").S
 
 value BRIDGE_GLOBAL_NAME: "gitGraphical"
 
+interface BranchEntry {
+    readonly label: string
+    readonly name: string
+}
+
+interface BranchMenu {
+    readonly branches: readonly string[]
+    readonly pressedFromEvery: boolean
+    readonly showAll: boolean
+}
+
 interface BranchSelection {
     readonly branches: readonly string[] | null
     readonly showRemoteBranches: boolean
@@ -142,6 +153,10 @@ type Result<TValue> = import("./result").Failure | import("./result").Success<TV
 type RowFlag = 1 | 2 | 4 | 8 | 16 | 32
 value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; }
 
+value SHOW_ALL: BranchMenu
+
+value SHOW_ALL_LABEL: "Show All"
+
 interface StartupRepository {
     readonly path: string | null
 }
@@ -175,13 +190,23 @@ interface WorkingTree {
 
 value authorOf: (columns: CommitColumns, row: number) => Person
 
+value boxText: (menu: BranchMenu, entries: readonly BranchEntry[]) => string
+
+value branchEntries: (refs: Refs, showRemoteBranches: boolean) => BranchEntry[]
+
 value commitCount: (columns: CommitColumns) => number
 
 value committerOf: (columns: CommitColumns, row: number) => Person
 
 value hexHashOf: (columns: CommitColumns, row: number) => string
 
+value isChecked: (menu: BranchMenu, name: string) => boolean
+
+value matchingEntries: (entries: readonly BranchEntry[], text: string) => BranchEntry[]
+
 value parentsOf: (columns: CommitColumns, row: number) => Uint32Array
+
+value pressShowAll: (menu: BranchMenu, clicks: number, entries: readonly BranchEntry[]) => BranchMenu
 
 value refCommitOf: (refs: Refs, ref: number) => number
 
@@ -193,4 +218,14 @@ value refKindOf: (refs: Refs, ref: number) => RefKind
 
 value refNameOf: (refs: Refs, ref: number) => string
 
+value sameEntries: (a: readonly BranchEntry[], b: readonly BranchEntry[]) => boolean
+
+value sameSelection: (a: BranchSelection, b: BranchSelection) => boolean
+
+value selectionOf: (menu: BranchMenu, showRemoteBranches: boolean) => BranchSelection
+
+value showingRemotes: (menu: BranchMenu, show: boolean) => BranchMenu
+
 value subjectOf: (columns: CommitColumns, row: number) => string
+
+value toggleBranch: (menu: BranchMenu, name: string) => BranchMenu
