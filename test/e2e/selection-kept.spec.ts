@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -280,11 +280,14 @@ test('each repository keeps its own selection', async () => {
     await expectGraph(page, other, { revisions: EVERY });
     await apply(page, 'uncheck');
     // This repository has no remote branch, so its graph does not change: what is
-    // waited on is its record arriving beside the first repository's, renamed into
-    // place (the file it is written to first has a dot in its name).
-    const records = (): string[] =>
-      readdirSync(join(home, RECORDS)).filter((n) => !n.includes('.'));
-    await expect.poll(() => records().length).toBe(2);
+    // waited on is a record saying remote branches are hidden, renamed into place
+    // (the file it is written to first has a dot in its name), which the first
+    // repository's, holding them shown, is not.
+    const hidden = (): boolean =>
+      readdirSync(join(home, RECORDS))
+        .filter((name) => !name.includes('.'))
+        .some((name) => readFileSync(join(home, RECORDS, name), 'utf8').includes(':false'));
+    await expect.poll(hidden).toBe(true);
   });
   await withWindow(remotesRepository, home, (page) =>
     expectShown(page, remotesRepository, {
