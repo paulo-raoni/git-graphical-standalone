@@ -90,6 +90,7 @@
       "src/ui/graph-canvas.ts",
       "src/ui/graph-table.ts",
       "src/ui/palette.ts",
+      "src/ui/remotes-store.ts",
       "src/ui/renderer.ts",
       "src/ui/row-element.ts",
       "src/ui/row-model.ts",
