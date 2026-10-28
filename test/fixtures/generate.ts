@@ -77,7 +77,7 @@ function stampOf(clock: Clock): string {
 }
 
 /** The current stamp, then advance the clock past it. */
-function takeStamp(clock: Clock): string {
+export function takeStamp(clock: Clock): string {
   const stamp = stampOf(clock);
   clock.seconds += clock.step;
   return stamp;
@@ -110,7 +110,7 @@ function environmentFor(identity: FixtureIdentity, stamp: string, home: string):
 }
 
 /** One repository being built: where it is, who writes it, and what time it is. */
-interface Workspace {
+export interface Workspace {
   readonly directory: string;
   readonly identity: FixtureIdentity;
   readonly clock: Clock;
@@ -134,16 +134,16 @@ function gitStamped(
 }
 
 /** Run git without creating an object, so the clock does not move. */
-function git(workspace: Workspace, args: readonly string[], input?: string): string {
+export function git(workspace: Workspace, args: readonly string[], input?: string): string {
   return gitStamped(workspace, stampOf(workspace.clock), args, input);
 }
 
 /** Run git to create an object, consuming this commit's slot on the clock. */
-function gitAt(workspace: Workspace, args: readonly string[]): string {
+export function gitAt(workspace: Workspace, args: readonly string[]): string {
   return gitStamped(workspace, takeStamp(workspace.clock), args);
 }
 
-function writeFile(workspace: Workspace, name: string, content: string): void {
+export function writeFile(workspace: Workspace, name: string, content: string): void {
   writeFileSync(join(workspace.directory, name), content);
 }
 
@@ -153,7 +153,7 @@ function commitFile(workspace: Workspace, name: string, content: string, message
   gitAt(workspace, ['commit', '-m', message]);
 }
 
-function linearCommits(workspace: Workspace, count: number, file = 'file.txt'): void {
+export function linearCommits(workspace: Workspace, count: number, file = 'file.txt'): void {
   for (let commit = 1; commit <= count; commit += 1) {
     commitFile(workspace, file, `line ${String(commit)}\n`, `commit ${String(commit)}`);
   }
