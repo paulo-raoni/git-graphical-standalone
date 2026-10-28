@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { HASH_BYTE_LENGTH, UNKNOWN_INDEX } from '../../contracts/index';
 
-import { resolveCommitRows } from './commit-lookup';
+import { lookUpCommitRows, resolveCommitRows } from './commit-lookup';
 
 /** An object name whose first four bytes are `prefix` and whose rest is `tail`. */
 function nameOf(prefix: readonly number[], tail: number): Uint8Array {
@@ -69,5 +69,73 @@ describe('resolveCommitRows', () => {
   it('answers nothing when the page holds no commits', () => {
     const rows = resolveCommitRows(concatenated([nameOf(SHARED, 0xaa)]), 1, new Uint8Array(0), 0);
     expect([...rows]).toEqual([UNKNOWN_INDEX]);
+  });
+});
+
+const THIRD = [0x05, 0x05, 0x05, 0x05];
+
+describe('lookUpCommitRows', () => {
+  it('answers what resolveCommitRows answers', () => {
+    const first = nameOf(SHARED, 0xaa);
+    const second = nameOf(OTHER, 0xbb);
+    const missing = nameOf(THIRD, 0xcc);
+    const targets = concatenated([second, missing, first]);
+    const page = concatenated([first, second]);
+    const lookup = lookUpCommitRows(targets, 3, page, 2);
+    expect([...lookup.rows]).toEqual([1, UNKNOWN_INDEX, 0]);
+    expect([...lookup.rows]).toEqual([...resolveCommitRows(targets, 3, page, 2)]);
+  });
+
+  it('compares each target only with the rows that share its first four bytes', () => {
+    const first = nameOf(SHARED, 0xaa);
+    const second = nameOf(OTHER, 0xbb);
+    const elsewhere = nameOf(THIRD, 0xcc);
+    const lookup = lookUpCommitRows(
+      concatenated([first, second]),
+      2,
+      concatenated([elsewhere, first, elsewhere, second, elsewhere]),
+      5,
+    );
+    expect([...lookup.rows]).toEqual([1, 3]);
+    expect(lookup.comparisons).toBe(2);
+  });
+
+  it('makes no comparison for a target that no row shares a prefix with', () => {
+    const lookup = lookUpCommitRows(
+      concatenated([nameOf(THIRD, 0xcc)]),
+      1,
+      concatenated([nameOf(SHARED, 0xaa), nameOf(OTHER, 0xbb)]),
+      2,
+    );
+    expect(lookup.comparisons).toBe(0);
+  });
+});
+
+describe('lookUpCommitRows, counting its comparisons', () => {
+  it('counts a comparison for a row that only shares the prefix', () => {
+    const wantedA = nameOf(SHARED, 0xaa);
+    const wantedB = nameOf(SHARED, 0xbb);
+    const decoy = nameOf(SHARED, 0xcc);
+    const lookup = lookUpCommitRows(
+      concatenated([wantedA, wantedB]),
+      2,
+      concatenated([decoy, wantedB]),
+      2,
+    );
+    expect([...lookup.rows]).toEqual([UNKNOWN_INDEX, 1]);
+    expect(lookup.comparisons).toBe(4);
+  });
+
+  it('compares a thousand references on one commit once each, not once per row', () => {
+    const crowded = nameOf(SHARED, 0xaa);
+    const targets = concatenated(Array.from({ length: 1000 }, () => crowded));
+    const page = concatenated([
+      nameOf(OTHER, 0x01),
+      crowded,
+      ...Array.from({ length: 48 }, (_, at) => nameOf(THIRD, at)),
+    ]);
+    const lookup = lookUpCommitRows(targets, 1000, page, 50);
+    expect(lookup.rows.every((row) => row === 1)).toBe(true);
+    expect(lookup.comparisons).toBe(1000);
   });
 });
