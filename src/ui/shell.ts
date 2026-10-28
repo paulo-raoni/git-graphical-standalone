@@ -1,6 +1,8 @@
 import { ThemeChoice } from '../contracts/index';
 import type { Failure } from '../contracts/index';
 
+import { mountBranchControl } from './branch-control';
+import type { BranchControl } from './branch-control';
 import { failureHeadline, repositoryLabel } from './status-text';
 
 /**
@@ -15,7 +17,8 @@ import { failureHeadline, repositoryLabel } from './status-text';
  * Nothing here decides anything. It holds no bridge and no state beyond which of
  * its two panes is showing and which colour scheme it was told to show, which is
  * why the whole of the wiring is in `./renderer.ts` and the wording of
- * everything but the controls is in `./status-text.ts`.
+ * everything but the controls is in `./status-text.ts`. The Branches dropdown
+ * is built by `./branch-control.ts` and only placed in the bar here.
  *
  * Everything is built from elements and `textContent`, never from a markup
  * string, so a repository path and a message from git cannot be interpreted as
@@ -52,6 +55,8 @@ export interface Shell {
   readonly open: HTMLButtonElement;
   /** The control that re-reads the open repository. */
   readonly refresh: HTMLButtonElement;
+  /** The Branches dropdown and the Show Remote Branches checkbox. */
+  readonly branches: BranchControl;
   /**
    * The control that chooses the colour scheme. Disabled until
    * {@link Shell.showTheme} has been told which one is in force, so that it never
@@ -127,8 +132,9 @@ export function mountShell(root: HTMLElement): Shell {
   const open = control('bar__button bar__open', OPEN_LABEL);
   const refresh = control('bar__button bar__refresh', REFRESH_LABEL);
   refresh.disabled = true;
+  const branches = mountBranchControl();
   const theme = themeControl();
-  bar.append(path, open, refresh, theme.label, theme.select);
+  bar.append(path, open, refresh, ...branches.parts, theme.label, theme.select);
 
   const stage = element('div', 'stage');
 
@@ -145,6 +151,7 @@ export function mountShell(root: HTMLElement): Shell {
     stage,
     open,
     refresh,
+    branches,
     theme: theme.select,
     showTheme: (choice: ThemeChoice): void => {
       document.documentElement.dataset['theme'] = choice;

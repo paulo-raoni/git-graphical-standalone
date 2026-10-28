@@ -1,5 +1,16 @@
-import { BRIDGE_GLOBAL_NAME, FailureKind, ThemeChoice } from '../contracts/index';
-import type { Failure, GraphPage, Result } from '../contracts/index';
+import {
+  branchEntries,
+  BRIDGE_GLOBAL_NAME,
+  FailureKind,
+  pressShowAll,
+  sameSelection,
+  selectionOf,
+  SHOW_ALL,
+  showingRemotes,
+  ThemeChoice,
+  toggleBranch,
+} from '../contracts/index';
+import type { BranchEntry, BranchMenu, Failure, GraphPage, Refs, Result } from '../contracts/index';
 
 import { mountGraphTable } from './graph-table';
 import type { GraphTableView } from './graph-table';
@@ -49,6 +60,20 @@ const LOAD_MORE_COMMITS = 300;
  */
 const OPEN_LABELS: Labels = { resting: OPEN_LABEL, busy: 'Opening…' };
 const REFRESH_LABELS: Labels = { resting: REFRESH_LABEL, busy: 'Refreshing…' };
+
+/**
+ * Where Show Remote Branches is kept for each repository: the renderer's own
+ * storage, under this prefix and the path the repository was opened by.
+ *
+ * Here and not in the main process, because the choice is only ever read by
+ * this page, on the way to an open request it makes itself, and `main.cjs` is
+ * at the edge of its size budget. The storage lives in the application's
+ * user-data directory, so the choice outlives a restart. A repository that moves
+ * is a new path: it opens with remote branches shown, and the old path's entry
+ * stays behind, a few bytes nobody reads. Storage that throws, as a profile that
+ * cannot be written can, only means the choice is not remembered.
+ */
+const REMOTES_KEY = 'show-remote-branches:';
 
 /**
  * The view, as everything outside this ring sees it.
@@ -106,6 +131,13 @@ interface Session {
   path: string | null;
   /** The bar's controls whose own request is unanswered. */
   readonly busy: Set<HTMLButtonElement>;
+  /** The references of the page drawn last, which the Branches list is made from. */
+  refs: Refs | null;
+  /** What the Branches list has checked, and the entries it offers. */
+  menu: BranchMenu;
+  entries: readonly BranchEntry[];
+  /** Whether Show Remote Branches is checked. */
+  showRemoteBranches: boolean;
 }
 
 /** What a bar control says at rest, and while the request it started runs. */
@@ -162,6 +194,9 @@ function receive(
   }
   shell.clearFailure();
   shell.showPath(session.path);
+  session.refs = reply.value.refs;
+  showBranches(shell, session);
+  shell.branches.enable();
   // A repository is shown, so Refresh is usable, unless a Refresh is still
   // reading: this may be another request's reply, and only its own answers it.
   shell.refresh.disabled = session.busy.has(shell.refresh);
@@ -202,16 +237,80 @@ function run(shell: Shell, work: Promise<void>): void {
   });
 }
 
-/** Open `path`, and remember it only once it has opened. */
+/** The remembered Show Remote Branches of `path`: shown unless it was unchecked. */
+function storedRemotes(path: string): boolean {
+  try {
+    return localStorage.getItem(REMOTES_KEY + path) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function storeRemotes(path: string, show: boolean): void {
+  try {
+    localStorage.setItem(REMOTES_KEY + path, String(show));
+  } catch {
+    // Not remembered: the choice still holds until the repository is closed.
+  }
+}
+
+/** Hand the Branches control the entries of the last page and what is checked. */
+function showBranches(shell: Shell, session: Session): void {
+  session.entries =
+    session.refs === null ? [] : branchEntries(session.refs, session.showRemoteBranches);
+  shell.branches.show(session.entries, session.menu);
+}
+
+/**
+ * Open `path` on every branch and its remembered Show Remote Branches, and
+ * remember it only once it has opened. The branch selection is not remembered:
+ * a repository always opens on Show All.
+ */
 async function open(
   shell: Shell,
   view: GraphTableView,
   session: Session,
   path: string,
 ): Promise<void> {
-  const reply = await window.gitGraphical.openRepository({ path });
-  session.path = reply.ok ? path : session.path;
+  const showRemoteBranches = storedRemotes(path);
+  const reply = await window.gitGraphical.openRepository({ path, showRemoteBranches });
+  if (reply.ok) {
+    session.path = path;
+    session.menu = SHOW_ALL;
+    session.showRemoteBranches = showRemoteBranches;
+    shell.branches.remotes.checked = showRemoteBranches;
+  }
   receive(shell, view, session, reply, true);
+}
+
+/**
+ * Show what the Branches control now has checked at once, and ask for its page
+ * when that is a different page from the one asked for before. The page is drawn
+ * from its first row: it is a first page laid out from nothing, and the offset
+ * the table had belongs to rows it may not hold.
+ */
+function choose(
+  shell: Shell,
+  view: GraphTableView,
+  session: Session,
+  menu: BranchMenu,
+  showRemoteBranches = session.showRemoteBranches,
+): void {
+  const before = selectionOf(session.menu, session.showRemoteBranches);
+  const selection = selectionOf(menu, showRemoteBranches);
+  session.menu = menu;
+  session.showRemoteBranches = showRemoteBranches;
+  showBranches(shell, session);
+  if (sameSelection(before, selection)) {
+    return;
+  }
+  run(
+    shell,
+    (async (): Promise<void> => {
+      const reply = await window.gitGraphical.refresh({ selection });
+      receive(shell, view, session, reply, true);
+    })(),
+  );
 }
 
 /**
@@ -252,6 +351,26 @@ async function showStoredTheme(shell: Shell): Promise<void> {
   shell.showTheme(reply.value.choice);
 }
 
+/**
+ * Wire the Branches control: each press is turned into what is checked by
+ * `src/contracts/branch-menu.ts`, and the result shown and asked for by `choose`.
+ */
+function connectBranches(shell: Shell, view: GraphTableView, session: Session): void {
+  shell.branches.onShowAll((clicks) => {
+    choose(shell, view, session, pressShowAll(session.menu, clicks, session.entries));
+  });
+  shell.branches.onBranch((name) => {
+    choose(shell, view, session, toggleBranch(session.menu, name));
+  });
+  shell.branches.remotes.addEventListener('change', () => {
+    const show = shell.branches.remotes.checked;
+    if (session.path !== null) {
+      storeRemotes(session.path, show);
+    }
+    choose(shell, view, session, showingRemotes(session.menu, show), show);
+  });
+}
+
 /** Wire every control to the bridge. Nothing here runs until something happens. */
 function connect(shell: Shell, view: GraphTableView, session: Session): void {
   shell.open.addEventListener('click', () => {
@@ -280,6 +399,8 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
   shell.theme.addEventListener('change', () => {
     chooseTheme(shell);
   });
+
+  connectBranches(shell, view, session);
 
   view.onLoadMore(() => {
     view.setLoadingMore(true);
@@ -322,7 +443,14 @@ function start(): void {
     showPage: view.showPage,
     onLoadMore: view.onLoadMore,
   };
-  const session: Session = { path: null, busy: new Set() };
+  const session: Session = {
+    path: null,
+    busy: new Set(),
+    refs: null,
+    menu: SHOW_ALL,
+    entries: [],
+    showRemoteBranches: true,
+  };
   connect(shell, view, session);
   run(shell, showStoredTheme(shell));
   run(shell, begin(shell, view, session));
