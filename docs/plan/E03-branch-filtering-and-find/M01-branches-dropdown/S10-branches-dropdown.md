@@ -36,9 +36,11 @@ remote branches out of the graph, drops a checked remote branch and keeps the lo
 when only remote ones were checked. Checking it again restores nothing that was dropped.
 
 **What is kept.** The checked branches survive Refresh and Load More: the control asks nothing of them, and the
-process that reads the repository keeps the selection it last applied (S09). They do not survive opening a
-repository, which always opens on Show All. The checkbox is remembered per repository, across closing and
-reopening and across a restart (below).
+process that reads the repository keeps the selection it last applied (S09). Since E03-M01-S12 they also survive
+opening the repository again, and the checkbox with them: both are kept per repository by the main process, across
+a restart and between instances, as
+`docs/plan/E03-branch-filtering-and-find/M01-branches-dropdown/S12-selection-kept-per-repository.md` describes. This
+slice kept the checkbox alone, in the renderer (below), and opened every repository on Show All.
 
 ## Observed, and decided here
 
@@ -94,30 +96,32 @@ gesture. `pressShowAll` records it on the menu it answers (`pressedFromEvery`), 
 `detail` of 2) reads it: from every entry checked the gesture ends on Show All alone, from anything else on every
 entry checked.
 
-The remembered checkbox has two hinges: the call of `storeRemotes` in the checkbox's `change` handler of
-`src/ui/renderer.ts`, and the line of `readRemotes` in `src/ui/remotes-store.ts` that answers a stored boolean,
-`done(typeof request.result === 'boolean' ? request.result : null)`.
+The remembered checkbox had two hinges, both removed by E03-M01-S12: the call of `storeRemotes` in the checkbox's
+`change` handler of `src/ui/renderer.ts`, and the line of `readRemotes` in `src/ui/remotes-store.ts` that answered a
+stored boolean, `done(typeof request.result === 'boolean' ? request.result : null)`.
 
 What the renderer holds is state, not rules: `src/ui/branch-control.ts` builds the elements, keeps whether the list
 is open, the filter's text and which row has the focus, and reports which row was pressed and how many times;
 `src/ui/renderer.ts` keeps the menu, the entries and the checkbox's value, and turns each press into the module's
-answer and that answer into a request; `src/ui/remotes-store.ts` reads and writes the remembered checkbox.
+answer and that answer into a request; `src/ui/remotes-store.ts` read and wrote the remembered checkbox until
+E03-M01-S12 moved what is kept to the main process.
 
 The module's exports, all through `src/contracts/index.ts`: `branchEntries`, `sameEntries`, `matchingEntries`,
 `isChecked`, `toggleBranch`, `pressShowAll`, `showingRemotes`, `selectionOf`, `sameSelection`, `boxText`,
 `SHOW_ALL`, `SHOW_ALL_LABEL`, and the types `BranchEntry` and `BranchMenu`. No existing contract type, channel or
 bridge method changed; `test/contract/shapes.snapshot.txt` gained those lines and lost none.
 
-## Where the remotes choice is kept
+## Where the remotes choice was kept, until E03-M01-S12
 
-In the renderer's own IndexedDB (`src/ui/remotes-store.ts`): a database `git-graphical-standalone` with one store,
-`show-remote-branches`, keyed by the path the repository was opened by, holding `true` or `false`. The checkbox
-writes it when it changes. `open` in `src/ui/renderer.ts` reads it before it asks for the repository and passes it
-as `showRemoteBranches`, waiting **at most 250 ms** (`REMOTES_WAIT_MS`); an answer that comes later, saying
-"hidden" for the repository still open while the checkbox is still checked, unchecks it then, as a click would.
-The database is in the browser profile in the application's user-data directory, so the choice outlives closing
-the repository and a restart: the end-to-end case below unchecks it, closes the application, and finds it
-unchecked on the next launch on the same user-data directory.
+E03-M01-S12 moved it, with the branch selection, to files kept by the main process, and removed what this section
+describes. Until then it was kept in the renderer's own IndexedDB (`src/ui/remotes-store.ts`): a database
+`git-graphical-standalone` with one store, `show-remote-branches`, keyed by the path the repository was opened by,
+holding `true` or `false`. The checkbox wrote it when it changed. `open` in `src/ui/renderer.ts` read it before it
+asked for the repository and passed it as `showRemoteBranches`, waiting **at most 250 ms** (`REMOTES_WAIT_MS`); an
+answer that came later, saying "hidden" for the repository still open while the checkbox was still checked,
+unchecked it then, as a click would. The database was in the browser profile in the application's user-data
+directory, so the choice outlived closing the repository and a restart: the end-to-end case below unchecked it,
+closed the application, and found it unchecked on the next launch on the same user-data directory.
 
 **Why the renderer, and not the main process.** The task directs it, so that the main process does not grow:
 `main.cjs` measured 5 106 production bytes of its 5 120 at this lane's head (`npm run gates:size`, 2026-10-27),
@@ -135,16 +139,16 @@ the open stopped waiting for it beyond a bound: a fresh window opening the store
 20.6 to 47.9 ms over ten launches, and 250 ms is about five times the slowest. With it, a second instance beside a
 first showed its repository in 1 295 to 2 240 ms over three launches.
 
-What it costs, said rather than hidden:
+What it cost, said rather than hidden:
 
-- **A second instance on the same user-data directory cannot read the choice.** It opens with remote branches
-  shown and its checkbox checked, as measured in the three launches above, and what it stores is not kept.
-- **A repository that moves is a new path.** It opens with remote branches shown, and the old path's entry stays
-  behind, a few bytes nobody reads. The same holds for one repository opened by two paths, such as its root and a
-  folder inside it: the renderer knows only the path it opened by.
-- **A store that cannot be opened or written** means the choice is not remembered; it still holds until the
-  repository is closed.
-- **The late answer** — a "hidden" arriving after 250 ms — is applied by code no case of the spec reaches: no
+- **A second instance on the same user-data directory could not read the choice.** It opened with remote branches
+  shown and its checkbox checked, as measured in the three launches above, and what it stored was not kept.
+- **A repository that moves is a new path.** It opened with remote branches shown, and the old path's entry stayed
+  behind, a few bytes nobody reads. The same held for one repository opened by two paths, such as its root and a
+  folder inside it: the renderer knew only the path it opened by.
+- **A store that could not be opened or written** meant the choice was not remembered; it still held until the
+  repository was closed.
+- **The late answer** — a "hidden" arriving after 250 ms — was applied by code no case of the spec reached: no
   launch measured here took that long to read the store.
 
 ## A thousand branches
@@ -193,8 +197,9 @@ revisions — whether the uncommitted row is above them, and whether any remote 
    without remote rows and the box narrower; nothing restored on re-checking, the box as wide as before; only remote
    branches checked returning to Show All.
 5. **What is kept.** The selection through Refresh and Load More (600 rows, still the branch's history), the
-   checkbox's state across a restart on the same user-data directory with the selection back at Show All, and
-   another repository on that directory with remote branches shown.
+   checkbox's state across a restart on the same user-data directory — with the selection back at Show All as this
+   slice built it, and, since E03-M01-S12 changed the case, with the selection kept too — and another repository on
+   that directory with remote branches shown.
 6. **The keyboard alone.** Tab to the box, Enter, typing filtering case-insensitively with Show All kept, the
    arrows, Space and Enter pressing rows, the arrows back to the filter, Escape closing with the box focused, Space
    reopening with the filter empty.
