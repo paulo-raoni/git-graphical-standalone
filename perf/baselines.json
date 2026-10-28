@@ -172,5 +172,13 @@
   "residentBytesAfterClose": {
     "baseline": 0,
     "unit": "bytes still resident, summed over the processes of the 50000-commit load still running 30 seconds after its window was closed the way a person closes it"
+  },
+  "refLookupComparisonsPerRef": {
+    "baseline": 1,
+    "unit": "full object-name comparisons per reference joining 2501 references to a page of 10000 commits, every reference on the page, in the mix of the many-refs fixture, perf/refs.perf.test.ts: 2501 comparisons, identical on every run"
+  },
+  "refLookupScalingRatio": {
+    "baseline": 3.999,
+    "unit": "times the comparisons of 2501 references, for 10001 of them on the same page: 3.9988 measured, which is 10001 over 2501, one comparison each at both sizes"
   }
 }

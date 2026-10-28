@@ -64,17 +64,32 @@ function targetsByPrefix(targets: Uint8Array, count: number): Map<number, number
   return byPrefix;
 }
 
+/** The rows {@link resolveCommitRows} found, and what finding them cost. */
+export interface CommitRowLookup {
+  /** The row of each target, or `UNKNOWN_INDEX` for one whose commit is not on the page. */
+  readonly rows: Uint32Array;
+  /**
+   * Full twenty-byte comparisons made: one for each target whose four-byte
+   * prefix a row of the page shares, whether or not the rest matches. It is the
+   * part of the work that grows with the references rather than with the
+   * commits, and `perf/refs.perf.test.ts` holds it per reference.
+   */
+  readonly comparisons: number;
+}
+
 /**
  * The row of each of `targetCount` object names in `targets`, or
- * `UNKNOWN_INDEX` for one whose commit is not on this page.
+ * `UNKNOWN_INDEX` for one whose commit is not on this page, and the
+ * comparisons it took to find them.
  */
 export function resolveCommitRows(
   targets: Uint8Array,
   targetCount: number,
   hashes: Uint8Array,
   commitCount: number,
-): Uint32Array {
+): CommitRowLookup {
   const rows = new Uint32Array(targetCount).fill(UNKNOWN_INDEX);
+  let comparisons = 0;
   const byPrefix = targetsByPrefix(targets, targetCount);
   for (let row = 0; row < commitCount; row += 1) {
     const offset = row * HASH_BYTE_LENGTH;
@@ -83,10 +98,11 @@ export function resolveCommitRows(
       continue;
     }
     for (const target of sharing) {
+      comparisons += 1;
       if (sameObjectName(targets, target * HASH_BYTE_LENGTH, hashes, offset)) {
         rows[target] = row;
       }
     }
   }
-  return rows;
+  return { rows, comparisons };
 }

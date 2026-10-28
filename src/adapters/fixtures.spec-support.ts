@@ -105,6 +105,28 @@ export function fixtureAt(name: string, set?: string): string {
   });
 }
 
+/**
+ * The path of a repository this suite builds for itself with `build`, rather
+ * than one the specification names: published and verified like the others, by
+ * {@link verifiedCopy}, under `suite/<name>-<digest>`. The digest is over
+ * `sources`, the files whose code `build` runs, so a change to that code builds
+ * a new repository instead of handing back the one the old code built; the
+ * specification's digest, which names {@link home}, does not move for it.
+ */
+export function suiteFixtureAt(
+  name: string,
+  sources: readonly string[],
+  build: (directory: string) => void,
+): string {
+  const code = createHash('sha256');
+  for (const source of sources) {
+    code.update(readFileSync(source));
+  }
+  const published = join(home, 'suite', `${name}-${code.digest('hex').slice(0, 12)}`);
+  mkdirSync(dirname(published), { recursive: true });
+  return verifiedCopy(published, stagingRoot, build);
+}
+
 /** Make sure every repository of the specification is published and matches its record. */
 export function ensureFixtures(): void {
   for (const repository of readSpecification(specification).repositories) {
