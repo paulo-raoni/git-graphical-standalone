@@ -28,7 +28,7 @@ export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
 export interface GitGraphicalBridge {
   /** Report the folder the application was started with, if it was given one. */
   readonly startupRepository: () => Promise<StartupRepositoryResponse>;
-  /** Open a repository by absolute path. */
+  /** Open a repository by absolute path, on the branch selection kept for it. */
   readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>;
   /** Show the folder chooser and report what the user picked. */
   readonly chooseFolder: () => Promise<ChooseFolderResponse>;

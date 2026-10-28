@@ -200,16 +200,15 @@ function startOver(repository: OpenRepository): void {
  * is dropped, succeeded or not: the window must end on the folder chosen last,
  * and the reads of two folders finish in whatever order git finishes them.
  *
- * It opens on every branch, with remote-tracking branches shown unless the
- * request says `false`.
+ * It opens on the selection the request carries, which the main process chose:
+ * the one kept for the repository, or every branch (`./handlers.ts`).
  */
 async function openRepository(
   path: string,
-  showRemoteBranches: boolean | undefined,
+  selection: BranchSelection,
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const selection = { branches: null, showRemoteBranches: showRemoteBranches !== false };
   const read = await reader.readPage({
     repositoryPath: path,
     pageSize: FIRST_PAGE_COMMITS,
@@ -337,7 +336,7 @@ async function select(
 async function answer(request: RepositoryRequest): Promise<Result<GraphPage | ReaderDescription>> {
   switch (request.kind) {
     case 'open':
-      return openRepository(request.path, request.showRemoteBranches);
+      return openRepository(request.path, request.selection);
     case 'load-more':
       return loadMore(request.count);
     case 'refresh':

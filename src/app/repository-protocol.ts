@@ -34,8 +34,11 @@ export type RepositoryQuestion =
       readonly kind: 'open';
       /** An absolute path to a working tree or to a directory inside one. */
       readonly path: string;
-      /** Whether remote-tracking branches are shown; absent means they are. */
-      readonly showRemoteBranches?: boolean;
+      /**
+       * The branch selection the open reads under and keeps, which the main
+       * process chose (`./handlers.ts`).
+       */
+      readonly selection: BranchSelection;
     }
   | {
       /** Read `count` more commits of the open repository and append them. */
