@@ -64,7 +64,7 @@ function targetsByPrefix(targets: Uint8Array, count: number): Map<number, number
   return byPrefix;
 }
 
-/** The rows {@link lookUpCommitRows} found, and what finding them cost. */
+/** The rows {@link resolveCommitRows} found, and what finding them cost. */
 export interface CommitRowLookup {
   /** The row of each target, or `UNKNOWN_INDEX` for one whose commit is not on the page. */
   readonly rows: Uint32Array;
@@ -79,19 +79,10 @@ export interface CommitRowLookup {
 
 /**
  * The row of each of `targetCount` object names in `targets`, or
- * `UNKNOWN_INDEX` for one whose commit is not on this page.
+ * `UNKNOWN_INDEX` for one whose commit is not on this page, and the
+ * comparisons it took to find them.
  */
 export function resolveCommitRows(
-  targets: Uint8Array,
-  targetCount: number,
-  hashes: Uint8Array,
-  commitCount: number,
-): Uint32Array {
-  return lookUpCommitRows(targets, targetCount, hashes, commitCount).rows;
-}
-
-/** {@link resolveCommitRows}, with the comparisons it made counted. */
-export function lookUpCommitRows(
   targets: Uint8Array,
   targetCount: number,
   hashes: Uint8Array,

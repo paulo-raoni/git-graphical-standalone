@@ -100,9 +100,11 @@ nothing was fixed for size.
 
 ### The counter
 
-`lookUpCommitRows` of `src/core/parse/commit-lookup.ts` is `resolveCommitRows` with the full object-name comparisons
-it makes counted; `resolveCommitRows`, which the adapter calls, is now that function's rows and is otherwise
-unchanged. A reference whose commit is on the page should cost one
+`resolveCommitRows` of `src/core/parse/commit-lookup.ts` now answers the full object-name comparisons it made beside
+the rows it found; the adapter takes the rows, as before. It is one function and not a counted twin of the old one
+because the twin did not fit: with a second exported function wrapping the first, `repository.cjs` measured 28 707
+production bytes against its budget of 28 672 (`npm run gates:size`, this lane, 2026-10-27), and with one function
+28 667. A reference whose commit is on the page should cost one
 comparison, and one that is not on it none, however many references there are; a lookup that compared every
 reference with every row would cost a page's worth each.
 

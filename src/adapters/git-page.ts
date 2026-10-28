@@ -180,7 +180,7 @@ function assemble(
     targets.length / HASH_BYTE_LENGTH,
     commits.columns.hashes,
     commits.columns.count,
-  );
+  ).rows;
   const headRow = facts.hasHead ? (rows[list.count] ?? UNKNOWN_INDEX) : UNKNOWN_INDEX;
   markDetachedFrom(list, rows, facts.isDetached ? headRow : UNKNOWN_INDEX);
   return {

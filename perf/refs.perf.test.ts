@@ -6,8 +6,8 @@ import {
   createReferenceList,
   createReferenceParser,
   finishReferences,
-  lookUpCommitRows,
   pushReferences,
+  resolveCommitRows,
 } from '../src/core/parse/index';
 import type { ReferenceList } from '../src/core/parse/index';
 
@@ -16,7 +16,7 @@ import { held } from './workloads';
 /**
  * The reader over very many references, counted.
  *
- * A page joins its references to its commits in `lookUpCommitRows` of
+ * A page joins its references to its commits in `resolveCommitRows` of
  * `src/core/parse/commit-lookup.ts`, and that is the one step of reading a page
  * whose cost could be a product of the two: every other step reads each
  * reference once, in one pass over `git for-each-ref`'s output. So this counts
@@ -121,7 +121,7 @@ function read(branches: number, hashes: Uint8Array): Reading {
     pushReferences(parser, output.subarray(from, from + 65_536));
   }
   finishReferences(parser);
-  const lookup = lookUpCommitRows(list.targets, list.count, hashes, PAGE_COMMITS);
+  const lookup = resolveCommitRows(list.targets, list.count, hashes, PAGE_COMMITS);
   const refs = buildRefs(list, lookup.rows);
   const kinds = [RefKind.LocalHead, RefKind.RemoteBranch, RefKind.Tag].map(
     (kind) => refs.kind.filter((each) => each === kind).length,
