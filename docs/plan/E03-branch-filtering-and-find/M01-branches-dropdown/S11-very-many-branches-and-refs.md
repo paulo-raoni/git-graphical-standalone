@@ -119,9 +119,10 @@ reader's own parser, every reference on a page of 10 000 commits, and holds two 
 
 It also kills a mutant that `scripts/gates/mutation-survivors.json` carried as not behavioural, because
 `src/core/parse/` had no work counter to assert it against: `prefixAt` of `commit-lookup.ts` emptied, which puts
-every target in one bucket and leaves every answer the same. Planted by this lane, it turned three cases of
-`commit-lookup.test.ts` red — 10 comparisons where 2 are asserted, 2 where none are, 50 000 where 1 000 are — and
-they were green again with it removed, so the entry was removed.
+every target in one bucket and leaves every answer the same. Planted by this lane at its head, it turned four cases of
+`commit-lookup.test.ts` red — 6 and 10 comparisons where 2 are asserted, 2 where none are, 50 000 where 1 000 are —
+and the counted benchmark's comparisons per reference red at 10 000; all were green again with it removed, so the
+entry was removed.
 
 ## Colour codes
 
