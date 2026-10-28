@@ -88,6 +88,10 @@ audit files; merge, push or tag; touch any remote or the hosted repository's set
 - Commit to `main`, **only** promotion merge commits (§8).
 - Create and remove worktrees and branches; merge; tag; copy sequence files between the primary checkout and
   worktrees.
+- Replace its own commits on `dev` that are **not yet pushed** by commits with **identical trees** whose messages
+  differ, to repair a message a gate refuses, saying so in the handoff and to the next reviewer. (Owner's ruling,
+  2026-10-27: review round 04 of E03-M01 found a 101-character body line in an orchestrator commit, and no other
+  role may change a commit on `dev`.)
 - **Push, only when the owner explicitly asks for it in the current session.**
 - **Create, rename, delete or reconfigure a remote, or change the hosted repository's visibility or settings,
   only when the owner explicitly asks for it in the current session.** Never otherwise.
@@ -194,6 +198,11 @@ If an executor context ends before its task is done, it writes the audit with `S
 exactly what is done and what is left. The orchestrator starts a **new** executor context on the same task in
 the same worktree. That context continues the work and rewrites the audit to cover the whole task, keeping
 each session's account under `## Sessions`. One task, one audit.
+
+**Only a lane whose audit says `Status: COMPLETE` is merged.** A lane left `INCOMPLETE`, even on a measurement
+alone, goes to a new executor context until it is complete; it is never merged with the rest recorded as owed.
+(Owner's ruling, 2026-10-27: work is delivered whole, never cut. E03-M01-S06 was merged with three measurements
+owed, and review round 03 had to take them.)
 
 ---
 
@@ -537,7 +546,11 @@ A committed baseline — coverage thresholds, mutation thresholds, performance c
 budgets — **moves in the improving direction only**. Loosening one is a commit that says why, inside the
 diff the reviewer reads. An executor that cannot meet a baseline raises it as a blocker in its audit; it
 never edits the target to match its result. A gate that flaps is a defect of the gate, fixed as one, and
-never a reason to relax a threshold.
+never a reason to relax a threshold **by itself**. When a fix task assigned to that flapping verdict measures
+that no verdict at the strict limit is both green on the unchanged product and red on a planted regression, it
+relaxes the threshold to the smallest value green on every kept reading of a free series, keeps it red on the
+planted regression, and argues both with the readings in the commit body. (Owner's ruling, 2026-10-27: finishing
+the work comes first; E03-M01's scrolled worst-frame verdict flapped twice on unchanged code.)
 
 ### Wall-clock gates on a shared machine
 
