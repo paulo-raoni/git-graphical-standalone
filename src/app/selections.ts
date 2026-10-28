@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -33,6 +33,19 @@ import type { BranchSelection } from '../contracts/index';
  * instance open on what another applied. What is read is checked by
  * `keptSelection` (`src/contracts/kept-selection.ts`); a record that is missing,
  * unreadable or not one this application wrote is nothing kept.
+ *
+ * **The file calls are synchronous**, as `./theme.ts` reads its file, and that is
+ * a measured choice. The first asynchronous file call this process makes costs it
+ * about 32 MiB of private memory for as long as it runs: measured by E03-M01-S12
+ * on 2026-10-28 with the built application on a three-commit repository, the main
+ * process read 67.6 to 71.6 MiB private twenty seconds after its first page with
+ * the record read by `fs/promises`, and 35.7 to 38.6 MiB with it read by
+ * `readFileSync` or not read at all, as at this slice's base (three launches each).
+ * What the synchronous calls cost the window instead, measured the same day
+ * through this module bundled on its own: a read of a record, or of one that is
+ * not there, 0.05 to 0.77 ms over fifty of each, and 8 to 21 ms when the record
+ * had been renamed into place a moment before (a scanner reading the new file is
+ * an inference, not a measurement); a whole write, 1.11 to 2.02 ms over fifty.
  */
 
 /** The folder the records are in, inside the user-data directory. */
@@ -57,7 +70,7 @@ const RENAME_PAUSE_MS = 20;
 async function replace(from: string, to: string): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      await rename(from, to);
+      renameSync(from, to);
       return;
     } catch (error: unknown) {
       if (attempt === RENAME_ATTEMPTS) {
@@ -88,7 +101,7 @@ export function openSelectionStore(directory: string): SelectionStore {
       // After this instance's own writes, so an open reads what it applied last.
       await saved;
       try {
-        return keptSelection(JSON.parse(await readFile(fileOf(path), 'utf8')));
+        return keptSelection(JSON.parse(readFileSync(fileOf(path), 'utf8')));
       } catch {
         return null;
       }
@@ -98,8 +111,8 @@ export function openSelectionStore(directory: string): SelectionStore {
       const written = `${file}.${String(process.pid)}`;
       saved = saved
         .then(async () => {
-          await mkdir(folder, { recursive: true });
-          await writeFile(written, JSON.stringify(selection));
+          mkdirSync(folder, { recursive: true });
+          writeFileSync(written, JSON.stringify(selection));
           // The line a whole record hinges on: until this rename, readers see the
           // previous record; after it, the new one, never a part of it.
           await replace(written, file);
