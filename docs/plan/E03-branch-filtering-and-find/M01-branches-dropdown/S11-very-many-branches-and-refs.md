@@ -104,7 +104,8 @@ nothing was fixed for size.
 the rows it found; the adapter takes the rows, as before. It is one function and not a counted twin of the old one
 because the twin did not fit: with a second exported function wrapping the first, `repository.cjs` measured 28 707
 production bytes against its budget of 28 672 (`npm run gates:size`, this lane, 2026-10-27), and with one function
-28 667. A reference whose commit is on the page should cost one
+28 667, against 28 609 at this slice's base: the colour override and the counter cost 58 bytes, and 5 are left under
+the budget. A reference whose commit is on the page should cost one
 comparison, and one that is not on it none, however many references there are; a lookup that compared every
 reference with every row would cost a page's worth each.
 
