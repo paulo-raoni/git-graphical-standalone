@@ -55,7 +55,10 @@ import { compareInRegime, readBaselines } from './baselines';
 
 const CHUNK_BYTES = 16 * 1024;
 const COMMITS = 10_000;
+/** Batches of timed runs, how many runs each, and the pause between two batches. */
+const BATCHES = 5;
 const RUNS = 5;
+const PAUSE_MILLISECONDS = 500;
 
 const repository = fixture('large', 'large', COMMITS);
 const log = execFileSync('git', commitLogArgs(repository, COMMITS + 1), {
@@ -120,13 +123,29 @@ function timedBeside(): { parse: number; reference: number } {
   return { parse, reference: middle([...before, ...after]) };
 }
 
+const pause = (milliseconds: number): Promise<void> =>
+  new Promise((done) => setTimeout(done, milliseconds));
+
+/** Every timed run and the reference around it, batch by batch, after one warm-up parse. */
+async function timedBatches(): Promise<{ parse: number; reference: number }[]> {
+  timed();
+  referenceOnce();
+  referenceOnce();
+  referenceOnce();
+  const readings: { parse: number; reference: number }[] = [];
+  for (let batch = 0; batch < BATCHES; batch += 1) {
+    if (batch > 0) {
+      await pause(PAUSE_MILLISECONDS);
+      timed();
+    }
+    readings.push(...Array.from({ length: RUNS }, timedBeside));
+  }
+  return readings;
+}
+
 describe('the streamed log parser, timed', () => {
-  it('parses a commit into the store in no more than fifty microseconds', () => {
-    timed();
-    referenceOnce();
-    referenceOnce();
-    referenceOnce();
-    const readings = Array.from({ length: RUNS }, timedBeside);
+  it('parses a commit into the store in no more than fifty microseconds', async () => {
+    const readings = await timedBatches();
     const runs = readings.map((each) => each.parse);
     const references = readings.map((each) => each.reference);
     const factors = references.map((each) => Math.min(1, REFERENCE_MILLISECONDS / each));
