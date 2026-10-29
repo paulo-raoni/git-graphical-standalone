@@ -83,14 +83,61 @@ function timed(): number {
   return (elapsed * 1000) / COMMITS;
 }
 
+/** Timings of the reference workload before each timed parse, and as many after it. */
+const REFERENCE_TIMES = 10;
+/**
+ * The reference workload's time when nothing slows it, in milliseconds: the lowest
+ * middle of a parse's twenty timings in the readings E03-M01-FIX-04 kept before it
+ * fixed this figure (the header says which).
+ */
+const REFERENCE_MILLISECONDS = 5.644;
+
+const table = new Int32Array(4096);
+let mixed = 1;
+
+/** Milliseconds of one pass of the fixed reference workload. */
+function referenceOnce(): number {
+  const started = performance.now();
+  for (let index = 0; index < 1 << 19; index += 1) {
+    const slot = Math.imul(index, 40_503) & 4095;
+    mixed = (Math.imul(mixed, 31) + (table[slot] ?? 0) + index) | 0;
+    table[slot] = mixed;
+  }
+  return performance.now() - started;
+}
+
+/** The middle of `values`, or the upper middle of an even count. */
+function middle(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+}
+
+/** One timed parse, and the middle of the reference timings around it. */
+function timedBeside(): { parse: number; reference: number } {
+  const before = Array.from({ length: REFERENCE_TIMES }, referenceOnce);
+  const parse = timed();
+  const after = Array.from({ length: REFERENCE_TIMES }, referenceOnce);
+  return { parse, reference: middle([...before, ...after]) };
+}
+
 describe('the streamed log parser, timed', () => {
   it('parses a commit into the store in no more than fifty microseconds', () => {
     timed();
-    const runs = Array.from({ length: RUNS }, timed);
-    const fastest = Math.min(...runs);
+    referenceOnce();
+    referenceOnce();
+    referenceOnce();
+    const readings = Array.from({ length: RUNS }, timedBeside);
+    const runs = readings.map((each) => each.parse);
+    const references = readings.map((each) => each.reference);
+    const scaled = readings.map(
+      (each) => each.parse * Math.min(1, REFERENCE_MILLISECONDS / each.reference),
+    );
+    const fastest = Math.min(...scaled);
     process.stdout.write(
       `  parse: ${String(log.length)} bytes, ${String(COMMITS)} commits, ` +
-        `${runs.map((each) => each.toFixed(3)).join(', ')} microseconds a commit\n`,
+        `${runs.map((each) => each.toFixed(3)).join(', ')} microseconds a commit, ` +
+        `reference ${references.map((each) => each.toFixed(3)).join(', ')} ms, ` +
+        `scaled ${scaled.map((each) => each.toFixed(3)).join(', ')} microseconds a commit\n`,
     );
     const baseline = readBaselines()['parseMicrosecondsPerCommit'];
     expect(baseline).toBeDefined();
