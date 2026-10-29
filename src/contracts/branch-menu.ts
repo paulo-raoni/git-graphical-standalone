@@ -26,8 +26,10 @@ import type { Refs } from './refs';
 /** What the first entry of the list, and the box with nothing selected, say. */
 export const SHOW_ALL_LABEL = 'Show All';
 
-const LOCAL_PREFIX = 'refs/heads/';
-const REMOTE_PREFIX = 'refs/remotes/';
+/** What a local branch's full reference name begins with. */
+export const LOCAL_PREFIX = 'refs/heads/';
+/** What a remote-tracking branch's full reference name begins with. */
+export const REMOTE_PREFIX = 'refs/remotes/';
 
 /** One branch the list offers. */
 export interface BranchEntry {
@@ -42,8 +44,8 @@ export interface BranchEntry {
  *
  * Invariants: `branches` holds no name twice; when `showAll` is false it is not
  * empty. `showAll` with `branches` empty is Show All alone, the state a
- * repository opens on; `showAll` with `branches` holding every entry is "every
- * entry checked", which a double-click on Show All toggles to.
+ * repository with nothing kept opens on; `showAll` with `branches` holding every
+ * entry is "every entry checked", which a double-click on Show All toggles to.
  */
 export interface BranchMenu {
   /** Whether Show All is checked, which is whether the graph shows every branch. */
@@ -58,7 +60,10 @@ export interface BranchMenu {
   readonly pressedFromEvery: boolean;
 }
 
-/** Show All alone: what a repository opens on, and what Show All returns to. */
+/**
+ * Show All alone: what a repository with nothing kept for it opens on, and what
+ * Show All returns to.
+ */
 export const SHOW_ALL: BranchMenu = /* @__PURE__ */ Object.freeze({
   showAll: true,
   branches: /* @__PURE__ */ Object.freeze([]),
@@ -173,6 +178,18 @@ export function showingRemotes(menu: BranchMenu, show: boolean): BranchMenu {
 /** What the graph is asked for under `menu`: every branch while Show All is checked. */
 export function selectionOf(menu: BranchMenu, showRemoteBranches: boolean): BranchSelection {
   return { branches: menu.showAll ? null : menu.branches, showRemoteBranches };
+}
+
+/**
+ * The menu that shows `selection`: Show All alone for every branch, and otherwise
+ * those branches checked, in its order. It is how an opened repository's control
+ * shows what survives of the selection kept for it (`survivingSelection` of
+ * `./kept-selection.ts`), which never names an empty list.
+ */
+export function menuOf(selection: BranchSelection): BranchMenu {
+  return selection.branches === null
+    ? SHOW_ALL
+    : { showAll: false, branches: selection.branches, pressedFromEvery: false };
 }
 
 /** Whether two selections ask for the same page, so that a second request would be wasted. */

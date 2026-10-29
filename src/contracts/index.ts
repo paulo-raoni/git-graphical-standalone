@@ -67,6 +67,7 @@ export {
   branchEntries,
   isChecked,
   matchingEntries,
+  menuOf,
   pressShowAll,
   sameEntries,
   sameSelection,
@@ -77,6 +78,18 @@ export {
   toggleBranch,
 } from './branch-menu';
 export type { BranchEntry, BranchMenu } from './branch-menu';
+
+/**
+ * The rules of the branch selection kept per repository: which stored value is a
+ * selection, which one an open reads under, and which kept branches survive the
+ * repository's references.
+ *
+ * Here because each is a decision `docs/ADR-0002-architecture-and-performance.md`
+ * decision 1 keeps out of `src/app/`, whose main process reads and writes the
+ * kept records and calls these, and because this ring is inside the mutation
+ * gate's scope.
+ */
+export { keptSelection, openingSelection, survivingSelection } from './kept-selection';
 
 export type { GraphPage } from './graph-page';
 
@@ -94,6 +107,7 @@ export type {
   ChosenFolder,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
+  OpenedPage,
   OpenRepositoryRequest,
   OpenRepositoryResponse,
   RefreshRequest,

@@ -2,18 +2,19 @@ import {
   branchEntries,
   BRIDGE_GLOBAL_NAME,
   FailureKind,
+  menuOf,
   pressShowAll,
   sameSelection,
   selectionOf,
   SHOW_ALL,
   showingRemotes,
+  survivingSelection,
   ThemeChoice,
   toggleBranch,
 } from '../contracts/index';
 import type { BranchEntry, BranchMenu, Failure, GraphPage, Refs, Result } from '../contracts/index';
 
 import { mountGraphTable } from './graph-table';
-import { readRemotes, storeRemotes } from './remotes-store';
 import type { GraphTableView } from './graph-table';
 import { mountShell, OPEN_LABEL, REFRESH_LABEL } from './shell';
 import type { Shell } from './shell';
@@ -29,10 +30,13 @@ import type { Shell } from './shell';
  * {@link LOAD_MORE_COMMITS} says why that is unavoidable and what stops it
  * drifting.
  *
- * Nothing polls, and the one timer is the bound on how long an open waits for
- * the remembered Show Remote Branches ({@link REMOTES_WAIT_MS}). Every request
- * starts from an event — the document loading, a click, or the view's Load More
- * intent — and the control that started one is disabled until it is answered.
+ * Nothing polls and nothing waits on a timer. Every request starts from an event
+ * — the document loading, a click, or the view's Load More intent — and the
+ * control that started one is disabled until it is answered.
+ *
+ * **It keeps nothing across a restart.** The branch selection and Show Remote
+ * Branches of each repository are kept by the main process (`src/app/selections.ts`),
+ * which opens a repository on them and says in the open's reply which they were.
  */
 
 /** Where the view is published on the window's global. */
@@ -62,26 +66,6 @@ const LOAD_MORE_COMMITS = 300;
  */
 const OPEN_LABELS: Labels = { resting: OPEN_LABEL, busy: 'Opening…' };
 const REFRESH_LABELS: Labels = { resting: REFRESH_LABEL, busy: 'Refreshing…' };
-
-/**
- * How long an open waits for the remembered Show Remote Branches before it opens
- * without it.
- *
- * **This is the one timer of this module.** The choice is kept in the
- * renderer's own storage (`./remotes-store.ts`, which says why there), and that
- * storage can take seconds to fail when a second instance of the application
- * shares the user-data directory. An open that waited for it would sit that long
- * on "Opening…". So the open waits this long at most; an answer that comes later
- * is applied when it comes, as a click on the checkbox would be.
- *
- * Measured by E03-M01-S10 on 2026-10-28 in the built application: a fresh
- * window opening the store and reading one stored path took 20.6 to 47.9 ms over
- * ten launches on one user-data directory, so 250 ms is about five times the
- * slowest. Beside a first instance on the same directory, a second showed its
- * repository in 1 295 to 2 240 ms over three launches, against 7 505 to 9 709 ms
- * when this read was a `localStorage` call.
- */
-const REMOTES_WAIT_MS = 250;
 
 /**
  * The view, as everything outside this ring sees it.
@@ -253,13 +237,20 @@ function showBranches(shell: Shell, session: Session): void {
 }
 
 /**
- * Open `path` on every branch and its remembered Show Remote Branches, and
- * remember it only once it has opened. The branch selection is not remembered:
- * a repository always opens on Show All.
+ * Open `path` on the branch selection and Show Remote Branches last applied to
+ * it, which the main process keeps and opens it on, less every kept branch the
+ * repository no longer has.
  *
- * Remote branches are shown unless the store says they were hidden, by the time
- * {@link REMOTES_WAIT_MS} has passed or later: a later "hidden" for the
- * repository still open, with the checkbox still checked, unchecks it then.
+ * The open's reply says which selection its page was read under. When a branch
+ * it names is gone (`survivingSelection`), that page is not drawn: what survives
+ * is applied, as a click would apply it, and its page is the first one drawn —
+ * every branch, when nothing survives, so a stale selection never shows an empty
+ * graph. Applying it is also what keeps it for the next open in place of the
+ * stale one, and what leaves the utility process reading only branches the
+ * control shows.
+ *
+ * The control is given the selection in the same task as the page, before either
+ * is drawn, so no page under another selection is ever drawn first.
  */
 async function open(
   shell: Shell,
@@ -267,24 +258,20 @@ async function open(
   session: Session,
   path: string,
 ): Promise<void> {
-  const stored = readRemotes(path);
-  const waited = new Promise<undefined>((done) => setTimeout(done, REMOTES_WAIT_MS));
-  const early = await Promise.race([stored, waited]);
-  const showRemoteBranches = early !== false;
-  const reply = await window.gitGraphical.openRepository({ path, showRemoteBranches });
-  if (reply.ok) {
+  const opened = await window.gitGraphical.openRepository({ path });
+  let reply: Result<GraphPage> = opened;
+  if (opened.ok) {
+    const { selection, refs } = opened.value;
+    const shown = survivingSelection(selection, refs);
     session.path = path;
-    session.menu = SHOW_ALL;
-    session.showRemoteBranches = showRemoteBranches;
-    shell.branches.remotes.checked = showRemoteBranches;
+    session.menu = menuOf(shown);
+    session.showRemoteBranches = shown.showRemoteBranches;
+    if (!sameSelection(shown, selection)) {
+      reply = await window.gitGraphical.refresh({ selection: shown });
+    }
+    shell.branches.remotes.checked = shown.showRemoteBranches;
   }
   receive(shell, view, session, reply, true);
-  void stored.then((late) => {
-    if (late === false && session.path === path && session.showRemoteBranches) {
-      shell.branches.remotes.checked = false;
-      choose(shell, view, session, showingRemotes(session.menu, false), false);
-    }
-  });
 }
 
 /**
@@ -368,9 +355,6 @@ function connectBranches(shell: Shell, view: GraphTableView, session: Session): 
   });
   shell.branches.remotes.addEventListener('change', () => {
     const show = shell.branches.remotes.checked;
-    if (session.path !== null) {
-      storeRemotes(session.path, show);
-    }
     choose(shell, view, session, showingRemotes(session.menu, show), show);
   });
 }

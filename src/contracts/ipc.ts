@@ -13,7 +13,7 @@ import type { Result } from './result';
 export const CHANNELS = /* @__PURE__ */ Object.freeze({
   /** Report the folder the application was started with, if it was given one. */
   startupRepository: 'repository:startup',
-  /** Open a repository at a known path and return its first page. */
+  /** Open a repository at a known path and return its first page, under the selection kept for it. */
   openRepository: 'repository:open',
   /** Ask the main process to show a folder chooser. */
   chooseFolder: 'repository:choose-folder',
@@ -54,7 +54,8 @@ export type StartupRepositoryResponse = Result<StartupRepository>;
  *
  * - `branches: null` is **every branch**: every local branch, every
  *   remote-tracking branch while they are shown, every tag, and HEAD. It is what
- *   a repository opens on and what the window showed before a selection existed.
+ *   a repository with nothing kept opens on, and what the window showed before a
+ *   selection existed.
  * - `branches: [...]` is **the union of the histories of the branches named**,
  *   and nothing else: no tag, no HEAD, no branch that is not named. Each name is
  *   a full reference name as git spells it, `refs/heads/<branch>` for a local
@@ -81,19 +82,39 @@ export interface BranchSelection {
 /**
  * Open the repository rooted at, or containing, `path`.
  *
- * A repository always opens on every branch. Whether remote-tracking branches
- * are shown is the request's to say, and they are when it does not say; Refresh
- * and Load More keep it, as they keep any selection applied later.
+ * A repository opens on the selection last applied to it — by `path`, as it is
+ * spelled — which the main process keeps across restarts and between instances
+ * on one user-data directory, and on every branch with remote-tracking branches
+ * shown when nothing is kept. The reply says which selection that was. Refresh
+ * and Load More keep it, as they keep any selection applied later, and every
+ * selection a Refresh applies is kept for the repository in its place.
+ *
+ * A kept selection is read as it was kept, so it can name a branch the
+ * repository no longer has; `survivingSelection` says which of its branches
+ * remain, and a Refresh applying that is how a caller drops the rest.
  */
 export interface OpenRepositoryRequest {
   /** An absolute path to a working tree or to a directory inside one. */
   readonly path: string;
-  /** Whether remote-tracking branches are shown. Absent means they are. */
+  /**
+   * Absent, the open reads under what is kept. Present, it opens on every
+   * branch with remote-tracking branches shown or not as this says, and what is
+   * kept is neither read nor changed by the open.
+   */
   readonly showRemoteBranches?: boolean;
 }
 
+/** An opened repository's first page, and the selection it was read under. */
+export interface OpenedPage extends GraphPage {
+  /**
+   * The selection the page was read under, and the one Refresh and Load More now
+   * keep: the one kept for the repository, or every branch.
+   */
+  readonly selection: BranchSelection;
+}
+
 /** The first page, or why the repository could not be opened. */
-export type OpenRepositoryResponse = Result<GraphPage>;
+export type OpenRepositoryResponse = Result<OpenedPage>;
 
 /** The folder the user picked. */
 export interface ChosenFolder {

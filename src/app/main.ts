@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { registerHandlers } from './handlers';
 import { createRepositoryClient } from './repository-client';
 import type { RepositoryClient } from './repository-client';
+import { openSelectionStore } from './selections';
 import { startupRepositoryPath } from './startup';
 import { openThemeStore } from './theme';
 import { createMainWindow } from './window';
@@ -40,12 +41,14 @@ function start(): void {
   client = createRepositoryClient(distDirectory());
   // The stored colour scheme is read and applied here, before any window
   // exists, so that the window's first paint is already in it (`./theme.ts`).
-  const theme = openThemeStore(app.getPath('userData'));
+  const home = app.getPath('userData');
+  const theme = openThemeStore(home);
   registerHandlers({
     client,
     startupPath: startupRepositoryPath(process.argv, app.isPackaged),
     windowOf: () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null,
     theme,
+    selections: openSelectionStore(home),
   });
   openWindow();
 

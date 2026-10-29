@@ -115,7 +115,16 @@ interface OpenRepositoryRequest {
     readonly showRemoteBranches?: boolean
 }
 
-type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
+type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./ipc").OpenedPage>
+
+interface OpenedPage {
+    readonly commits: CommitColumns
+    readonly hasMore: boolean
+    readonly layout: LayoutRows
+    readonly refs: Refs
+    readonly selection: BranchSelection
+    readonly workingTree: WorkingTree
+}
 
 interface Person {
     readonly email: string
@@ -202,7 +211,13 @@ value hexHashOf: (columns: CommitColumns, row: number) => string
 
 value isChecked: (menu: BranchMenu, name: string) => boolean
 
+value keptSelection: (value: unknown) => BranchSelection | null
+
 value matchingEntries: (entries: readonly BranchEntry[], text: string) => BranchEntry[]
+
+value menuOf: (selection: BranchSelection) => BranchMenu
+
+value openingSelection: (kept: BranchSelection | null, showRemoteBranches: boolean | undefined) => BranchSelection
 
 value parentsOf: (columns: CommitColumns, row: number) => Uint32Array
 
@@ -227,5 +242,7 @@ value selectionOf: (menu: BranchMenu, showRemoteBranches: boolean) => BranchSele
 value showingRemotes: (menu: BranchMenu, show: boolean) => BranchMenu
 
 value subjectOf: (columns: CommitColumns, row: number) => string
+
+value survivingSelection: (selection: BranchSelection, refs: Refs) => BranchSelection
 
 value toggleBranch: (menu: BranchMenu, name: string) => BranchMenu

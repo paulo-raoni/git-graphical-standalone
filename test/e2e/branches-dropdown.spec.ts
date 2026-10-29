@@ -327,7 +327,7 @@ test('unchecking Show Remote Branches drops remote entries, labels and selection
   });
 });
 
-test('Refresh and Load More keep the selection; a restart keeps Show Remote Branches only', async () => {
+test('Refresh and Load More keep the selection; a restart keeps it and Show Remote Branches', async () => {
   const home = freshHome();
   const feature: Step = { box: 'feature', graph: [[FEATURE], false, false] };
   await withWindow(remotesRepository, home, async () => {
@@ -337,7 +337,7 @@ test('Refresh and Load More keep the selection; a restart keeps Show Remote Bran
   });
   await withWindow(remotesRepository, home, async () => {
     await expect(remotes()).not.toBeChecked();
-    await play([{ box: 'Show All', graph: [EVERY_LOCAL, true, false] }]);
+    await play([feature, { do: 'open', checked: ['feature'], listed: ['Show All', ...LOCALS] }]);
   });
   // Another repository on the same user-data directory has a choice of its own.
   await withWindow(manyRepository, home, () => expect(remotes()).toBeChecked());
