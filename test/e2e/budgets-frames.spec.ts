@@ -85,11 +85,62 @@ const SET_ASIDE_FRAMES = 4;
 /** Timings of the reference workload in the page before each run, and as many after it. */
 const REFERENCE_TIMES = 10;
 /**
- * The reference workload's time in the page on a free machine, in milliseconds: the
- * upper end of what a run's twenty timings read at their middle on a quiet machine
- * (the case's comment says where it was read), so that a free run is scaled by 1.
+ * The milliseconds a held figure is expressed in: a run's figure over the middle of its
+ * reference timings, times this, which is about what that middle reads on this machine
+ * when it is free (the case's comment says where it was read).
  */
-const REFERENCE_MILLISECONDS = 8.8;
+const REFERENCE_MILLISECONDS = 7;
+
+/**
+ * Runs in the page: the reference workload, timed `count` times after three untimed
+ * passes. It is the view's kind of work and none of the view's code: 800 text cells
+ * in 200 flex rows of an element of its own, off screen, each pass rewriting every
+ * cell's text and reading the element's height, which makes the engine recompute
+ * their style and layout at once. The element is in the document only while it is
+ * timed, so the scrolled frames do not pay for it.
+ */
+const referenceTimes = (count: number): number[] => {
+  interface Node {
+    textContent: string | null;
+    readonly offsetHeight: number;
+    readonly style: { cssText: string };
+    appendChild: (child: Node) => void;
+    remove: () => void;
+  }
+  const scope = globalThis as unknown as {
+    document: { body: Node; createElement: (tag: string) => Node };
+    performance: { now: () => number };
+  };
+  const make = (tag: string, css: string): Node => {
+    const made = scope.document.createElement(tag);
+    made.style.cssText = css;
+    return made;
+  };
+  const box = make('div', 'position:absolute;left:-10000px;top:0;width:600px');
+  const cells: Node[] = [];
+  for (let row = 0; row < 200; row += 1) {
+    const line = make('div', 'display:flex;gap:4px');
+    for (let cell = 0; cell < 4; cell += 1) cells.push(make('span', ''));
+    cells.slice(-4).forEach((cell) => {
+      line.appendChild(cell);
+    });
+    box.appendChild(line);
+  }
+  scope.document.body.appendChild(box);
+  let turn = 0;
+  const once = (): number => {
+    const at = scope.performance.now();
+    turn += 1;
+    cells.forEach((cell, index) => {
+      cell.textContent = `${String((turn * 7_919 + index * 104_729) % 1_000_003)} x`;
+    });
+    turn += box.offsetHeight & 1;
+    return scope.performance.now() - at;
+  };
+  const times = Array.from({ length: count + 3 }, once).slice(3);
+  box.remove();
+  return times;
+};
 
 /**
  * The mean, the worst frame and the worst frame once the {@link SET_ASIDE_FRAMES}
@@ -110,30 +161,26 @@ async function framesAt(
   const references: number[] = [];
   for (let run = 0; run < runs; run += 1) {
     if (run > 0 && pause > 0) await page.waitForTimeout(pause);
-    const sample = await page.evaluate(sampleScrollFrames, {
-      frames: 240,
-      step,
-      reference: REFERENCE_TIMES,
-    });
+    const before = await page.evaluate(referenceTimes, REFERENCE_TIMES);
+    const sample = await page.evaluate(sampleScrollFrames, { frames: 240, step });
+    const after = await page.evaluate(referenceTimes, REFERENCE_TIMES);
     const slowestFirst = [...sample.work].sort((left, right) => right - left);
     means.push(sample.work.reduce((all, one) => all + one, 0) / sample.work.length);
     worsts.push(slowestFirst[0] ?? Number.NaN);
     trimmed.push(slowestFirst[SET_ASIDE_FRAMES] ?? Number.NaN);
-    references.push(median(sample.reference));
+    references.push(median([...before, ...after]));
   }
-  const scale = references.map((each) => Math.min(1, REFERENCE_MILLISECONDS / each));
-  const held = [means, trimmed].map((values) => {
-    const lowest = values.indexOf(Math.min(...values));
-    return (values[lowest] ?? Number.NaN) * (scale[lowest] ?? Number.NaN);
-  });
+  const scaled = [means, trimmed].map((values) =>
+    values.map((value, run) => (REFERENCE_MILLISECONDS * value) / (references[run] ?? Number.NaN)),
+  );
+  const held = scaled.map((values) => Math.min(...values));
   process.stdout.write(
     `  ${String(step)} px a frame, 240 frames a run: mean ${described(means, 2)} ms, ` +
       `worst ${described(worsts, 1)} ms, ` +
       `fifth-slowest ${described(trimmed, 1)} ms, ` +
       `reference ${described(references, 3)} ms, ` +
-      `factor ${described(scale, 3)}, ` +
-      `held mean ${(held[0] ?? Number.NaN).toFixed(2)} ms, ` +
-      `held fifth-slowest ${(held[1] ?? Number.NaN).toFixed(1)} ms\n`,
+      `mean per reference ${described(scaled[0] ?? [], 2)} ms, ` +
+      `fifth-slowest per reference ${described(scaled[1] ?? [], 1)} ms\n`,
   );
   return { means, worsts, trimmed, held };
 }

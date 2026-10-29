@@ -371,8 +371,7 @@ export interface FrameSample {
 export async function sampleScrollFrames(input: {
   frames: number;
   step: number;
-  reference?: number;
-}): Promise<FrameSample & { readonly reference: readonly number[] }> {
+}): Promise<FrameSample> {
   const scope = globalThis as unknown as Scope;
   const probe = scope.budgetProbe;
   const list = scope.document.querySelector('.graph__scroll');
@@ -382,34 +381,20 @@ export async function sampleScrollFrames(input: {
   const channel = new scope.MessageChannel();
   const work: number[] = [];
   const redrawsBefore = probe.redraws;
-  const table = new Int32Array(4096);
-  let mixed = 1;
-  const once = (): number => {
-    const at = scope.performance.now();
-    for (let index = 0; index < 1 << 19; index += 1) {
-      const slot = Math.imul(index, 40_503) & 4095;
-      mixed = (Math.imul(mixed, 31) + (table[slot] ?? 0) + index) | 0;
-      table[slot] = mixed;
-    }
-    return scope.performance.now() - at;
-  };
-  const times = input.reference ?? 0;
-  const reference = Array.from({ length: times === 0 ? 0 : times + 3 }, once).slice(3);
   let started = 0;
   const tick = (): void => {
     started = scope.performance.now();
     list.scrollTop = (list.scrollTop + input.step) % room;
     channel.port2.postMessage(0);
   };
-  return new Promise((done) => {
+  return new Promise<FrameSample>((done) => {
     channel.port1.onmessage = (): void => {
       work.push(scope.performance.now() - started);
       if (work.length < input.frames) {
         probe.frame(tick);
         return;
       }
-      reference.push(...Array.from({ length: times }, once));
-      done({ work, redraws: probe.redraws - redrawsBefore, reference });
+      done({ work, redraws: probe.redraws - redrawsBefore });
     };
     probe.frame(tick);
   });
