@@ -29,11 +29,11 @@
     "unit": "milliseconds to append 10000 commits, the slowest of the 12502, 20000 and 80000 builds normalised to ten thousand"
   },
   "parseMicrosecondsPerCommit": {
-    "baseline": 14.579,
+    "baseline": 15.326,
     "ceiling": 50,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks; fastest of five runs after a warm-up, perf/parse.timed.perf.test.ts; the baseline is S07's reading of 2026-09-28, taken in that file under its first name, perf/parse.perf.test.ts, which E01-M01-S11 renamed on 2026-10-10 adding only a comment"
+    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks, perf/parse.timed.perf.test.ts; read per a reference since E03-M01-FIX-04: 25 timed parses in five batches half a second apart, each divided by the middle of twenty timings of a fixed arithmetic workload around it and multiplied by 6, about what that middle reads in milliseconds on this machine when free, and the lowest of the 25 is held. The baseline is the median of that reading in ten readings kept at 037bee5 on 2026-10-29, 14.866 to 16.4, at other load of 9.0 to 33.3 per cent; S07's 14.579 was the fastest of five plain timings. It cannot see a regression that slows plain arithmetic in the runtime as much as the parser"
   },
   "layoutMicrosecondsPerCommit": {
     "baseline": 0.59,
@@ -89,18 +89,18 @@
     "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, the fastest of ten Refreshes a second apart, five in each of two windows; the baseline is the median of that figure over five runs on 2026-10-03 with all ten in one window, which read 418.4 to 539.4 at a processor load of 15 to 80 per cent; five runs with two windows read 418.7 to 560.8, median 428.5, at 12 to 100 per cent, and the baseline was not raised to them"
   },
   "scrollFrameMeanMilliseconds": {
-    "baseline": 5.24,
+    "baseline": 4.4,
     "ceiling": 8,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts: the reading is the lowest of ten runs a second apart since E01-M01-FIX-37; the baseline is S07's median of five runs, which read 5.13 to 5.34 on 2026-09-28; re-measured as the lowest of ten in seven kept runs on 2026-10-17, 5.02 to 5.67, median 5.33, at other load of 20 to 38 per cent, and not raised to it"
+    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts, read per a reference since E03-M01-FIX-04: each of ten runs a second apart is divided by the middle of twenty timings of a fixed layout workload run in the same page around it, and multiplied by 7, about what that middle reads on this machine when free; the lowest of the ten is held. The baseline is the median of that reading in ten readings kept at 037bee5 on 2026-10-29, 3.967 to 5.322, at other load of 10.0 to 33.1 per cent, own processes counted apart; S07's 5.24 and FIX-37's lowest of ten raw means were in plain milliseconds. It cannot see a regression that slows the reference as much as the frames, such as a style rule that slows the style of every element of the page"
   },
   "scrollFrameWorstMilliseconds": {
-    "baseline": 6.9,
+    "baseline": 6.3,
     "ceiling": 16.7,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest: the reading is the lowest of the same ten runs' fifth-slowest frames since E03-M01-FIX-03, which lowered the baseline from 7.7, the lowest slowest frame's, to 6.9, the median of the new reading in twelve readings kept at its base on 2026-10-28, 6.3 to 8.4, at other load of 11.0 to 34.5 per cent, own processes counted apart; in the same runs the lowest slowest frame read 7.1 to 10.8; twelve more kept at FIX-03's first commit read 6.5 to 8.0 at other load of 23.2 to 36.5 per cent; the tolerance and the ceiling are unchanged"
+    "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest, read per the same reference since E03-M01-FIX-04: each run's fifth-slowest frame is divided by the middle of its reference timings and multiplied by 7, and the lowest of the ten is held. The baseline is the median of that reading in the same ten readings, 5.377 to 8.638; E03-M01-FIX-03 had held the raw fifth-slowest frame to a baseline of 6.9 and E01-M01-FIX-37 the raw slowest to 7.7. It cannot see a regression that slows the reference as much as the frames, nor one that slows four or fewer frames of every run; the tolerance and the ceiling are unchanged"
   },
   "liveRowElements": {
     "baseline": 37,
