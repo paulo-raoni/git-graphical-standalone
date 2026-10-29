@@ -86,11 +86,11 @@ function timed(): number {
 /** Timings of the reference workload before each timed parse, and as many after it. */
 const REFERENCE_TIMES = 10;
 /**
- * The reference workload's time when nothing slows it, in milliseconds: the lowest
- * middle of a parse's twenty timings in the readings E03-M01-FIX-04 kept before it
- * fixed this figure (the header says which).
+ * The reference workload's time on a free machine, in milliseconds: the upper end of
+ * what a parse's twenty timings read at their middle on a quiet machine (the header
+ * says where it was read), so that a free run is scaled by 1.
  */
-const REFERENCE_MILLISECONDS = 5.644;
+const REFERENCE_MILLISECONDS = 6.1;
 
 const table = new Int32Array(4096);
 let mixed = 1;
@@ -129,15 +129,15 @@ describe('the streamed log parser, timed', () => {
     const readings = Array.from({ length: RUNS }, timedBeside);
     const runs = readings.map((each) => each.parse);
     const references = readings.map((each) => each.reference);
-    const scaled = readings.map(
-      (each) => each.parse * Math.min(1, REFERENCE_MILLISECONDS / each.reference),
-    );
-    const fastest = Math.min(...scaled);
+    const factors = references.map((each) => Math.min(1, REFERENCE_MILLISECONDS / each));
+    const lowest = runs.indexOf(Math.min(...runs));
+    const fastest = (runs[lowest] ?? Number.NaN) * (factors[lowest] ?? Number.NaN);
     process.stdout.write(
       `  parse: ${String(log.length)} bytes, ${String(COMMITS)} commits, ` +
         `${runs.map((each) => each.toFixed(3)).join(', ')} microseconds a commit, ` +
         `reference ${references.map((each) => each.toFixed(3)).join(', ')} ms, ` +
-        `scaled ${scaled.map((each) => each.toFixed(3)).join(', ')} microseconds a commit\n`,
+        `factor ${factors.map((each) => each.toFixed(3)).join(', ')}, ` +
+        `held ${fastest.toFixed(3)} microseconds a commit\n`,
     );
     const baseline = readBaselines()['parseMicrosecondsPerCommit'];
     expect(baseline).toBeDefined();

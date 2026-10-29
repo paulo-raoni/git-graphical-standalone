@@ -85,30 +85,25 @@ const SET_ASIDE_FRAMES = 4;
 /** Timings of the reference workload in the page before each run, and as many after it. */
 const REFERENCE_TIMES = 10;
 /**
- * The reference workload's time in the page when nothing slows it, in milliseconds:
- * the lowest middle of a run's twenty timings in the readings E03-M01-FIX-04 kept
- * before it fixed this figure (the case's comment says which).
+ * The reference workload's time in the page on a free machine, in milliseconds: the
+ * upper end of what a run's twenty timings read at their middle on a quiet machine
+ * (the case's comment says where it was read), so that a free run is scaled by 1.
  */
-const REFERENCE_MILLISECONDS = 7.9;
+const REFERENCE_MILLISECONDS = 8.8;
 
 /**
  * The mean, the worst frame and the worst frame once the {@link SET_ASIDE_FRAMES}
  * slowest are set aside, of each run, at one scroll step, `pause` ms between runs;
- * and the mean and that worst frame scaled by the run's reference, which is
- * `REFERENCE_MILLISECONDS` over the middle of its reference timings, at most 1.
+ * and the lowest mean and the lowest of those worst frames, each scaled by its own
+ * run's factor: `REFERENCE_MILLISECONDS` over the middle of the run's reference
+ * timings, at most 1.
  */
 async function framesAt(
   page: Page,
   step: number,
   runs: number,
   pause: number,
-): Promise<{
-  means: number[];
-  worsts: number[];
-  trimmed: number[];
-  scaledMeans: number[];
-  scaledTrimmed: number[];
-}> {
+): Promise<{ means: number[]; worsts: number[]; trimmed: number[]; held: number[] }> {
   const means: number[] = [];
   const worsts: number[] = [];
   const trimmed: number[] = [];
@@ -127,17 +122,20 @@ async function framesAt(
     references.push(median(sample.reference));
   }
   const scale = references.map((each) => Math.min(1, REFERENCE_MILLISECONDS / each));
-  const scaledMeans = means.map((each, run) => each * (scale[run] ?? Number.NaN));
-  const scaledTrimmed = trimmed.map((each, run) => each * (scale[run] ?? Number.NaN));
+  const held = [means, trimmed].map((values) => {
+    const lowest = values.indexOf(Math.min(...values));
+    return (values[lowest] ?? Number.NaN) * (scale[lowest] ?? Number.NaN);
+  });
   process.stdout.write(
     `  ${String(step)} px a frame, 240 frames a run: mean ${described(means, 2)} ms, ` +
       `worst ${described(worsts, 1)} ms, ` +
       `fifth-slowest ${described(trimmed, 1)} ms, ` +
       `reference ${described(references, 3)} ms, ` +
-      `scaled mean ${described(scaledMeans, 2)} ms, ` +
-      `scaled fifth-slowest ${described(scaledTrimmed, 1)} ms\n`,
+      `factor ${described(scale, 3)}, ` +
+      `held mean ${(held[0] ?? Number.NaN).toFixed(2)} ms, ` +
+      `held fifth-slowest ${(held[1] ?? Number.NaN).toFixed(1)} ms\n`,
   );
-  return { means, worsts, trimmed, scaledMeans, scaledTrimmed };
+  return { means, worsts, trimmed, held };
 }
 
 /**
@@ -199,12 +197,12 @@ test('main-thread work per frame while scrolling @budgets', async () => {
       holdToBaseline(
         'scrollFrameMeanMilliseconds',
         'mean main-thread work a frame',
-        Math.min(...jumping.scaledMeans),
+        jumping.held[0] ?? Number.NaN,
       ).failed,
       holdToBaseline(
         'scrollFrameWorstMilliseconds',
         'worst main-thread frame of a run, its four slowest set aside',
-        Math.min(...jumping.scaledTrimmed),
+        jumping.held[1] ?? Number.NaN,
       ).failed,
     ];
     expect(verdicts).toEqual([false, false]);
