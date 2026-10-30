@@ -576,7 +576,8 @@ From E03-M01's review round 05 (2026-10-28, at `d31361f`):
 
 28. The S07 slice document's table row gives the worst-frame baseline as 7.7 ms (6.9 since E03-M01-FIX-03), and
     *Two regimes* says that verdict is the lowest of ten worst frames (it is the lowest of ten fifth-slowest
-    frames). E03-M01-FIX-04's boundary holds both lines; if it corrects them, this item is closed by it.
+    frames). E03-M01-FIX-04's boundary holds both lines; if it corrects them, this item is closed by it. **Closed by
+    E03-M01-FIX-04** (review round 06).
 29. The fifth-slowest frame verdict cannot see a slowdown of four or fewer frames in every run; FIX-03's commit
     `c6edf89` says "Not a loosening" without that exception; and ADR-0002's "no frame over 16.7 ms" is checked
     literally by no verdict. **The owner ruled on 2026-10-28 that a check of it is wanted, in E04-M01.**
@@ -593,11 +594,26 @@ From E03-M01's review round 05 (2026-10-28, at `d31361f`):
 34. A second instance on the same user-data directory opened with Show Remote Branches checked whatever was stored.
     **Taken by E03-M01-S12** (owner's ruling, 2026-10-28).
 35. The plan and E03-M01's goal say the branch selection persists per repository; the observed reference and the
-    product did not. **Taken by E03-M01-S12** (owner's ruling, 2026-10-28: keep it per repository).
+    product did not. **Taken by E03-M01-S12** (owner's ruling, 2026-10-28: keep it per repository). Items 30, 34 and
+    35 are **closed by E03-M01-S12** (review round 06: its mutation M1 and the built application).
 36. The check mark drawn by `.branches__option[aria-selected='true']::before` becomes part of each checked row's
     accessible name ("✓ main"); `aria-selected` already says it.
 37. Short wall-clock readings are judged on samples longer than the reading: the parse benchmark takes about 3 s and
     `AGENTS.md` §11 allows sampling every 5 s.
+
+From E03-M01's review round 06 (2026-10-30, at `f15ad50`):
+
+38. `test/e2e/branch-selection.spec.ts` runs on the default user-data directory and, since E03-M01-S12, writes a
+    kept record into the real profile of whoever runs the suite (measured by the reviewer); its header still says
+    no control applies a selection.
+39. Before a repository's first page, the disabled Show Remote Branches checkbox shows checked whatever is kept
+    (measured 14 to 703 ms on a restart by the reviewer), as before E03-M01-S12.
+40. `AGENTS.md` §5 does not say whether a fix task may run beside a slice lane; E03-M01-FIX-04 ran beside S12
+    from a different base, and only review round 06 gated the two together.
+
+Round 06's C-42 (the scrolled fifth-slowest baseline kept above its re-measured median) is not carried: the
+owner ruled on 2026-10-30 to tighten it before v0.2.0, by E03-M01-FIX-05. Its C-45, the orchestrator's
+tree-identical reword of 2026-10-25 made before `AGENTS.md` §2 listed one, was ratified by the owner on 2026-10-30.
 
 ### What shapes the plan rather than the code
 
