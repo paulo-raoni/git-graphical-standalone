@@ -85,8 +85,11 @@ const SET_ASIDE_FRAMES = 4;
 /**
  * The milliseconds a held figure is expressed in: each frame's work over the timing of
  * the reference workload that followed it, times this, which is about what that
- * timing reads on this machine when it is free (the case's comment says where it was
- * read), so that a free frame reads about its own milliseconds.
+ * timing reads on this machine when it is free, so that a free frame reads about its
+ * own milliseconds. It was set from E03-M01-FIX-04's first reading, whose runs' middle
+ * timings read 2.3 to 3.0 ms at 12.6 per cent other load; in its later readings kept at
+ * under 15 per cent the median run's middle read 2.4 to 2.5, so a free frame reads a
+ * few per cent under its own milliseconds.
  */
 const REFERENCE_MILLISECONDS = 2.3;
 
@@ -206,7 +209,8 @@ async function framesAt(
  * most a frame of this view can be asked to do. **The budget is held on the
  * second**, ten runs a second apart. The mean of a run is its work per frame, and
  * its worst frame is read **with its four slowest frames set aside**: the
- * fifth-slowest of its 240. **The lowest of the ten of each is compared.**
+ * fifth-slowest of its 240, **both read per a reference timed after each frame**
+ * (below). **The lowest of the ten of each is compared.**
  *
  * The lowest, and not the median of five as S07 held it, because the machine is
  * shared and what other programs do to a frame only ever adds to it. On
@@ -246,6 +250,28 @@ async function framesAt(
  * and the case for the change is the margin above. By construction, and not
  * measured, it cannot see a regression that slows four or fewer frames of every
  * run.
+ *
+ * **Each frame is read per a reference since E03-M01-FIX-04** (2026-10-29),
+ * because both verdicts still flapped: at `d31361f`, in twenty readings FIX-04
+ * kept of this case alone and of the whole budgets gate, judged as FIX-03's
+ * were with the machine sampled every 2 s and a synthetic load added to spread
+ * them, the lowest raw mean was red in four (7.861 to 9.298 ms) and the lowest
+ * raw fifth-slowest in five (10.4 to 20.6), at 22.7 to 37.0 per cent other load,
+ * every run of each slow. After every frame `sampleScrollFrames` times
+ * {@link frameReference}; the frame's work over that time, times
+ * `REFERENCE_MILLISECONDS`, is the figure the mean and the fifth-slowest are taken
+ * of. Twenty readings of that kept at FIX-04's `044b3fa`, interleaved with those
+ * and spread the same way, at 6.5 to 37.9 per cent: means 4.786 to 6.111,
+ * fifth-slowest 5.8 to 9.834, none red. The mean's baseline went down to their
+ * median, 4.94; the fifth-slowest's stays 6.9, its median 6.691 being too close
+ * to the highest. On a quiet machine a regression must add 3.87 to 4.55 to the
+ * new fifth-slowest to turn it red, against 3.45 to 4.35 to the old: planted in
+ * `paint`, 3 ms in every frame read 9.09 to 9.932, green in three kept readings,
+ * 4 ms 10.036 to 10.465, red in one of three, 5 ms red in three of three, as was
+ * 6 ms in every tenth frame; the mean was red on 3 ms in two of three and on 4 ms
+ * in three. Neither verdict can see a regression that slows the reference as
+ * much as the frames, such as a style rule costly for every element of the page;
+ * the slice document, *Main-thread work per frame while scrolling*, has the rest.
  */
 test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);
