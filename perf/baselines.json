@@ -96,7 +96,7 @@
     "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts, read per a reference since E03-M01-FIX-04: each frame's work is divided by the time of a fixed layout workload run in the same page straight after it and multiplied by 2.3, about what that time reads on this machine when free, and the lowest of ten runs' means a second apart is held. The baseline is the median of that reading in twenty readings kept on 2026-10-30 at a product unchanged since E03-M01-FIX-03, 4.786 to 6.111, at other load of 6.5 to 37.9 per cent, own processes counted apart; S07's 5.24 was the median of five raw runs. It cannot see a regression that slows the reference as much as the frames, such as a style rule that slows the style of every element of the page"
   },
   "scrollFrameWorstMilliseconds": {
-    "baseline": 6.9,
+    "baseline": 6.691,
     "ceiling": 16.7,
     "tolerance": 1.5,
     "ciTolerance": 4,
