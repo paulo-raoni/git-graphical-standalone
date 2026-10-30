@@ -36,12 +36,12 @@ cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day 
 | --- | --- | --- | --- | --- |
 | Cold start to a painted window, empty repository | ≤ 1500 ms | fastest of ten launches, **991 ms** (median of five runs) | five runs on 2026-10-03: fastest 958 to 1096 | meets |
 | Load 10 000 commits, to rows painted | ≤ 800 ms | fastest of ten Refreshes, **423.5 ms** (median of five runs) | five runs on 2026-10-03: fastest 418.4 to 539.4 | meets |
-| Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
+| Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs; since E03-M01-FIX-04 the lowest of twenty-five per a reference, twenty kept readings on 2026-10-30: 14.06 to 17.301 µs | meets |
 | Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs; since E01-M01-FIX-37 the fastest of twenty-five, six kept runs on 2026-10-17: 0.572 to 0.643 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
 | Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **157 372 416 bytes** (150.1 MiB), read once the load's memory has come back | five runs on 2026-10-03, 147.6 to 154.1 MiB | meets |
 | Resident memory growth over 5 minutes idle | ≤ 2 % | **+0.2 %** (ratio 1.002), from the settled reading | five five-minute runs on 2026-10-03: 0.853 to 1.006 | meets |
-| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6 | meets |
+| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **4.94 ms** per reference since E03-M01-FIX-04 (S07: **5.24 ms**), fifth-slowest frame **6.9 ms** since E03-M01-FIX-03 (S07: worst frame **7.7 ms**) | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6; since FIX-04 each frame per a reference, twenty kept on 2026-10-30: means 4.786 to 6.111, fifth-slowest 5.8 to 9.834 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
 | CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | five five-minute runs: 0.063 to 0.453 % | meets |
 
@@ -192,6 +192,28 @@ stays 0.59. The median of the six kept readings is 0.605, higher, by review roun
 FIX-37's record lists, of which 0.611, given here before as the median, is the fourth (the record is not in the
 repository, and E03-M01-S04 did not repeat the count); a baseline moves only down (`AGENTS.md` §11); the first batch is S07's reading as it was made, so the fastest of twenty-five is never above it, and
 S07's figure is not a looser limit for the new reading. The tolerance and the ceiling are unchanged.
+
+**Since E03-M01-FIX-04 (2026-10-29) the parse is timed over twenty-five runs too, each read per a
+reference.** E03-M01-S10's lane kept a reading of 24.741 µs against the limit of 21.87 (14.579 times 1.5) on code
+identical to its base, and review round 05 read 25.702 at 39.4 per cent other load during the reading; both are
+their readings, and FIX-04 did not reproduce either. The timing is now one warm-up parse, then five batches half
+a second apart, each one untimed parse and five timed ones; around each timed parse a fixed arithmetic workload in
+the same thread, 2^19 steps over a 16 KiB table, is timed ten times before and ten after, the parse's time is
+divided by the middle of those twenty timings and multiplied by 6, about what that middle reads in milliseconds on
+this machine when free (the median run's middle read 5.69 to 5.73 in FIX-04's four readings kept at under 7 per
+cent other load), and **the lowest of the
+twenty-five** is compared. FIX-04 kept twenty readings of the parse at its base, `d31361f`, and twenty of the new
+reading over the same product, on 2026-10-29 and 2026-10-30, interleaved, each judged by `AGENTS.md` §11 with the
+lane's own processes counted apart through a Windows job object, the machine sampled every 2 s, a synthetic load
+added on top of the machine's own to spread them: the old reading 14.118 to 17.088 at other load of 7.0 to 39.3
+per cent, none red; the new 14.06 to 17.301 at 5.9 to 36.8, none red, median 15.214. **The baseline stays
+14.579**, a baseline moving only down. On the readings kept at under 15 per cent other load, what a regression
+must add to turn the verdict red was 6.35 to 7.70 µs for the new reading and 6.61 to 7.75 for the old. Planted in
+the parser, a busy-wait per commit of 6 µs read 20.763 to 21.159, green in three kept readings of three; of 7 µs,
+22.37 to 23.08, red in three of three; of 8 µs, 22.989 to 23.399, and of 10 µs, 24.919 to 26.385, red in three
+of three each; removed, 14.476 to 15.197, green. The reference does none of the parser's work, so it cannot see a
+regression that slows plain arithmetic in the runtime as much as the parser. Since the old reading was not red in
+FIX-04's series either, the case for the change is review round 05's red, not a red FIX-04 saw.
 
 **Both are held as time per commit, not commits per second.** A throughput is a lower bound and
 `compareWithBaseline` fails a number that rises; 20 000 commits a second turned over is at most 50 µs a commit,
@@ -531,6 +553,53 @@ is the margin, 0.75 ms under the old limit on the worst of the first twelve agai
 not measured, the new reading cannot see a regression that slows four or fewer frames of every run; the old
 reading could, and that is what the four set aside cost.
 
+**Since E03-M01-FIX-04 (2026-10-29) every frame is read per a reference timed straight after it.** Review round
+05 kept a full `npm run gates:budgets` reading at `d31361f` on 2026-10-28, other load 34.3 per cent in the minute
+before and 31.9 during, whose lowest mean read 8.086 ms, past the 8 ms ceiling, and whose lowest fifth-slowest
+read 11.0 against 10.35; E03-M01-S10's lane kept a mean of 8.785. Those are their readings. FIX-04 reproduced the
+flap: of twenty readings it kept at that commit on 2026-10-29 and 2026-10-30 (the case alone and the whole gate,
+ten each, judged as the parse readings above are), the lowest mean was red in four, 7.861 to 9.298, and the lowest
+fifth-slowest in five, 10.4 to 20.6, at other load of 22.7 to 37.0 per cent during the reading. In each of those
+readings every run was slow, so no lowest of ten could step around it. A first repair in this lane divided each
+run by the middle of a layout workload timed ten times before the run and ten after it; in its own series the
+fifth-slowest went red in three of its fifteen kept readings that held it, at 28.1 to 35.0 per cent, 12.18 to
+13.13 against 9.45: under that load a run's slowest frames slowed up to three times where the reference slowed by
+a third to two thirds.
+
+So `sampleScrollFrames` now runs a reference workload after every frame, in the task that takes the frame's end
+mark: an element of its own, off screen, of 240 text cells in 60 flex rows, every cell's text rewritten and the
+element's height read, which makes the engine recompute their style and layout. It is in the document only while
+a run's frames are sampled. Each frame's work is divided by that timing and multiplied by 2.3 ms, about what the
+timing reads when the machine is free (the median run's middle read 2.4 to 2.5 in every reading FIX-04 kept at
+under 15 per cent other load), and of each run the mean and the fifth-slowest of those figures are taken; the lowest of the
+ten of each is compared. In a copy of the case never committed, six runs with the reference at each of six load
+levels gave a lowest mean per frame's reference whose highest level read 1.17 times its lowest, and a lowest
+fifth-slowest 1.49 times, where the raw figures read 2.12 and 2.83 times.
+
+Twenty readings of the new reading kept at FIX-04's `044b3fa`, which changes no product file, interleaved with
+those twenty at `d31361f` and spread the same way, at other load of 6.5 to 37.9 per cent: the lowest mean per
+reference 4.786 to 6.111, the lowest fifth-slowest per reference 5.8 to 9.834, none red. **The mean's baseline went
+down from 5.24 to 4.94**, the median of the twenty, so its limit is 7.41; **the fifth-slowest's stays 6.9**,
+because its median, 6.691, would have left the highest reading 0.2 ms under its limit. The tolerances and the
+ceilings are unchanged. On the readings kept at under 15 per cent other load, what a regression must add to turn
+a verdict red was, in its own unit, 2.45 to 2.60 for the new mean against 2.47 to 2.84 for the old, and 3.87 to
+4.55 for the new fifth-slowest against 3.45 to 4.35 for the old: **on a quiet machine the fifth-slowest verdict is
+up to 0.4 ms less sensitive**, and that is what it costs not to go red at the load where the old one did. With the
+reference beside it a frame itself read a few per cent slower on a quiet machine, a lowest raw mean of 5.25 to
+5.62 against 5.02 to 5.39 without it; the baselines were measured with it.
+
+Planted at the top of the view's `paint` and rebuilt, each read in kept readings at 6.2 to 19.1 per cent other load:
+a busy-wait of 2 ms in every frame read a lowest mean of 6.738 to 6.797 and a fifth-slowest of 7.995 to 9.476,
+green on both in three of three; of 3 ms, a mean of 7.406 to 7.765, red in two of three, and a fifth-slowest of
+9.09 to 9.932, green; of 4 ms, a mean of 8.562 to 8.818, red in three of three, and a fifth-slowest of 10.036 to
+10.465, red in one of three; of 5 ms, 9.623 to 9.809 and 11.171 to 11.5, red on both in three of three. Of 4 ms
+in every tenth frame only, a fifth-slowest of 9.2 to 9.305, green in three of three; of 6 ms in every tenth frame,
+10.969 to 11.4, red in three of three while the mean stayed green at 5.489 to 6.14. Removed, the case read 4.871
+to 5.407 and 5.805 to 8.433, green. FIX-03's raw reading had caught 3 ms in every frame in two readings of three
+and 4 ms in three of three on the fifth-slowest. The reference does none of the view's code, so the readings
+cannot see a regression that slows the reference as much as the frames, such as a style rule costly for every
+element of the page, and the fifth-slowest still cannot see one that slows four or fewer frames of every run.
+
 ### Live row elements
 
 37 row elements with 300 commits loaded, and 37 with 10 000 loaded after scrolling to four offsets across the
@@ -693,10 +762,14 @@ it was held to.
 **How wide.** An entry with a `ciTolerance` has every limit multiplied by it in CI — the ceiling and the
 baseline's own tolerance — and nothing removed. **Seven wall-clock entries carry a tolerance of 1.5 and a
 `ciTolerance` of 4**, each applied to a statistic of several runs, never to one: `parseMicrosecondsPerCommit`
-the fastest of five; `layoutMicrosecondsPerCommit` the fastest of five as S07 built it and of twenty-five since
+the fastest of five as S07 built it and, since E03-M01-FIX-04, the lowest of twenty-five read per a reference;
+`layoutMicrosecondsPerCommit` the fastest of five as S07 built it and of twenty-five since
 E01-M01-FIX-37; `coldStartEmptyMilliseconds`, `coldStartOpenMilliseconds` and `load10000Milliseconds` the
-fastest of ten; and `scrollFrameMeanMilliseconds` and `scrollFrameWorstMilliseconds` the median of five as S07
-built them and the lowest of ten since FIX-37. Two wall-clock entries are held otherwise:
+fastest of ten; `scrollFrameMeanMilliseconds` the median of five runs' means as S07 built it, the lowest of ten
+since FIX-37 and, since FIX-04, the lowest of ten read per a reference; and `scrollFrameWorstMilliseconds` the
+median of five runs' slowest frames as S07 built it, the lowest of ten since FIX-37, the lowest of ten runs'
+fifth-slowest frames since E03-M01-FIX-03 and, since FIX-04, that figure read per a reference (*Main-thread work
+per frame while scrolling*). Two wall-clock entries are held otherwise:
 `idleCpuPerCent`, one five-minute reading, with a tolerance of 8 (below), and `buildMilliseconds`, the slowest
 of three store builds, with a tolerance of 10 and no `ciTolerance`, which `perf/store.timed.perf.test.ts`
 compares through `compareWithBaseline` and not `compareInRegime`, so it is held to ten times its baseline in
