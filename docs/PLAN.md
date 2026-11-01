@@ -615,6 +615,19 @@ Round 06's C-42 (the scrolled fifth-slowest baseline kept above its re-measured 
 owner ruled on 2026-10-30 to tighten it before v0.2.0, by E03-M01-FIX-05. Its C-45, the orchestrator's
 tree-identical reword of 2026-10-25 made before `AGENTS.md` §2 listed one, was ratified by the owner on 2026-10-30.
 
+From E03-M01's review round 07 (2026-11-01, at `02ec06a`):
+
+41. Under a load that slows the renderer more than its processor share shows, the scrolled verdicts read a
+    regression smaller: E03-M01-FIX-05 measured its 5 ms-a-frame plant green under a game at 32.7 and 34.0 % other
+    load, which `AGENTS.md` §11 counts as a free machine (not reproduced by the reviewer, whose synthetic memory
+    load left the plant red). The repair round 07 names is an amendment of §11 that discards a reading whose own
+    reference time goes beyond a bound, measured first. **The owner ruled on 2026-11-01 to promote v0.2.0 and take
+    it in E04-M01.**
+42. `launchBudgeted` (`test/e2e/support/budgets.ts`) adds its five init scripts after `electron.launch` has
+    released the application's ready event, so the first window can get four (round 07 read Playwright 1.63.0's
+    launcher; not reproduced). FIX-05 saw it once, at a load §11 discards; its rate on a free machine is unmeasured.
+    The comment above it draws a conclusion the launcher does not support.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
