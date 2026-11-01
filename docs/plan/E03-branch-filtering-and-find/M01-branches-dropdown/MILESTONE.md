@@ -2,7 +2,7 @@
 
 **Epic:** E03 · Branch filtering and find
 **Base tag:** v0.1.0
-**State:** in flight
+**State:** delivered
 
 ## Goal
 
@@ -39,8 +39,8 @@ the goal above says, although the reference extension was observed opening a reo
 **Owed by S06** (merged 2026-10-25 with its audit `INCOMPLETE` on this one item, all its code and `npm run gates` green
 at `01fb07d`): its scope item 2's three dedicated runs of `npm run gates:mutation`, measuring how often the
 re-measure clause chooses kills, re-runs them, and refuses unchanged source. It had two draws inside full gate runs
-(3 and 2 kills chosen, all clock-only; no second run starved), which is not a rate. The next review or a later
-slice takes the measurement.
+(3 and 2 kills chosen, all clock-only; no second run starved), which is not a rate. Review round 03 took the
+measurement: three dedicated runs at its head, all `ok`, and no refusal of unchanged source in five draws.
 
 The Branches dropdown's slices, S09 to S11, were written from the reference extension observed by an observer
 session on 2026-10-25 (`AGENTS.md` §1, §7).
@@ -64,7 +64,7 @@ Filled in before promotion (`AGENTS.md` §8.5).
 | field | value |
 | --- | --- |
 | base tag | v0.1.0 |
-| reviewed commit | |
-| review rounds | |
-| tasks | |
-| tag created | |
+| reviewed commit | `02ec06a` (review round 07, `PASS`) |
+| review rounds | 7 |
+| tasks | S01 to S12; FIX-01 to FIX-05 |
+| tag created | v0.2.0 |
