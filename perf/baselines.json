@@ -33,14 +33,14 @@
     "ceiling": 50,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks; fastest of five runs after a warm-up, perf/parse.perf.test.ts, 2026-09-28"
+    "unit": "microseconds to parse one commit of `git log` into the store, the ceiling being ADR-0002 decision 6's 20000 commits a second turned over: the 10000-commit fixture's 2108854 bytes, read once from git before timing, fed in 16 KiB chunks, perf/parse.timed.perf.test.ts; read per a reference since E03-M01-FIX-04: 25 timed parses in five batches half a second apart, each divided by the middle of twenty timings of a fixed arithmetic workload around it and multiplied by 6, and the lowest of the 25 is held. The baseline stays S07's 14.579, the fastest of five plain timings on 2026-09-28: FIX-04's twenty readings of the new reading kept on 2026-10-30, other load 5.9 to 36.8 per cent, read 14.06 to 17.301, median 15.214, and a baseline moves only down. It cannot see a regression that slows plain arithmetic in the runtime as much as the parser"
   },
   "layoutMicrosecondsPerCommit": {
     "baseline": 0.59,
     "ceiling": 5,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, perf/layout.timed.perf.test.ts; the reading is the fastest of 25 runs in five batches half a second apart since E01-M01-FIX-37; the baseline is S07's fastest of five after a warm-up, 2026-09-28, which is that file's first batch; re-measured as the fastest of 25 in six kept runs on 2026-10-17, 0.572 to 0.643, median 0.611, at other load of 19 to 39 per cent, and not raised to it"
+    "unit": "microseconds to lay out one commit, the ceiling being ADR-0002 decision 6's 200000 commits a second turned over: 40000 braided rows in one page from a fresh state, perf/layout.timed.perf.test.ts; the reading is the fastest of 25 runs in five batches half a second apart since E01-M01-FIX-37; the baseline is S07's fastest of five after a warm-up, 2026-09-28, which is that file's first batch; re-measured as the fastest of 25 in six kept runs on 2026-10-17, 0.572 to 0.643, median 0.605 by review round 22's count of FIX-37's six, at other load of 19 to 39 per cent, and not raised to it"
   },
   "layoutWorkPerRow": {
     "baseline": 18.747,
@@ -89,18 +89,18 @@
     "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, the fastest of ten Refreshes a second apart, five in each of two windows; the baseline is the median of that figure over five runs on 2026-10-03 with all ten in one window, which read 418.4 to 539.4 at a processor load of 15 to 80 per cent; five runs with two windows read 418.7 to 560.8, median 428.5, at 12 to 100 per cent, and the baseline was not raised to them"
   },
   "scrollFrameMeanMilliseconds": {
-    "baseline": 5.24,
+    "baseline": 4.94,
     "ceiling": 8,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts: the reading is the lowest of ten runs a second apart since E01-M01-FIX-37; the baseline is S07's median of five runs, which read 5.13 to 5.34 on 2026-09-28; re-measured as the lowest of ten in seven kept runs on 2026-10-17, 5.02 to 5.67, median 5.33, at other load of 20 to 38 per cent, and not raised to it"
+    "unit": "milliseconds of main-thread work per frame, the mean of 240 frames scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts, read per a reference since E03-M01-FIX-04: each frame's work is divided by the time of a fixed layout workload run in the same page straight after it and multiplied by 2.3, about what that time reads on this machine when free, and the lowest of ten runs' means a second apart is held. The baseline is the median of that reading in twenty readings kept on 2026-10-30 at a product unchanged since E03-M01-FIX-03, 4.786 to 6.111, at other load of 6.5 to 37.9 per cent, own processes counted apart; S07's 5.24 was the median of five raw runs. It cannot see a regression that slows the reference as much as the frames, such as a style rule that slows the style of every element of the page"
   },
   "scrollFrameWorstMilliseconds": {
-    "baseline": 7.7,
+    "baseline": 6.691,
     "ceiling": 16.7,
     "tolerance": 1.5,
     "ciTolerance": 4,
-    "unit": "milliseconds of main-thread work in the worst of the same 240 frames: the reading is the lowest of the same ten runs' worst frames; the baseline is S07's median of five, which read 7.3 to 8.1; re-measured as the lowest of ten in the same seven kept runs, 7.0 to 10.6, median 8.6, and not raised to it"
+    "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest, read per the same reference since E03-M01-FIX-04: each frame's work over the reference timed after it, times 2.3, and the lowest of the ten runs' fifth-slowest such figures is held. The baseline is 6.691 since E03-M01-FIX-05, the median of FIX-04's twenty readings of this reading kept on 2026-10-30, 5.8 to 9.834 (FIX-04's measurement), so the limit is 10.0365; FIX-05 kept sixteen more on 2026-10-31 and 2026-11-01 at other load of 7.7 to 37.7 per cent, 6.037 to 7.541, none red. E03-M01-FIX-03's 6.9 was the median of the raw fifth-slowest frame. It cannot see a regression that slows the reference as much as the frames, nor one that slows four or fewer frames of every run, and under a load that slows layout more than script it reads a regression of script smaller: FIX-05's busy-wait of 5 ms in every frame read 9.237 and 9.246, green, at 32.7 and 34.0 per cent other load from a game. The tolerance and the ceiling are unchanged"
   },
   "liveRowElements": {
     "baseline": 37,
@@ -146,7 +146,7 @@
     "baseline": 1.002,
     "ceiling": 1.02,
     "tolerance": 1.1,
-    "unit": "times the resident memory at the reading that met the settling rule of privateBytesAt50000, five real idle minutes after it: the median of five runs on 2026-10-03, which read 0.853 to 1.006, the lowest where the operating system trimmed 58.7 MiB of working sets while the private bytes stayed; the ceiling is the strict limit, as it was"
+    "unit": "times the resident memory at the reading that met the settling rule of privateBytesAt50000, five real idle minutes after it: the median of five runs by E01-M01-FIX-28 on 2026-10-03, which read 0.853 to 1.006, the lowest in a run whose working sets fell by 58.7 MiB while its private bytes rose by 0.2 MiB, the operating system taking resident pages back by that lane's inference; the ceiling is the strict limit, as it was"
   },
   "idleCpuPerCent": {
     "baseline": 0.063,
@@ -172,5 +172,13 @@
   "residentBytesAfterClose": {
     "baseline": 0,
     "unit": "bytes still resident, summed over the processes of the 50000-commit load still running 30 seconds after its window was closed the way a person closes it"
+  },
+  "refLookupComparisonsPerRef": {
+    "baseline": 1,
+    "unit": "full object-name comparisons per reference joining 2501 references to a page of 10000 commits, every reference on the page, in the mix of the many-refs fixture, perf/refs.perf.test.ts: 2501 comparisons, identical on every run"
+  },
+  "refLookupScalingRatio": {
+    "baseline": 3.999,
+    "unit": "times the comparisons of 2501 references, for 10001 of them on the same page: 3.9988 measured, which is 10001 over 2501, one comparison each at both sizes"
   }
 }

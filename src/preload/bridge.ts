@@ -5,6 +5,8 @@ import type {
   ApplicationInfoResponse,
   ChannelName,
   ChooseFolderResponse,
+  ChooseThemeRequest,
+  ChooseThemeResponse,
   GitGraphicalBridge,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
@@ -13,6 +15,7 @@ import type {
   RefreshRequest,
   RefreshResponse,
   StartupRepositoryResponse,
+  ThemeChoiceResponse,
 } from '../contracts/index';
 
 /**
@@ -41,6 +44,10 @@ const bridge: GitGraphicalBridge = {
     request<RefreshResponse>(CHANNELS.refresh, refreshRequest),
   applicationInfo: (): Promise<ApplicationInfoResponse> =>
     request<ApplicationInfoResponse>(CHANNELS.applicationInfo),
+  themeChoice: (): Promise<ThemeChoiceResponse> =>
+    request<ThemeChoiceResponse>(CHANNELS.themeChoice),
+  chooseTheme: (themeRequest: ChooseThemeRequest): Promise<ChooseThemeResponse> =>
+    request<ChooseThemeResponse>(CHANNELS.chooseTheme, themeRequest),
 };
 
 contextBridge.exposeInMainWorld(BRIDGE_GLOBAL_NAME, bridge);

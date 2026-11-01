@@ -1,4 +1,4 @@
-import type { Result } from '../contracts/index';
+import type { BranchSelection, Result } from '../contracts/index';
 
 /**
  * What crosses between the main process and the utility process that reads
@@ -21,8 +21,9 @@ import type { Result } from '../contracts/index';
  * Matching by `id` says which request a reply answers, not whether its answer
  * still applies. That is the utility process's to decide, and it decides it in
  * one place: a load or a refresh whose read returns after a different repository
- * was opened, and an open overtaken by an open asked for after it, is answered
- * with a `FailureKind.Cancelled` failure and changes nothing
+ * was opened or another branch selection applied, an open overtaken by an open
+ * asked for after it, and a selection overtaken by a selection asked for after
+ * it, is answered with a `FailureKind.Cancelled` failure and changes nothing
  * (`./repository-host.ts`, *What can be in flight at once*).
  */
 
@@ -33,6 +34,11 @@ export type RepositoryQuestion =
       readonly kind: 'open';
       /** An absolute path to a working tree or to a directory inside one. */
       readonly path: string;
+      /**
+       * The branch selection the open reads under and keeps, which the main
+       * process chose (`./handlers.ts`).
+       */
+      readonly selection: BranchSelection;
     }
   | {
       /** Read `count` more commits of the open repository and append them. */
@@ -40,8 +46,13 @@ export type RepositoryQuestion =
       readonly count: number;
     }
   | {
-      /** Read the open repository again from a fresh store and a fresh layout. */
+      /**
+       * Read the open repository again from a fresh store and a fresh layout,
+       * under `selection` when there is one, which is then the one kept.
+       */
       readonly kind: 'refresh';
+      /** The branch selection to apply, or absent to keep the one in force. */
+      readonly selection?: BranchSelection;
     }
   | {
       /** Report which git this is, or why there is none. */

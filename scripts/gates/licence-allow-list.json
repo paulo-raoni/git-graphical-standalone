@@ -24,6 +24,10 @@
     "lightningcss-win32-x64-msvc": {
       "licence": "MPL-2.0",
       "why": "The prebuilt binary of the entry above, on this platform, and the same reasoning applies to it."
+    },
+    "lightningcss-linux-x64-gnu": {
+      "licence": "MPL-2.0",
+      "why": "The prebuilt binary of the entry above for x64 Linux on glibc, which the ubuntu-latest jobs of the CI workflow install (CI run 39157409731 refused it there), and the same reasoning applies to it."
     }
   }
 }

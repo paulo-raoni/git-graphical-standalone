@@ -68,5 +68,23 @@
     ],
     "commitCount": 10000,
     "commitDigest": "9f6a8849ebbf6653079a2c33f97c388954168d55074ce8a9a1ed0bf4b233f9ce"
+  },
+  "remotes": {
+    "refs": [
+      "4b9766eb4a7a9d017651f3b87731bbbe74c8a5e9 HEAD",
+      "7211c5abb7492212276f862510429a3d7f8b5a29 refs/heads/feature",
+      "4b9766eb4a7a9d017651f3b87731bbbe74c8a5e9 refs/heads/main",
+      "13c4d5934602a5a94849fbc64464ea162ac239fd refs/heads/release",
+      "2a3fcd818bb27823fc41317a34e0b26b88a54823 refs/heads/topic",
+      "ac0ff460ff10ea8f1b05505dedf71ad6fc54289e refs/remotes/origin/HEAD",
+      "23d803510430d275bf08ef90a484caa175e6de63 refs/remotes/origin/feature",
+      "ac0ff460ff10ea8f1b05505dedf71ad6fc54289e refs/remotes/origin/main",
+      "85cda1f3a77f4b682e5f9bbb25fdb98b63f8813e refs/remotes/origin/only-remote",
+      "fdad10ee2c78d173a42949ee4fd39d12652a09b6 refs/tags/annotated",
+      "121b4c8bbdf27846c03ffdbc2d090cc2b5e8f35a refs/tags/annotated^{}",
+      "b70fbc17cde789fbdbd4d89d72216b16f5d81a24 refs/tags/light"
+    ],
+    "commitCount": 5008,
+    "commitDigest": "3122b2f3d9bb909d85139951c4615283bcdd1c7b9361ed516d4e29c03d005ec2"
   }
 }

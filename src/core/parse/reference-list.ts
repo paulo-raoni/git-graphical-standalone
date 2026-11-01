@@ -105,7 +105,7 @@ export function markDetachedFrom(list: ReferenceList, rows: Uint32Array, headRow
 /**
  * The references as the contract holds them, pointing at rows of the page.
  *
- * `rows` is what {@link resolveCommitRows} produced for this list's targets. It
+ * `rows` is the rows {@link resolveCommitRows} found for this list's targets. It
  * may be longer than the list, because the same pass resolves HEAD's own commit,
  * so only the first `count` entries are taken.
  */

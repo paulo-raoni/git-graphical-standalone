@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { HASH_BYTE_LENGTH, UNKNOWN_INDEX } from '../src/contracts/index';
 import type { CommitColumns } from '../src/contracts/index';
 import { createLayoutState, layoutPage } from '../src/core/layout/index';
 
-import { compareInRegime, readBaselines } from './baselines';
-import type { Comparison } from './baselines';
+import { BRAIDED_LARGE as LARGE, BRAIDED_SMALL as SMALL, braided, held } from './workloads';
 
 /**
  * The lane layout, timed.
@@ -42,53 +40,16 @@ import type { Comparison } from './baselines';
  * slows some runs and not others; the start cases of
  * `test/e2e/budgets-start.spec.ts` pay the same price for the same reason.
  *
- * The shape is the braided one that file describes, and `braided` below is a
- * copy of its function of the same name: a test file cannot import another
+ * The shape is the braided one that file describes, built by the same
+ * `braided`, from `perf/workloads.ts`: a test file cannot import another
  * without running its cases too, which would put the counted cases in both
- * gates. The two must stay the same function.
+ * gates, so the function lives in a module that is not a test file.
  */
 
-const SMALL = 10_000;
-const LARGE = 40_000;
 /** Batches of timed runs, how many runs each, and the pause between batches. */
 const BATCHES = 5;
 const RUNS = 5;
 const PAUSE_MILLISECONDS = 500;
-
-/** The parents of a braided page of `count` commits; nothing else of the columns is read. */
-function braided(count: number): CommitColumns {
-  let state = 12345;
-  const next = (bound: number): number => {
-    state = (state * 1103515245 + 12345) >>> 0;
-    return (state >>> 16) % bound;
-  };
-  const parentOffsets = new Uint32Array(count + 1);
-  const parents: number[] = [];
-  const within = (row: number): number => (row < count ? row : UNKNOWN_INDEX);
-  for (let row = 0; row < count; row += 1) {
-    parentOffsets[row] = parents.length;
-    parents.push(within(row + 1 + next(3)));
-    if (row % 9 === 0) {
-      parents.push(within(row + 1 + next(40)));
-    }
-  }
-  parentOffsets[count] = parents.length;
-  return {
-    count,
-    hashes: new Uint8Array(count * HASH_BYTE_LENGTH),
-    parentOffsets,
-    parentIndices: Uint32Array.from(parents),
-    authorId: new Uint32Array(count),
-    committerId: new Uint32Array(count),
-    authorTime: new Float64Array(count),
-    commitTime: new Float64Array(count),
-    authorTzMinutes: new Int16Array(count),
-    commitTzMinutes: new Int16Array(count),
-    subjectOffsets: new Uint32Array(count + 1),
-    subjects: '',
-    people: { names: [], emails: [] },
-  };
-}
 
 /** Lay `columns` out in one page from a fresh state; the microseconds a commit it took. */
 function layOut(columns: CommitColumns): number {
@@ -97,16 +58,6 @@ function layOut(columns: CommitColumns): number {
   layoutPage(state, columns, 0);
   const elapsed = performance.now() - started;
   return (elapsed * 1000) / columns.count;
-}
-
-const baselines = readBaselines();
-
-function held(key: string, name: string, measured: number): Comparison {
-  const baseline = baselines[key];
-  expect(baseline).toBeDefined();
-  const comparison = compareInRegime(name, measured, baseline ?? { baseline: 0, unit: 'missing' });
-  process.stdout.write(`  ${comparison.failed ? 'FAIL' : 'ok  '} ${comparison.message}\n`);
-  return comparison;
 }
 
 const small = braided(SMALL);

@@ -1,3 +1,4 @@
+import type { BranchSelection } from '../contracts/index';
 import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse/index';
 
 /**
@@ -8,8 +9,8 @@ import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse
  * be read at once — including by the reviewer checking what the user's own
  * configuration is allowed to keep doing.
  *
- * **What is overridden, and why.** Two configuration variables, both because a
- * user who has set them would otherwise change the shape of the output rather
+ * **What is overridden, and why.** Three configuration variables, each because
+ * a user who has set it would otherwise change the shape of the output rather
  * than its content:
  *
  * - `log.showSignature=false`. With it on, `git log` runs the signature verifier
@@ -20,13 +21,30 @@ import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse
  *   encoding on the way out. The parser decodes UTF-8, so a user who has set a
  *   legacy encoding would otherwise get mojibake for every message with a
  *   character outside ASCII in it.
+ * - `color.diff=never`. No format read here asks for colour today, and none of
+ *   the five commands printed an escape sequence with `color.ui`,
+ *   `color.branch`, `color.diff`, `color.status`, `color.decorate` or
+ *   `color.showBranch` set to `always` (git 2.51.0, measured by E03-M01-S11;
+ *   `src/adapters/git-colour.spec.ts` holds it for the commands as they are).
+ *   But a `%C(…)` placeholder in a `git log` or `git stash list` format is
+ *   coloured whenever colour is on, so the first format that used one would put
+ *   escape sequences into a subject or a stash name for every user who has
+ *   colour on. `color.diff` is the key those two commands read, and it outranks
+ *   `color.ui`: with `-c color.ui=never` alone, a user's `color.diff=always`
+ *   still coloured `%C(red)` in both (same measurement). Given on the command
+ *   line, it also outranks the user's files and the `GIT_CONFIG_COUNT` and
+ *   `GIT_CONFIG_PARAMETERS` variables, each of which was measured setting
+ *   `color.diff=always` against it and losing. `for-each-ref` reads no colour
+ *   key for its `%(color)` atoms (it coloured them only for `--color=always`)
+ *   and porcelain `status` is never coloured, so a command added later that
+ *   reads a key of its own, such as `git branch` and `color.branch`, needs that
+ *   key overridden beside this one.
  *
  * **What is deliberately not overridden.** The locale is left alone, so git's
  * own diagnostics reach the user in the user's own language; every format read
- * here is a machine format that a locale does not move. Colour is left alone,
- * because `--format` without a `%C` placeholder emits none and no porcelain
- * format is coloured. `.mailmap` is turned off with the command-line option
- * `--no-use-mailmap` rather than by writing to `log.mailmap`, because
+ * here is a machine format that a locale does not move. `.mailmap` is turned
+ * off with the command-line option `--no-use-mailmap` rather than by writing to
+ * `log.mailmap`, because
  * `PersonTable` says identity is whatever git reported **before** a mailmap is
  * applied, and applying one is a later milestone's decision to take.
  */
@@ -37,6 +55,8 @@ export const PARSING_CONFIGURATION: readonly string[] = [
   'log.showSignature=false',
   '-c',
   'i18n.logOutputEncoding=UTF-8',
+  '-c',
+  'color.diff=never',
 ];
 
 /**
@@ -55,12 +75,38 @@ export function repositoryProbeArgs(repositoryPath: string): string[] {
   return [...baseArgs(repositoryPath), 'rev-parse', '--git-dir'];
 }
 
+/** What a page shows when nothing was chosen: every branch, remote-tracking ones included. */
+const EVERY_BRANCH: BranchSelection = { branches: null, showRemoteBranches: true };
+
+/** The prefix of a local branch's full reference name. */
+const LOCAL_BRANCHES = 'refs/heads/';
+
+/** The prefix of a remote-tracking branch's full reference name. */
+const REMOTE_BRANCHES = 'refs/remotes/';
+
 /**
- * Read the newest `limit` commits of the references shown.
+ * Whether one selected name is read: a local branch always, a remote-tracking
+ * branch only while remote-tracking branches are shown, anything else never.
  *
- * "The branches being shown" is read here as **every local branch, every
- * remote-tracking branch, every tag, and HEAD** — the same set a user sees
- * without having chosen anything.
+ * Refusing every other name is what makes the list safe to put on a command line
+ * a renderer chose: a name that begins with one of the two prefixes cannot begin
+ * with `-`, so no name can be read by git as an option, and no tag, `HEAD` or
+ * `refs/stash` can ride in under a branch's name.
+ */
+function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
+  return (
+    name.startsWith(LOCAL_BRANCHES) || (showRemoteBranches && name.startsWith(REMOTE_BRANCHES))
+  );
+}
+
+/**
+ * The revisions a page's log walks from.
+ *
+ * **Every branch** is read as **every local branch, every remote-tracking branch
+ * while they are shown, every tag, and HEAD** — the same set a user sees
+ * without having chosen anything. With remote-tracking branches shown, that is
+ * exactly the list every page was read with before selections existed, which
+ * `git-page.spec.ts` holds to the argument.
  *
  * It is spelled out rather than written `--all`, and the reason is measurable:
  * on the `stash` fixture, `--all` returns four commits and this list returns
@@ -70,11 +116,63 @@ export function repositoryProbeArgs(repositoryPath: string): string[] {
  * `refs/pull/*` namespace — is walked too. Only the stash was measured here;
  * the rest follows from what `--all` is documented to mean.
  *
- * `--ignore-missing` is what lets `HEAD` be named unconditionally: in a
- * repository with no commits yet, HEAD resolves to nothing and naming it would
- * otherwise be a fatal error rather than an empty page.
+ * **A selection** is read as the selected names alone, each a full reference
+ * name, so a tag or a local branch of the same short name is never read in its
+ * place: with a tag `side` beside a branch `side`, git 2.51.0 resolves `side` to
+ * the tag and warns that it is ambiguous, and resolves `refs/heads/side` to the
+ * branch (measured by E03-M01-S09 on a scratch repository).
+ *
+ * `--ignore-missing` is what lets a name be given that resolves to nothing. On
+ * every branch that name is `HEAD`: in a repository with no commits yet, HEAD
+ * resolves to nothing and naming it would otherwise be a fatal error rather
+ * than an empty page. Under a selection it is a branch deleted since it was
+ * chosen, which is skipped, and a selection whose every name is skipped reads
+ * nothing: git 2.51.0 printed no commit for `--ignore-missing refs/heads/gone`
+ * and exited 0, and printed the other branch's history alone for
+ * `--ignore-missing refs/heads/gone refs/heads/side`, and it failed with `bad
+ * revision` without `--ignore-missing` (measured by E03-M01-S09 on a scratch
+ * repository; the fixture suite holds the first two on the `remotes` fixture).
  */
-export function commitLogArgs(repositoryPath: string, limit: number): string[] {
+function revisionArgs(selection: BranchSelection): string[] {
+  if (selection.branches === null) {
+    return selection.showRemoteBranches
+      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD']
+      : ['--branches', '--tags', '--ignore-missing', 'HEAD'];
+  }
+  return [
+    '--ignore-missing',
+    ...selection.branches.filter((name) => isReadBranch(name, selection.showRemoteBranches)),
+  ];
+}
+
+/**
+ * Whether the log of a page under `selection` has any revision to walk from.
+ *
+ * It has none when a selection names no branch that is read. Git's log, given
+ * no revision at all, walks HEAD — measured with git 2.51.0, where
+ * `log --ignore-missing --` printed HEAD's history — so a selection naming
+ * nothing would show HEAD's history rather than the nothing it names. The
+ * adapter asks this before it runs the log, and does not run it when the answer
+ * is no.
+ */
+export function selectsAnyRevision(selection: BranchSelection = EVERY_BRANCH): boolean {
+  return (
+    selection.branches === null ||
+    selection.branches.some((name) => isReadBranch(name, selection.showRemoteBranches))
+  );
+}
+
+/**
+ * Read the newest `limit` commits of the branches `selection` shows.
+ *
+ * Which revisions those are is {@link revisionArgs}'s to say, and its comment
+ * says why each is there.
+ */
+export function commitLogArgs(
+  repositoryPath: string,
+  limit: number,
+  selection: BranchSelection = EVERY_BRANCH,
+): string[] {
   return [
     ...baseArgs(repositoryPath),
     'log',
@@ -83,23 +181,27 @@ export function commitLogArgs(repositoryPath: string, limit: number): string[] {
     '--date=raw',
     '--no-use-mailmap',
     `--max-count=${String(limit)}`,
-    '--branches',
-    '--tags',
-    '--remotes',
-    '--ignore-missing',
-    'HEAD',
+    ...revisionArgs(selection),
     '--',
   ];
 }
 
-/** Read every reference that decorates a commit. */
-export function referenceArgs(repositoryPath: string): string[] {
+/**
+ * Read every reference that decorates a commit: the local branches, the
+ * remote-tracking ones while they are shown, and the tags.
+ *
+ * It reads them whatever branches are selected, so a reference that is not
+ * selected still labels a commit a selected branch reaches; a reference whose
+ * commit is not on the page points at `UNKNOWN_INDEX`, as every reference past a
+ * page always has.
+ */
+export function referenceArgs(repositoryPath: string, showRemoteBranches = true): string[] {
   return [
     ...baseArgs(repositoryPath),
     'for-each-ref',
     `--format=${REFERENCE_FORMAT}`,
     'refs/heads',
-    'refs/remotes',
+    ...(showRemoteBranches ? ['refs/remotes'] : []),
     'refs/tags',
   ];
 }

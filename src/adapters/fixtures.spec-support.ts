@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generateRepository, readSpecification } from '../../test/fixtures/generate';
-import { verifiedCopy } from '../../test/fixtures/shared-store';
+import { removeOldStores, verifiedCopy } from '../../test/fixtures/shared-store';
 
 /**
  * Fixture repositories of this suite's own, and why they are not the ones under
@@ -48,9 +48,17 @@ import { verifiedCopy } from '../../test/fixtures/shared-store';
  *
  * {@link home} is neither the `git-graphical-standalone-unit-shared-` directory
  * the code before E01-M01-FIX-33 published a whole set into, with no record,
- * which a checkout of that code still reads as it finds it, nor the
- * `git-graphical-standalone-fixtures-` directory an older checkout builds into
- * in place under a lock, so those protocols' files and this one's never meet.
+ * nor the `git-graphical-standalone-fixtures-` directory an older checkout
+ * builds into in place under a lock, so those protocols' files and this one's
+ * never meet. The first of them is removed when this module loads, by
+ * `removeOldStores` of `test/fixtures/shared-store.ts`, which says why that is
+ * safe; the second is left as it is.
+ *
+ * **A case that changes what it is handed asks for a set of its own**:
+ * `fixtureAt(name, set)` publishes under {@link home}'s `sets/<set>/`, which
+ * no other case names, so what one such case did to its repository is never
+ * what the next case is handed (E03-M01-S05, after review round 22 found the
+ * damage cases of `shared-store.test.ts` sharing one copy per shape).
  *
  * This module is `.spec-support.ts` rather than `.spec.ts` on purpose: the
  * fixture suite matches `*.spec.ts`, and a helper collected as a suite of its own
@@ -76,20 +84,47 @@ export const fixtureRoot = join(home, 'repositories');
 /** Where each build happens, in a directory named `<process identifier>-` and six random characters. */
 const stagingRoot = join(home, 'staging');
 
+removeOldStores(tmpdir());
+
 /**
  * The path of one fixture repository, by the name the specification gives it:
  * the first copy that matches its record, built and published if there is none.
+ * With `set`, the repository of that name in a set no other caller names, for
+ * a case that changes what it is handed.
  */
-export function fixtureAt(name: string): string {
+export function fixtureAt(name: string, set?: string): string {
   const recipeOf = readSpecification(specification);
   const repository = recipeOf.repositories.find((one) => one.name === name);
   if (repository === undefined) {
     throw new Error(`the fixture specification names no repository "${name}"`);
   }
-  mkdirSync(fixtureRoot, { recursive: true });
-  return verifiedCopy(join(fixtureRoot, name), stagingRoot, (directory) => {
+  const published = set === undefined ? join(fixtureRoot, name) : join(home, 'sets', set, name);
+  mkdirSync(dirname(published), { recursive: true });
+  return verifiedCopy(published, stagingRoot, (directory) => {
     generateRepository(directory, repository, recipeOf);
   });
+}
+
+/**
+ * The path of a repository this suite builds for itself with `build`, rather
+ * than one the specification names: published and verified like the others, by
+ * {@link verifiedCopy}, under `suite/<name>-<digest>`. The digest is over
+ * `sources`, the files whose code `build` runs, so a change to that code builds
+ * a new repository instead of handing back the one the old code built; the
+ * specification's digest, which names {@link home}, does not move for it.
+ */
+export function suiteFixtureAt(
+  name: string,
+  sources: readonly string[],
+  build: (directory: string) => void,
+): string {
+  const code = createHash('sha256');
+  for (const source of sources) {
+    code.update(readFileSync(source));
+  }
+  const published = join(home, 'suite', `${name}-${code.digest('hex').slice(0, 12)}`);
+  mkdirSync(dirname(published), { recursive: true });
+  return verifiedCopy(published, stagingRoot, build);
 }
 
 /** Make sure every repository of the specification is published and matches its record. */

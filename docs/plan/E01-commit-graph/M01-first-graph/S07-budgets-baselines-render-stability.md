@@ -8,13 +8,21 @@ answer to the golden-image question of `docs/ADR-0003-quality-gates-and-ci.md` d
 
 ## The machine, and the condition it was in
 
-Every figure below was measured by this slice's executor on **2026-09-28**, on the development machine: an
+This slice's executor measured on **2026-09-28**, on the development machine: an
 Intel Core i5-10310U (four cores, eight threads, 1.7 GHz base), 16 GB of memory, Intel UHD Graphics, Windows 11
 Pro 10.0.26200, a display running at 60 Hz with a device pixel ratio of 1. Node 24.18.0 ran the gates; the
-application ran on Electron 44.3.0, which is Chromium 152 and Node 24.20. **Load condition:** no other build,
-gate or test was running during any measurement, and each run of the end-to-end suites started exactly one
-application at a time; the owner's desktop session was otherwise as it was left, which this lane did not
-control and did not measure.
+application ran on Electron 44.3.0, which is Chromium 152 and Node 24.20. **Load condition that day:** no other
+build, gate or test was running during any of its measurements, and each run of the end-to-end suites started
+exactly one application at a time; the owner's desktop session was otherwise as it was left, which this lane
+did not control and did not measure.
+
+**Not every figure below is from that day.** Later lanes measured again, on the same machine, and each section
+names who and when: the two cold starts and the load of ten thousand commits, and their three baselines, by
+E01-M01-FIX-27 on 2026-10-03; the memory at 50 000 commits and the idle ratio, and their two baselines, by this
+slice's second executor context and by E01-M01-FIX-28 on 2026-10-03; the allocation figures' runtime by
+E01-M01-FIX-30 and the regimes' quotients by E01-M01-FIX-31, both on 2026-10-10; and the layout timing and the
+frame case by E01-M01-FIX-37 on 2026-10-17, whose readings moved no baseline. (Which baselines changed, and when,
+was read by E03-M01-S04 on 2026-10-24 from every commit to `perf/baselines.json` since S07's first.)
 
 **The memory row was measured again on 2026-10-03**, after the owner's ruling (below), by a second executor
 context on the same machine and the same Electron, between 02:15 and 02:44 local time. That time the machine
@@ -28,12 +36,12 @@ cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day 
 | --- | --- | --- | --- | --- |
 | Cold start to a painted window, empty repository | ≤ 1500 ms | fastest of ten launches, **991 ms** (median of five runs) | five runs on 2026-10-03: fastest 958 to 1096 | meets |
 | Load 10 000 commits, to rows painted | ≤ 800 ms | fastest of ten Refreshes, **423.5 ms** (median of five runs) | five runs on 2026-10-03: fastest 418.4 to 539.4 | meets |
-| Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs | meets |
+| Parse throughput, streamed log | ≥ 20 000 / s, held as ≤ 50 µs a commit | **14.579 µs** a commit, 68 600 / s | fastest of five in each of six sessions: 14.468 to 15.768 µs; since E03-M01-FIX-04 the lowest of twenty-five per a reference, twenty kept readings on 2026-10-30: 14.06 to 17.301 µs | meets |
 | Lane layout throughput | ≥ 200 000 / s, held as ≤ 5 µs a commit | **0.59 µs** a commit, 1.69 million / s | fastest of five in each of six sessions: 0.570 to 0.590 µs; since E01-M01-FIX-37 the fastest of twenty-five, six kept runs on 2026-10-17: 0.572 to 0.643 µs | meets |
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
 | Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **157 372 416 bytes** (150.1 MiB), read once the load's memory has come back | five runs on 2026-10-03, 147.6 to 154.1 MiB | meets |
 | Resident memory growth over 5 minutes idle | ≤ 2 % | **+0.2 %** (ratio 1.002), from the settled reading | five five-minute runs on 2026-10-03: 0.853 to 1.006 | meets |
-| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **5.24 ms**, worst frame **7.7 ms** | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6 | meets |
+| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **4.94 ms** per reference since E03-M01-FIX-04 (S07: **5.24 ms**), fifth-slowest frame **6.691 ms** per reference since E03-M01-FIX-05 (FIX-03: **6.9 ms**; S07: worst frame **7.7 ms**) | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6; since FIX-04 each frame per a reference, twenty kept on 2026-10-30: means 4.786 to 6.111, fifth-slowest 5.8 to 9.834; FIX-05, sixteen kept on 2026-10-31 and 2026-11-01: means 4.629 to 4.912, fifth-slowest 6.037 to 7.541 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
 | CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | five five-minute runs: 0.063 to 0.453 % | meets |
 
@@ -180,9 +188,32 @@ second, the twenty-five about three, and a slower layout moves every run. Six re
 (16:23 to 16:50, other load 20.7 to 35.2 per cent in the minute before and 19.0 to 38.9 during): fastest
 0.572 to 0.643, all green, while the slowest run of each read 0.885 to 1.272. Planted, a busy-wait of twice
 the layout's own time inside the timed call read 2.006 and 1.725 in two kept readings, red. The baseline
-stays 0.59. The median of the six kept readings is 0.611, higher, and a baseline moves only down (`AGENTS.md`
-§11); the first batch is S07's reading as it was made, so the fastest of twenty-five is never above it, and
+stays 0.59. The median of the six kept readings is 0.605, higher, by review round 22's count of the six
+FIX-37's record lists, of which 0.611, given here before as the median, is the fourth (the record is not in the
+repository, and E03-M01-S04 did not repeat the count); a baseline moves only down (`AGENTS.md` §11); the first batch is S07's reading as it was made, so the fastest of twenty-five is never above it, and
 S07's figure is not a looser limit for the new reading. The tolerance and the ceiling are unchanged.
+
+**Since E03-M01-FIX-04 (2026-10-29) the parse is timed over twenty-five runs too, each read per a
+reference.** E03-M01-S10's lane kept a reading of 24.741 µs against the limit of 21.87 (14.579 times 1.5) on code
+identical to its base, and review round 05 read 25.702 at 39.4 per cent other load during the reading; both are
+their readings, and FIX-04 did not reproduce either. The timing is now one warm-up parse, then five batches half
+a second apart, each one untimed parse and five timed ones; around each timed parse a fixed arithmetic workload in
+the same thread, 2^19 steps over a 16 KiB table, is timed ten times before and ten after, the parse's time is
+divided by the middle of those twenty timings and multiplied by 6, about what that middle reads in milliseconds on
+this machine when free (the median run's middle read 5.69 to 5.73 in FIX-04's four readings kept at under 7 per
+cent other load), and **the lowest of the
+twenty-five** is compared. FIX-04 kept twenty readings of the parse at its base, `d31361f`, and twenty of the new
+reading over the same product, on 2026-10-29 and 2026-10-30, interleaved, each judged by `AGENTS.md` §11 with the
+lane's own processes counted apart through a Windows job object, the machine sampled every 2 s, a synthetic load
+added on top of the machine's own to spread them: the old reading 14.118 to 17.088 at other load of 7.0 to 39.3
+per cent, none red; the new 14.06 to 17.301 at 5.9 to 36.8, none red, median 15.214. **The baseline stays
+14.579**, a baseline moving only down. On the readings kept at under 15 per cent other load, what a regression
+must add to turn the verdict red was 6.35 to 7.70 µs for the new reading and 6.61 to 7.75 for the old. Planted in
+the parser, a busy-wait per commit of 6 µs read 20.763 to 21.159, green in three kept readings of three; of 7 µs,
+22.37 to 23.08, red in three of three; of 8 µs, 22.989 to 23.399, and of 10 µs, 24.919 to 26.385, red in three
+of three each; removed, 14.476 to 15.197, green. The reference does none of the parser's work, so it cannot see a
+regression that slows plain arithmetic in the runtime as much as the parser. Since the old reading was not red in
+FIX-04's series either, the case for the change is review round 05's red, not a red FIX-04 saw.
 
 **Both are held as time per commit, not commits per second.** A throughput is a lower bound and
 `compareWithBaseline` fails a number that rises; 20 000 commits a second turned over is at most 50 µs a commit,
@@ -240,7 +271,9 @@ still to come is more than the 19 MB its tolerance allowed.
 
 **The rule: read when the sum has stopped falling.** The case takes the first reading for which a reading at
 least 40 s older exists, no reading since that older one is 1 MB or more below one before it, and every one of
-them holds the same processes. Past 180 s after the paint it fails rather than reads. The window is 40 s
+them holds the same processes. The rule is tested on each reading before the cap of 180 s after the paint is,
+so a reading past the cap that meets the rule is taken, and the first reading past it that does not fails the
+case (`settle` in `test/e2e/budgets-memory.spec.ts`, read by E03-M01-S04 on 2026-10-24). The window is 40 s
 because the longest still stretch between two steps, the GPU's third to the main process's, was 15 to 20 s by
 the nearest readings and at most 26 s between them, so the rule is not met inside one; 1 MB is under the
 smallest step. A rise does not hold the rule back, so a leak reaches the budgets instead of the cap. Applied to
@@ -396,8 +429,11 @@ fail an application that does not leak for that reason, and it can pass one that
 amended on 2026-10-03 keeps this row on the working sets, so which sum it should read is the owner's question,
 raised by E01-M01-FIX-28 and not answered here.
 
-**CPU:** as S07 measured it on 2026-09-28, the five processes used 187 ms of processor time in 300 s,
-**0.063 % of one core**, read from Windows' per-process kernel and user times; the second run read 0.063 % as
+**CPU:** as S07 measured it on 2026-09-28, the five processes used **0.063 % of one core** over 300 s, read from
+Windows' per-process kernel and user times. S07 gave that time as 187 ms, which is 0.0623 % and would print as
+0.062: the gate rounds the figure to three decimals (`round` in `perf/baselines.ts`), so 0.063 means 187.5 to
+190.5 ms, and the 187 is a rounded figure (E03-M01-S04's arithmetic, 2026-10-24; S07's log is not in the
+repository); the second run read 0.063 % as
 well, the third **0.453 %**, the fourth 0.099 % and the fifth 0.156 %. Of the third run's time, 1 110 ms was
 the main process alone, while the main-process count below saw no Node callback at all in that run, so the
 time went to something in Chromium's side of the main process that this gate cannot name. **Wakeups:** none. In the page,
@@ -458,8 +494,8 @@ scrolls of 1 200 px: each frame split at an animation-frame callback queued afte
 script (the scroll write and the renderer's `paint`) and rendering (style, layout, paint and the hand-off to
 the compositor), and a fixed loop of 200 000 iterations timed after each frame, outside it. In those 50 runs
 a run's worst frame was 1.4 to 3.5 times its median frame, its script part 1.0 to 4.4 times the median
-script part and its rendering 1.5 to 3.6 times the median rendering: the same work, done slower, and not one
-step grown. In 12 of the 50 the fixed loop after the worst frame was slowed by more than half too. That the
+script part and its rendering 1.5 to 3.6 times the median rendering. That it was the same work done slower is an inference: only the two parts were timed, and no
+instrument counted the work inside them. In 12 of the 50 the fixed loop after the worst frame was slowed by more than half too. That the
 slowness came from outside the page is an inference. A garbage collection is not excluded: the heap figure
 Chromium gives the page read the same in all 18 000 frames, so it could not show one.
 
@@ -474,6 +510,126 @@ lowest worst of 19.7 and 19.3 in two kept readings, red on both and past both ce
 not see is a slow frame the product makes in some runs and not others. The baselines stay 5.24 and 7.7: the
 medians of the seven kept readings are 5.33 and 8.6, higher, and a baseline moves only down; the lowest of
 ten is never above the median of any five of them. The tolerances and the ceilings are unchanged.
+
+**Since E03-M01-FIX-03 (2026-10-28) each run's worst frame is read with its four slowest frames set aside**,
+its fifth-slowest of 240, and the lowest of the ten is compared; the mean is held as FIX-37 left it. The lowest
+of ten slowest frames had flapped: it read 12.5 ms against 11.55 at E03-M01-S09's head on 2026-10-25, other
+load about 20 per cent, on a renderer that lane and review round 04 found byte-identical (SHA-256) to the one
+rounds 03 and 04 read green at 10.1, 8.3 and 8.3 ms; those are their readings, and FIX-03 did not reproduce them.
+
+FIX-03 took fourteen readings of the case alone at its base, `34a245e`, on 2026-10-28 from 02:31 to 02:51, each
+judged by `AGENTS.md` §11 with the lane's own processes, run and sampler, counted apart through a Windows job
+object, the machine sampled once a second from its idle, kernel and user times and its peak taken over
+five-second blocks. Twelve were kept, at other load of 10.5 to 39.6 per cent in the minute before and 11.0 to
+34.5 during; one was discarded for a five-second peak of 76 per cent, and one because its load record was lost
+to a file lock in the sampler. On the twelve kept, raw frames recorded: the lowest slowest frame read 7.1 to
+10.8 ms, green on all twelve, the highest 1.30 times their median of 8.3 and 0.75 ms under 11.55; the lowest
+mean 4.90 to 5.69, green on all twelve, so the mean verdict was left as it was. Read from the same frames, the
+lowest k-th slowest frame had its highest reading 1.29 times its median for the second-slowest, 1.20 for the
+third, 1.24 for the fourth and 1.22 for the fifth, and 1.19 to 1.26 for the sixth to the twelfth, which read
+further from the worst frame for no better ratio. The third-slowest, held to 1.5 times its median, would sit
+2.20 ms under its limit and need 4.40 ms added to every frame to turn all twelve red; the fifth-slowest 1.95
+and 4.05. The fifth was taken for the smaller regression it sees. It read 6.3 to 8.4 ms, median 6.9.
+
+**The baseline went down from 7.7 to 6.9**, the median of the new reading, as FIX-37 re-measured its own;
+the tolerance stays 1.5 and the ceiling 16.7, so the limit is 10.35 and the highest of the twelve sits 1.95 ms
+under it. This is not a loosening, measured as the regression a verdict needs to go red: adding a constant to
+every recorded frame of the twelve readings, an additive model and an inference, turns all twelve red at
+4.05 ms for the new verdict against 4.45 ms for the old one at its limit of 11.55. Planted at the top of the
+view's `paint` and rebuilt, a busy-wait of 4 ms in every frame read a lowest fifth-slowest of 10.4 to 12.4, red
+in three kept readings of three; of 3 ms, 9.7 to 11.8, red in two of three; of 6 ms in every tenth frame only,
+10.9 to 11.3, red in three of three while the mean verdict stayed green at 5.48 to 5.64. Readings of the
+planted regressions were judged as the others were: nine kept, four discarded.
+
+A second series at FIX-03's first commit, `c6edf89`, whose view and build are those of its base (the built
+`renderer.js`, `renderer.css` and `index.html` hashed identical), took twenty-two readings from 03:34 to 04:32;
+twelve were kept, at other load of 23.9 to 39.9 per cent in the minute before and 23.2 to 36.5 during, and ten
+discarded: one for a minute before of 40.2 per cent, nine for their load during the reading, averaging 38.5 to
+74.7 per cent with five-second peaks of 71.6 to 100. The busiest processes outside the lane over those readings
+were the operating system's malware scanner and Node processes that were not the lane's. The new verdict read 6.5 to
+8.0 ms, green on all twelve; the lowest slowest frame 7.3 to 9.7 and the lowest mean 5.09 to 5.33. **In neither
+series did the old verdict go red**, so FIX-03 did not reproduce the flap it repairs: the case for the change
+is the margin, 0.75 ms under the old limit on the worst of the first twelve against 1.95 under the new. By construction, and
+not measured, the new reading cannot see a regression that slows four or fewer frames of every run; the old
+reading could, and that is what the four set aside cost.
+
+**Since E03-M01-FIX-04 (2026-10-29) every frame is read per a reference timed straight after it.** Review round
+05 kept a full `npm run gates:budgets` reading at `d31361f` on 2026-10-28, other load 34.3 per cent in the minute
+before and 31.9 during, whose lowest mean read 8.086 ms, past the 8 ms ceiling, and whose lowest fifth-slowest
+read 11.0 against 10.35; E03-M01-S10's lane kept a mean of 8.785. Those are their readings. FIX-04 reproduced the
+flap: of twenty readings it kept at that commit on 2026-10-29 and 2026-10-30 (the case alone and the whole gate,
+ten each, judged as the parse readings above are), the lowest mean was red in four, 7.861 to 9.298, and the lowest
+fifth-slowest in five, 10.4 to 20.6, at other load of 22.7 to 37.0 per cent during the reading. In each of those
+readings every run was slow, so no lowest of ten could step around it. A first repair in this lane divided each
+run by the middle of a layout workload timed ten times before the run and ten after it; in its own series the
+fifth-slowest went red in three of its fifteen kept readings that held it, at 28.1 to 35.0 per cent, 12.18 to
+13.13 against 9.45: under that load a run's slowest frames slowed up to three times where the reference slowed by
+a third to two thirds.
+
+So `sampleScrollFrames` now runs a reference workload after every frame, in the task that takes the frame's end
+mark: an element of its own, off screen, of 240 text cells in 60 flex rows, every cell's text rewritten and the
+element's height read, which makes the engine recompute their style and layout. It is in the document only while
+a run's frames are sampled. Each frame's work is divided by that timing and multiplied by 2.3 ms, about what the
+timing reads when the machine is free (the median run's middle read 2.4 to 2.5 in every reading FIX-04 kept at
+under 15 per cent other load), and of each run the mean and the fifth-slowest of those figures are taken; the lowest of the
+ten of each is compared. In a copy of the case never committed, six runs with the reference at each of six load
+levels gave a lowest mean per frame's reference whose highest level read 1.17 times its lowest, and a lowest
+fifth-slowest 1.49 times, where the raw figures read 2.12 and 2.83 times.
+
+Twenty readings of the new reading kept at FIX-04's `044b3fa`, which changes no product file, interleaved with
+those twenty at `d31361f` and spread the same way, at other load of 6.5 to 37.9 per cent: the lowest mean per
+reference 4.786 to 6.111, the lowest fifth-slowest per reference 5.8 to 9.834, none red. **The mean's baseline went
+down from 5.24 to 4.94**, the median of the twenty, so its limit is 7.41; **the fifth-slowest's stayed 6.9** in
+that lane, because its median, 6.691, would have left the highest reading 0.2 ms under its limit (E03-M01-FIX-05
+lowered it to that median, below). The tolerances and the ceilings are unchanged. On the readings kept at under
+15 per cent other load, what a regression must add to turn a verdict red was, in its own unit, 2.45 to 2.60 for
+the new mean against 2.47 to 2.84 for the old, and 3.87 to 4.55 for the new fifth-slowest at the limit of 10.35
+against 3.45 to 4.35 for the old: **on a quiet machine the fifth-slowest verdict was up to 0.4 ms less
+sensitive** until FIX-05, and that was what it cost not to go red at the load where the old one did. With the
+reference beside it a frame itself read a few per cent slower on a quiet machine, a lowest raw mean of 5.25 to
+5.62 against 5.02 to 5.39 without it; the baselines were measured with it.
+
+Planted at the top of the view's `paint` and rebuilt, each read in kept readings at 6.2 to 19.1 per cent other load,
+the fifth-slowest against FIX-04's limit of 10.35: a busy-wait of 2 ms in every frame read a lowest mean of 6.738
+to 6.797 and a fifth-slowest of 7.995 to 9.476,
+green on both in three of three; of 3 ms, a mean of 7.406 to 7.765, red in two of three, and a fifth-slowest of
+9.09 to 9.932, green; of 4 ms, a mean of 8.562 to 8.818, red in three of three, and a fifth-slowest of 10.036 to
+10.465, red in one of three; of 5 ms, 9.623 to 9.809 and 11.171 to 11.5, red on both in three of three. Of 4 ms
+in every tenth frame only, a fifth-slowest of 9.2 to 9.305, green in three of three; of 6 ms in every tenth frame,
+10.969 to 11.4, red in three of three while the mean stayed green at 5.489 to 6.14. Removed, the case read 4.871
+to 5.407 and 5.805 to 8.433, green. FIX-03's raw reading had caught 3 ms in every frame in two readings of three
+and 4 ms in three of three on the fifth-slowest. The reference does none of the view's code, so the readings
+cannot see a regression that slows the reference as much as the frames, such as a style rule costly for every
+element of the page, and the fifth-slowest still cannot see one that slows four or fewer frames of every run.
+
+**Since E03-M01-FIX-05 (2026-11-01) the fifth-slowest's baseline is 6.691**, the median of FIX-04's twenty, by the
+owner's ruling of 2026-10-30 on review round 06's finding C-42, so its limit is 10.0365; the reading, the tolerance
+and the ceiling are unchanged. FIX-05 judged its readings as FIX-04 did: its own processes in a Windows job object,
+the machine sampled every 2 s, other load under 40 per cent on average over the minute before and over the
+reading, no sample over 75. Its second session kept sixteen readings of the case alone at its first commit,
+`65e6bce`, which changes only that baseline, on 2026-10-31 and 2026-11-01, at other load of 7.7 to 37.7 per cent
+during the reading, nine of them at 29.0 to 37.7 and that load almost all a game being played on the machine: the
+lowest fifth-slowest per reference read 6.037 to 7.541, median 7.014, none red, and the lowest mean 4.629 to
+4.912; nine more were discarded. Its first session, on 2026-10-30, had kept twelve at 6.5 to 33.3 per cent, 5.959
+to 9.095, and two of the whole gate, 6.0 and 6.072, none red. No reading of the unchanged product kept by FIX-04,
+review round 06 or FIX-05 is over 10.0365 (the first two by their own records): the highest is FIX-04's 9.834.
+
+Planted at the top of `paint` and rebuilt, against the new limit, in readings kept at 7.4 to 9.0 per cent other
+load: a busy-wait of 4 ms in every frame read 10.076 to 10.405, red in three of three (the first session's three
+at 5.6 to 7.2 per cent read 9.932 to 10.245, red in two); of 5 ms, 11.291 to 11.5, red in three of three. Removed,
+the four kept under 15 per cent read 6.037 to 6.681, green, so on a quiet machine a regression must add 3.36 to
+4.0 to turn the verdict red. Under load it depends on the load. With a synthetic load outside the job, two Node
+threads busy for 80 per cent of every 50 ms, 5 ms read 11.235 and 13.87, red, at 27.7 and 29.7 per cent, as the
+first session's two at 25.1 and 25.6 per cent read 13.34 and 13.173; that such a load stands in for other
+projects' is an inference. Under the game, at 32.7 and 34.0 per cent, 5 ms read 9.237 and 9.246, **green**. There
+the reference's run middles read 3.6 to 9.6 ms, against 2.2 to 2.5 under 10 per cent, and the frames' raw run
+means 9.2 to 19.9 against 5.4 to 7.4 under 15 per cent: the load slowed layout more than script, and each frame
+is divided by a layout workload. Averaged over the kept readings of each, the 5 ms busy-wait, a fixed time, added
+4.80 to the lowest mean per reference on a quiet machine and 1.33 under the game; a fixed loop of arithmetic in
+every frame, planted the same way, added 2.34 and 1.45 (two kept readings of each; its fifth-slowest read 8.324
+quiet and 9.377 to 9.625 under the game, green). **Under a load that slows layout more than script the verdict
+reads a regression of script time smaller, and one of 5 ms went unseen.** It still cannot see a regression that
+slows the reference as much as the frames, nor one that slows four or fewer frames of every run.
 
 ### Live row elements
 
@@ -561,8 +717,11 @@ Node of every job, to the exact `24.18.0`, where it had been `'24'`, a range und
 takes a cached or the newest 24.x. Under that range the runtime check would have refused the newest one, read
 by review round 21 on 2026-10-16 in Node's own files and not in a run: v24.22.0, dated 2026-10-14, is listed in
 `nodejs.org/dist/index.json` with V8 13.6.233.17, and its `common.gypi` sets the embedder string `-node.57`,
-against `-node.50` at v24.18.0. That a runner given `24.18.0` reports V8 13.6.233.17-node.50 is an inference
-until CI first runs, which it has not since the scaffold. What was run is this machine's: FIX-35 ran the case
+against `-node.50` at v24.18.0. That a runner given `24.18.0` reports V8 13.6.233.17-node.50 was an inference
+when FIX-35 wrote this. The first CI run, on 2026-10-18 (run 39157409731 at `27498c8`), passed its `perf` job
+under Node 24.18.0 by the orchestrator's record in `docs/PLAN.md`, and the allocation case passes only when the
+child's V8 string is the measured one; that the runner reported it is therefore an inference from that record,
+which E03-M01-S04 repeats without having read the run's log. What was run is this machine's: FIX-35 ran the case
 on 2026-10-17 under Node v24.18.0, where the child printed V8 13.6.233.17-node.50 and the case passed, and
 under Node v20.19.5, where the child printed V8 11.3.244.8-node.30 and the case failed on the runtime check.
 Moving `NODE_VERSION` costs the four entries measured again under the new Node and committed with it.
@@ -579,17 +738,30 @@ the frame budget is what holds that path.
 
 Every figure above is an entry of `perf/baselines.json`, in the shape the file already had — `baseline`, an
 optional `ceiling`, an optional `tolerance`, a `unit` that says what was measured and how — plus one new
-optional field, `ciTolerance` (next section). Every ceiling is decision 6's budget, unchanged; every baseline
-is what was measured on 2026-09-28 — the private memory at 50 000 commits on 2026-10-03 — not a round target.
+optional field, `ciTolerance` (next section). Every ceiling S07 set is decision 6's budget, unchanged, or for
+the idle processor figure the gate's reading of decision 6's "≈ 0 %" (under *Five idle minutes after the
+load*). Every baseline S07 set is a measured figure, not a round target, and was measured on 2026-09-28; five
+were measured again on 2026-10-03 — `coldStartEmptyMilliseconds`, `coldStartOpenMilliseconds` and
+`load10000Milliseconds` by E01-M01-FIX-27, `privateBytesAt50000` and `idleResidentRatio` by E01-M01-FIX-28,
+the first of those two after this slice's second executor context had set it once that day. The six entries of
+the two store files are E01-M01-S02's and its fixes', from before S07 (read from the history of
+`perf/baselines.json` by E03-M01-S04, 2026-10-24).
 
 | gate | files | entries | the line that reaches `compareWithBaseline` |
 | --- | --- | --- | --- |
 | `gates:budgets` | `perf/parse.timed.perf.test.ts` | `parseMicrosecondsPerCommit` | its `compareInRegime` call |
 | `gates:budgets` | `perf/layout.timed.perf.test.ts` | `layoutMicrosecondsPerCommit` | `compareInRegime` in its `held` |
+| `gates:budgets` | `perf/store.timed.perf.test.ts` | `buildMilliseconds` | its `compareWithBaseline` call, with no regime |
+| `gates:perf` | `perf/store.perf.test.ts` | `structuralBytesPerCommitWorst`, `structuralBytesPerCommit`, `structuralBytesPerCommitLarge`, `scalingRatio`, `workPerCommit` | its `compareWithBaseline` calls, with no regime |
 | `gates:perf` | `perf/layout.perf.test.ts` | `layoutWorkPerRow`, `layoutScalingRatio` | `compareInRegime` in its `held` |
 | `gates:perf` | `perf/allocation.perf.test.ts` | the four allocation entries | `compareInRegime` in its `held` |
 | `gates:budgets` | `test/e2e/budgets-start.spec.ts`, `budgets-memory.spec.ts`, and the case *main-thread work per frame while scrolling* of `budgets-frames.spec.ts` | `coldStartEmptyMilliseconds`, `coldStartOpenMilliseconds`, `load10000Milliseconds`; `privateBytesAt50000`, `idleResidentRatio`, `idleCpuPerCent`, `idlePageWakeups`, `idleRedraws`, `idleMainWakeups`, `residentBytesAfterClose`; `scrollFrameMeanMilliseconds`, `scrollFrameWorstMilliseconds` | `compareInRegime` in `holdToBaseline`, `test/e2e/support/budgets.ts` |
 | `gates:e2e` | `test/e2e/budgets-git.spec.ts`, and the other two cases of `budgets-frames.spec.ts` | `gitProcessesPerOpen`, `gitProcessesPerRefresh`, `gitProcessesPerLoadMore`, `loadMoreReadGrowth`; `liveRowElements`, `liveRowGrowth`, `redrawsPerScrolledFrame`, `redrawsPerScrollBurst` | the same line |
+
+The table holds all 34 entries of `perf/baselines.json`, each in the one file that names it: E03-M01-S04 searched
+every `perf/*.ts` and `test/e2e/*.spec.ts` for each entry's quoted name on 2026-10-24, and each was found in
+exactly one. The two store rows were added then; the store's entries are older than S07 and were left out of
+the table as S07 wrote it.
 
 As S07 built it, one gate, `gates:e2e`, ran all four files. E01-M01-S11 split them on 2026-10-10: the cases
 held to a clock or to the machine's load run in `npm run gates:budgets`, which is in none of the tiers of
@@ -600,7 +772,8 @@ says how.
 As S07 built it, `gates:perf` ran the parse and layout timings too, from `perf/parse.perf.test.ts` and
 `perf/layout.perf.test.ts`. E01-M01-S11 moved the two timings the same day into files named
 `*.timed.perf.test.ts`, which `gates:perf` leaves out and `npm run gates:budgets` runs, with the comparison
-each makes unchanged; the layout's two counters stayed where they were.
+each makes unchanged by that move; the layout's two counters stayed where they were. The layout timing's
+statistic changed later, under E01-M01-FIX-37 (*Parse and layout throughput*).
 
 `compareInRegime`, in `perf/baselines.ts`, applies the regime's limits and calls `compareWithBaseline`, which is
 unchanged. Every case asserts on the verdict it gets back, and a case that holds several budgets makes every
@@ -618,19 +791,34 @@ that did not set it would be held strictly and go red, which is seen. Every verd
 it was held to.
 
 **How wide.** An entry with a `ciTolerance` has every limit multiplied by it in CI — the ceiling and the
-baseline's own tolerance — and nothing removed. Every wall-clock entry carries a tolerance of 1.5, applied to a
-median of five, to the fastest of five or to the fastest of ten, never to one run. The two cold starts and the
-load are the fastest of ten since E01-M01-FIX-27 (2026-10-03), because their median of five went red in seven
-runs of ten on an unchanged product on a shared machine (under *Cold start, empty repository*); in those
-ten runs single cold starts read 968 to 3351 ms, and in the five runs that set today's baselines the fastest
-of ten sat 958 to 1100. Each also carries a `ciTolerance` of 4, so that in CI a
-figure may be six times its baseline, or four times its budget, whichever is less. Six because it has to be
+baseline's own tolerance — and nothing removed. **Seven wall-clock entries carry a tolerance of 1.5 and a
+`ciTolerance` of 4**, each applied to a statistic of several runs, never to one: `parseMicrosecondsPerCommit`
+the fastest of five as S07 built it and, since E03-M01-FIX-04, the lowest of twenty-five read per a reference;
+`layoutMicrosecondsPerCommit` the fastest of five as S07 built it and of twenty-five since
+E01-M01-FIX-37; `coldStartEmptyMilliseconds`, `coldStartOpenMilliseconds` and `load10000Milliseconds` the
+fastest of ten; `scrollFrameMeanMilliseconds` the median of five runs' means as S07 built it, the lowest of ten
+since FIX-37 and, since FIX-04, the lowest of ten read per a reference; and `scrollFrameWorstMilliseconds` the
+median of five runs' slowest frames as S07 built it, the lowest of ten since FIX-37, the lowest of ten runs'
+fifth-slowest frames since E03-M01-FIX-03 and, since FIX-04, that figure read per a reference (*Main-thread work
+per frame while scrolling*). Two wall-clock entries are held otherwise:
+`idleCpuPerCent`, one five-minute reading, with a tolerance of 8 (below), and `buildMilliseconds`, the slowest
+of three store builds, with a tolerance of 10 and no `ciTolerance`, which `perf/store.timed.perf.test.ts`
+compares through `compareWithBaseline` and not `compareInRegime`, so it is held to ten times its baseline in
+both regimes (read from `perf/baselines.json` and the test files by E03-M01-S04, 2026-10-24). The two cold
+starts and the load are the fastest of ten since E01-M01-FIX-27 (2026-10-03), because their median of five went
+red in seven runs of ten on an unchanged product on a shared machine (under *Cold start, empty repository*); in
+those ten runs single cold starts read 968 to 3351 ms, and in the five runs that set today's baselines the
+fastest of ten sat 958 to 1100. With a `ciTolerance` of 4, a figure of the seven may be six times its baseline
+in CI, or four times its budget, whichever is less. Six because it has to be
 **under ten**, or a regression of an order of magnitude would pass on the runner, with room for a fast run to
-still fail at ten; and as far above one as that allows, because the runner is a different machine: no run of
-either job has happened (the task file records that `origin` carries only the scaffold commit, checked
-2026-09-28; this lane touched no remote and did not check it), the runner has no
+still fail at ten; and as far above one as that allows, because the runner is a different machine: when S07
+chose the figure no run of either job had happened (the task file records that `origin` carried only the
+scaffold commit, checked 2026-09-28; this lane touched no remote and did not check it), the runner has no
 GPU, so its frames are drawn in software, and it builds its fixtures cold. That the runner is less than about
-three times slower than this machine is an inference, and the first CI run is where it is tested.
+three times slower than this machine is an inference. The first CI run, on 2026-10-18 (run 39157409731 at
+`27498c8`), passed its `budgets` job by the orchestrator's record in `docs/PLAN.md`, which E03-M01-S04 repeats
+without having read the run: that bounds every figure of the job under its CI limit, and does not measure how
+much slower the runner is.
 
 The idle processor figure, `idleCpuPerCent`, carries a `ciTolerance` of 4 as well, because it is a time too;
 its tolerance is 8 and not 1.5, for the reason given under *Five idle minutes after the load*. Of the memory
@@ -698,7 +886,9 @@ the image depends on Skia's software rasteriser drawing the same pixels from the
 processors. It selects its vector code by the processor's features at run time, so a runner with a different
 instruction set may round an anti-aliased edge by one step differently. I expect it to hold, and do not know
 that it will; the case is not skipped or weakened anywhere, so if it does not hold, the first CI run says so,
-and the repair is the owner's choice between a per-platform image and a tolerance.
+and the repair is the owner's choice between a per-platform image and a tolerance. That run, on 2026-10-18
+(run 39157409731 at `27498c8`), passed its end-to-end job on `windows-latest`, whose `gates:e2e` holds this
+case, by the orchestrator's record in `docs/PLAN.md`; E03-M01-S04 repeats that record and did not read the run.
 
 ## How each reading could be wrong, and how that was checked
 
@@ -725,7 +915,8 @@ and the repair is the owner's choice between a per-platform image and a toleranc
   minutes after the start, and once another program's processes were in the tree by a reused identifier, and
   the case now takes neither (under *Memory at 50 000 commits*).
 - **A memory reading taken while the load's memory is still coming back.** It was, at ten seconds. The case now
-  reads when the private sum has not fallen by 1 MB in 40 s, and fails past 180 s rather than read; a step more
+  reads when the private sum has not fallen by 1 MB in 40 s, and fails at the first reading past 180 s that does
+not meet that rule; a step more
   than 40 s after the one before it is what that still misses.
 - **An idle window whose wakeups the count cannot see.** Chromium's own work and the utility process are out of
   the counters' reach; the processor times of all five processes are what cover them.
@@ -733,8 +924,15 @@ and the repair is the owner's choice between a per-platform image and a toleranc
   table gives in bytes; a planted 250 MiB held in one process raised it by 252.2 to 260.9 MiB against the five
   unplanted runs, which is that allocation and the bytes the plant itself costs to run, so the field counts
   what a process commits for itself.
-- **A ceiling nobody can reach.** Every gate was watched failing on a planted regression (above), the memory
-  ceiling of 400 MB included.
+- **A ceiling nobody can reach.** Every gate this document names a plant for was watched failing on it
+  (above), the memory ceiling of 400 MB included: the start, load, frame, parse and layout figures in both
+  regimes, the regime code under FIX-29, the allocation case's runtime check under FIX-35, the layout and frame
+  readings again under FIX-37, the memory's ceiling, baseline and settling rule, the idle ratio, what closing
+  gives back, and the paint marks. The document records no plant for the idle processor figure, the page and
+  main-process wakeups, the redraw counters, the live row elements, the git counters, the allocation figures'
+  own limits or the golden image
+(E03-M01-S04's reading of
+  this document, 2026-10-24).
 
 ## What is not here
 

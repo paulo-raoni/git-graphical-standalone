@@ -52,25 +52,70 @@ export type { Person } from './commit-columns';
  */
 export { refCommitOf, refCount, refFlagsOf, refKindOf, refNameOf } from './ref-list';
 
+/**
+ * The rules of the bar's Branches dropdown, over a {@link Refs} block and a
+ * {@link BranchSelection}.
+ *
+ * Here rather than in `src/core/` because the renderer is the only caller and it
+ * may import this ring and nothing else (`ui-only-contracts`), while every rule
+ * in it is a decision that `docs/ADR-0002-architecture-and-performance.md`
+ * decision 1 keeps out of `src/ui/`. This ring is the one inside both the
+ * renderer's reach and the mutation gate's scope.
+ */
+export {
+  boxText,
+  branchEntries,
+  isChecked,
+  matchingEntries,
+  menuOf,
+  pressShowAll,
+  sameEntries,
+  sameSelection,
+  selectionOf,
+  SHOW_ALL,
+  SHOW_ALL_LABEL,
+  showingRemotes,
+  toggleBranch,
+} from './branch-menu';
+export type { BranchEntry, BranchMenu } from './branch-menu';
+
+/**
+ * The rules of the branch selection kept per repository: which stored value is a
+ * selection, which one an open reads under, and which kept branches survive the
+ * repository's references.
+ *
+ * Here because each is a decision `docs/ADR-0002-architecture-and-performance.md`
+ * decision 1 keeps out of `src/app/`, whose main process reads and writes the
+ * kept records and calls these, and because this ring is inside the mutation
+ * gate's scope.
+ */
+export { keptSelection, openingSelection, survivingSelection } from './kept-selection';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';
 
-export { CHANNELS } from './ipc';
+export { CHANNELS, ThemeChoice } from './ipc';
 export type {
   ApplicationInfo,
   ApplicationInfoResponse,
+  BranchSelection,
   ChannelName,
   ChooseFolderResponse,
+  ChooseThemeRequest,
+  ChooseThemeResponse,
   ChosenFolder,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
+  OpenedPage,
   OpenRepositoryRequest,
   OpenRepositoryResponse,
   RefreshRequest,
   RefreshResponse,
   StartupRepository,
   StartupRepositoryResponse,
+  ThemeChoiceResponse,
+  ThemeSetting,
 } from './ipc';
 
 export { RowFlag } from './layout';

@@ -1,5 +1,18 @@
-import { BRIDGE_GLOBAL_NAME, FailureKind } from '../contracts/index';
-import type { Failure, GraphPage, Result } from '../contracts/index';
+import {
+  branchEntries,
+  BRIDGE_GLOBAL_NAME,
+  FailureKind,
+  menuOf,
+  pressShowAll,
+  sameSelection,
+  selectionOf,
+  SHOW_ALL,
+  showingRemotes,
+  survivingSelection,
+  ThemeChoice,
+  toggleBranch,
+} from '../contracts/index';
+import type { BranchEntry, BranchMenu, Failure, GraphPage, Refs, Result } from '../contracts/index';
 
 import { mountGraphTable } from './graph-table';
 import type { GraphTableView } from './graph-table';
@@ -17,9 +30,13 @@ import type { Shell } from './shell';
  * {@link LOAD_MORE_COMMITS} says why that is unavoidable and what stops it
  * drifting.
  *
- * Nothing polls and no timer runs. Every request starts from an event — the
- * document loading, a click, or the view's Load More intent — and the control
- * that started one is disabled until it is answered.
+ * Nothing polls and nothing waits on a timer. Every request starts from an event
+ * — the document loading, a click, or the view's Load More intent — and the
+ * control that started one is disabled until it is answered.
+ *
+ * **It keeps nothing across a restart.** The branch selection and Show Remote
+ * Branches of each repository are kept by the main process (`src/app/selections.ts`),
+ * which opens a repository on them and says in the open's reply which they were.
  */
 
 /** Where the view is published on the window's global. */
@@ -106,6 +123,13 @@ interface Session {
   path: string | null;
   /** The bar's controls whose own request is unanswered. */
   readonly busy: Set<HTMLButtonElement>;
+  /** The references of the page drawn last, which the Branches list is made from. */
+  refs: Refs | null;
+  /** What the Branches list has checked, and the entries it offers. */
+  menu: BranchMenu;
+  entries: readonly BranchEntry[];
+  /** Whether Show Remote Branches is checked. */
+  showRemoteBranches: boolean;
 }
 
 /** What a bar control says at rest, and while the request it started runs. */
@@ -162,6 +186,9 @@ function receive(
   }
   shell.clearFailure();
   shell.showPath(session.path);
+  session.refs = reply.value.refs;
+  showBranches(shell, session);
+  shell.branches.enable();
   // A repository is shown, so Refresh is usable, unless a Refresh is still
   // reading: this may be another request's reply, and only its own answers it.
   shell.refresh.disabled = session.busy.has(shell.refresh);
@@ -202,16 +229,134 @@ function run(shell: Shell, work: Promise<void>): void {
   });
 }
 
-/** Open `path`, and remember it only once it has opened. */
+/** Hand the Branches control the entries of the last page and what is checked. */
+function showBranches(shell: Shell, session: Session): void {
+  session.entries =
+    session.refs === null ? [] : branchEntries(session.refs, session.showRemoteBranches);
+  shell.branches.show(session.entries, session.menu);
+}
+
+/**
+ * Open `path` on the branch selection and Show Remote Branches last applied to
+ * it, which the main process keeps and opens it on, less every kept branch the
+ * repository no longer has.
+ *
+ * The open's reply says which selection its page was read under. When a branch
+ * it names is gone (`survivingSelection`), that page is not drawn: what survives
+ * is applied, as a click would apply it, and its page is the first one drawn —
+ * every branch, when nothing survives, so a stale selection never shows an empty
+ * graph. Applying it is also what keeps it for the next open in place of the
+ * stale one, and what leaves the utility process reading only branches the
+ * control shows.
+ *
+ * The control is given the selection in the same task as the page, before either
+ * is drawn, so no page under another selection is ever drawn first.
+ */
 async function open(
   shell: Shell,
   view: GraphTableView,
   session: Session,
   path: string,
 ): Promise<void> {
-  const reply = await window.gitGraphical.openRepository({ path });
-  session.path = reply.ok ? path : session.path;
+  const opened = await window.gitGraphical.openRepository({ path });
+  let reply: Result<GraphPage> = opened;
+  if (opened.ok) {
+    const { selection, refs } = opened.value;
+    const shown = survivingSelection(selection, refs);
+    session.path = path;
+    session.menu = menuOf(shown);
+    session.showRemoteBranches = shown.showRemoteBranches;
+    if (!sameSelection(shown, selection)) {
+      reply = await window.gitGraphical.refresh({ selection: shown });
+    }
+    shell.branches.remotes.checked = shown.showRemoteBranches;
+  }
   receive(shell, view, session, reply, true);
+}
+
+/**
+ * Show what the Branches control now has checked at once, and ask for its page
+ * when that is a different page from the one asked for before. The page is drawn
+ * from its first row: it is a first page laid out from nothing, and the offset
+ * the table had belongs to rows it may not hold.
+ */
+function choose(
+  shell: Shell,
+  view: GraphTableView,
+  session: Session,
+  menu: BranchMenu,
+  showRemoteBranches = session.showRemoteBranches,
+): void {
+  const before = selectionOf(session.menu, session.showRemoteBranches);
+  const selection = selectionOf(menu, showRemoteBranches);
+  session.menu = menu;
+  session.showRemoteBranches = showRemoteBranches;
+  showBranches(shell, session);
+  if (sameSelection(before, selection)) {
+    return;
+  }
+  run(
+    shell,
+    (async (): Promise<void> => {
+      const reply = await window.gitGraphical.refresh({ selection });
+      receive(shell, view, session, reply, true);
+    })(),
+  );
+}
+
+/**
+ * Apply the colour scheme the control now shows, then tell the main process.
+ *
+ * The page changes first and at once, in the task of the `change` event, so the
+ * whole window is in the new scheme in the next frame whatever the bridge takes.
+ * The main process then moves what the page cannot — the frame, the menu bar
+ * and the preference the page sees — and keeps the choice for the next start
+ * (`src/app/theme.ts`). Its reply carries the choice back and is not shown: by
+ * the time it arrives a person may have chosen again, and the control already
+ * says what they chose last.
+ */
+function chooseTheme(shell: Shell): void {
+  const choice = Object.values(ThemeChoice).find((each) => each === shell.theme.value);
+  if (choice === undefined) {
+    return;
+  }
+  shell.showTheme(choice);
+  run(
+    shell,
+    (async (): Promise<void> => {
+      const reply = await window.gitGraphical.chooseTheme({ choice });
+      if (!reply.ok) {
+        report(shell, reply);
+      }
+    })(),
+  );
+}
+
+/** Show the colour scheme the main process applied before this window existed. */
+async function showStoredTheme(shell: Shell): Promise<void> {
+  const reply = await window.gitGraphical.themeChoice();
+  if (!reply.ok) {
+    report(shell, reply);
+    return;
+  }
+  shell.showTheme(reply.value.choice);
+}
+
+/**
+ * Wire the Branches control: each press is turned into what is checked by
+ * `src/contracts/branch-menu.ts`, and the result shown and asked for by `choose`.
+ */
+function connectBranches(shell: Shell, view: GraphTableView, session: Session): void {
+  shell.branches.onShowAll((clicks) => {
+    choose(shell, view, session, pressShowAll(session.menu, clicks, session.entries));
+  });
+  shell.branches.onBranch((name) => {
+    choose(shell, view, session, toggleBranch(session.menu, name));
+  });
+  shell.branches.remotes.addEventListener('change', () => {
+    const show = shell.branches.remotes.checked;
+    choose(shell, view, session, showingRemotes(session.menu, show), show);
+  });
 }
 
 /** Wire every control to the bridge. Nothing here runs until something happens. */
@@ -238,6 +383,12 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
       }),
     );
   });
+
+  shell.theme.addEventListener('change', () => {
+    chooseTheme(shell);
+  });
+
+  connectBranches(shell, view, session);
 
   view.onLoadMore(() => {
     view.setLoadingMore(true);
@@ -280,8 +431,16 @@ function start(): void {
     showPage: view.showPage,
     onLoadMore: view.onLoadMore,
   };
-  const session: Session = { path: null, busy: new Set() };
+  const session: Session = {
+    path: null,
+    busy: new Set(),
+    refs: null,
+    menu: SHOW_ALL,
+    entries: [],
+    showRemoteBranches: true,
+  };
   connect(shell, view, session);
+  run(shell, showStoredTheme(shell));
   run(shell, begin(shell, view, session));
 }
 

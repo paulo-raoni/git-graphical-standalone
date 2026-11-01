@@ -38,7 +38,8 @@ Scope and boundary of each slice live **only** in its task file (`AGENTS.md` §3
 ## Gates
 
 Every gate of `docs/ADR-0003-quality-gates-and-ci.md` §2, reachable through `npm run gates`, at the state the
-sequence has reached: a gate exists from the slice that lands it and is run by every slice after it.
+sequence has reached: a gate exists from the slice that lands it and is run by every slice after it. (From
+E01-M01-S11, merged 2026-10-10, a slice runs the tier its task names, `AGENTS.md` §11.)
 
 | from | gates |
 | --- | --- |

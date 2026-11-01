@@ -23,7 +23,7 @@ hidden, the drawing itself, reference labels, the columns, message rendering, re
 
 | ID | title | state |
 | --- | --- | --- |
-| E01-M01 | First graph | in flight |
+| E01-M01 | First graph | delivered, `v0.1.0` (2026-10-17) |
 | E01-M02 | Graph fidelity | planned |
 | E01-M03 | Live view | planned |
 | E01-M04 | Message rendering | planned |

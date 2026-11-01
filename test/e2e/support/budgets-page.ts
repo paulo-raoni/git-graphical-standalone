@@ -43,10 +43,12 @@ import type { GitGraphicalBridge, GraphPage } from '../../../src/contracts/index
  *
  * **The state is read in the first callback, not the second**, because the
  * second can see a change made after the first update's paint, which nothing has
- * painted yet. That happened: in one cold start of 80 measured on 2026-10-03
- * (processor load 44 to 100 per cent), the document's first update painted the
- * empty page, the renderer had mounted its bar 3.5 ms after that paint, and a mark
- * read in the second callback showed the bar 1.9 ms before Chromium's
+ * painted yet. That happened: in 140 cold starts of the probe as it then was,
+ * measured by E01-M01-FIX-27 on 2026-10-03 (processor load 37 to 100 per cent;
+ * the slice document, *How each reading could be wrong*), three first marks came
+ * before Chromium's paint. In one of them the document's first update painted
+ * the empty page, the renderer had mounted its bar 3.5 ms after that paint, and a
+ * mark read in the second callback showed the bar 1.9 ms before Chromium's
  * `paintTime` for the first contentful paint, which was the paint of the bar.
  *
  * What a mark does not see is the compositor putting the frame on the screen.
@@ -365,11 +367,19 @@ export interface FrameSample {
  * the scroll listener itself, which runs before the first callback and only asks
  * for a frame, and anything on another thread: rasterising and compositing are
  * not the main thread's.
+ *
+ * **With `reference` set, each frame is followed by a reference workload, timed
+ * on its own** (E03-M01-FIX-04): the page's `frameReference`, which the caller
+ * installs, is run and timed in the task that takes the frame's end mark, before
+ * the next frame is asked for, so a few milliseconds after the frame it stands
+ * beside; `reference` holds its timings, one a frame. Without it the frames are
+ * timed as they always were and `reference` is empty.
  */
 export async function sampleScrollFrames(input: {
   frames: number;
   step: number;
-}): Promise<FrameSample> {
+  reference?: boolean;
+}): Promise<FrameSample & { readonly reference: readonly number[] }> {
   const scope = globalThis as unknown as Scope;
   const probe = scope.budgetProbe;
   const list = scope.document.querySelector('.graph__scroll');
@@ -378,6 +388,9 @@ export async function sampleScrollFrames(input: {
   const room = Math.max(1, spacer.clientHeight - list.clientHeight);
   const channel = new scope.MessageChannel();
   const work: number[] = [];
+  const reference: number[] = [];
+  const timed = (globalThis as unknown as { frameReference?: () => number }).frameReference;
+  if (input.reference === true && timed === undefined) throw new Error('no frame reference');
   const redrawsBefore = probe.redraws;
   let started = 0;
   const tick = (): void => {
@@ -385,14 +398,15 @@ export async function sampleScrollFrames(input: {
     list.scrollTop = (list.scrollTop + input.step) % room;
     channel.port2.postMessage(0);
   };
-  return new Promise<FrameSample>((done) => {
+  return new Promise((done) => {
     channel.port1.onmessage = (): void => {
       work.push(scope.performance.now() - started);
+      if (input.reference === true && timed !== undefined) reference.push(timed());
       if (work.length < input.frames) {
         probe.frame(tick);
         return;
       }
-      done({ work, redraws: probe.redraws - redrawsBefore });
+      done({ work, reference, redraws: probe.redraws - redrawsBefore });
     };
     probe.frame(tick);
   });

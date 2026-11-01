@@ -17,6 +17,7 @@ export {
 export type { CommitLogParser, CommitSink } from './commit-log';
 
 export { resolveCommitRows } from './commit-lookup';
+export type { CommitRowLookup } from './commit-lookup';
 
 export { addReference, buildRefs, createReferenceList, markDetachedFrom } from './reference-list';
 export type { ReferenceList } from './reference-list';

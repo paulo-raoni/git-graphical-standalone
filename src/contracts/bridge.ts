@@ -9,7 +9,7 @@ import type {
   RefreshResponse,
   StartupRepositoryResponse,
 } from './ipc';
-
+import type { ChooseThemeRequest, ChooseThemeResponse, ThemeChoiceResponse } from './ipc';
 /** The property the preload attaches the bridge to on the renderer's global. */
 export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
 
@@ -28,16 +28,23 @@ export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
 export interface GitGraphicalBridge {
   /** Report the folder the application was started with, if it was given one. */
   readonly startupRepository: () => Promise<StartupRepositoryResponse>;
-  /** Open a repository by absolute path. */
+  /** Open a repository by absolute path, on the branch selection kept for it. */
   readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>;
   /** Show the folder chooser and report what the user picked. */
   readonly chooseFolder: () => Promise<ChooseFolderResponse>;
   /** Append more commits to the open repository's page. */
   readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>;
-  /** Re-read the open repository from disk. */
+  /**
+   * Re-read the open repository from disk under the branch selection in force,
+   * or apply the selection the request carries and answer its first page.
+   */
   readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>;
   /** Report the application's own versions. */
   readonly applicationInfo: () => Promise<ApplicationInfoResponse>;
+  /** Report the colour scheme in force. */
+  readonly themeChoice: () => Promise<ThemeChoiceResponse>;
+  /** Apply a colour scheme to the whole application and keep it for the next start. */
+  readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>;
 }
 
 declare global {

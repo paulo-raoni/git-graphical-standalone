@@ -1,5 +1,8 @@
+import { ThemeChoice } from '../contracts/index';
 import type { Failure } from '../contracts/index';
 
+import { mountBranchControl } from './branch-control';
+import type { BranchControl } from './branch-control';
 import { failureHeadline, repositoryLabel } from './status-text';
 
 /**
@@ -12,8 +15,10 @@ import { failureHeadline, repositoryLabel } from './status-text';
  * element with it.
  *
  * Nothing here decides anything. It holds no bridge and no state beyond which of
- * its two panes is showing, which is why the whole of the wiring is in
- * `./renderer.ts` and the whole of the wording is in `./status-text.ts`.
+ * its two panes is showing and which colour scheme it was told to show, which is
+ * why the whole of the wiring is in `./renderer.ts` and the wording of
+ * everything but the controls is in `./status-text.ts`. The Branches dropdown
+ * is built by `./branch-control.ts` and only placed in the bar here.
  *
  * Everything is built from elements and `textContent`, never from a markup
  * string, so a repository path and a message from git cannot be interpreted as
@@ -28,6 +33,20 @@ import { failureHeadline, repositoryLabel } from './status-text';
 export const OPEN_LABEL = 'Open Repository';
 export const REFRESH_LABEL = 'Refresh';
 
+/**
+ * The colour-scheme control's name, and what each of its three choices says,
+ * in the order the list shows them.
+ */
+const THEME_LABEL = 'Theme';
+const THEME_CHOICES: readonly (readonly [ThemeChoice, string])[] = [
+  [ThemeChoice.Light, 'Light'],
+  [ThemeChoice.Dark, 'Dark'],
+  [ThemeChoice.System, 'System'],
+];
+
+/** The `id` the theme control's visible label names it by. */
+const THEME_ID = 'bar-theme';
+
 /** What the shell hands `./renderer.ts` to drive it with. */
 export interface Shell {
   /** The element `mountGraphTable` owns. */
@@ -36,6 +55,19 @@ export interface Shell {
   readonly open: HTMLButtonElement;
   /** The control that re-reads the open repository. */
   readonly refresh: HTMLButtonElement;
+  /** The Branches dropdown and the Show Remote Branches checkbox. */
+  readonly branches: BranchControl;
+  /**
+   * The control that chooses the colour scheme. Disabled until
+   * {@link Shell.showTheme} has been told which one is in force, so that it never
+   * shows a choice that is not the one applied.
+   */
+  readonly theme: HTMLSelectElement;
+  /**
+   * Show `choice` in the control and apply it to the whole document at once:
+   * `data-theme` on the root element is what `renderer.css` pins a scheme by.
+   */
+  readonly showTheme: (choice: ThemeChoice) => void;
   /** Show which repository the window is looking at, or that there is none. */
   readonly showPath: (path: string | null) => void;
   /** Replace the table with the failure, in git's own words. */
@@ -61,6 +93,27 @@ function control(className: string, label: string): HTMLButtonElement {
 }
 
 /**
+ * The colour-scheme control: a list of exactly three choices with a visible
+ * label that names it, so it has an accessible name and is reached and changed
+ * from the keyboard as every native list is.
+ */
+function themeControl(): { label: HTMLLabelElement; select: HTMLSelectElement } {
+  const label = element('label', 'bar__theme-label');
+  label.htmlFor = THEME_ID;
+  label.textContent = THEME_LABEL;
+  const select = element('select', 'bar__theme');
+  select.id = THEME_ID;
+  for (const [value, text] of THEME_CHOICES) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    select.append(option);
+  }
+  select.disabled = true;
+  return { label, select };
+}
+
+/**
  * Build the shell into `root` and answer the handles the wiring needs.
  *
  * The failure view is built now rather than when a failure arrives, for the
@@ -79,7 +132,9 @@ export function mountShell(root: HTMLElement): Shell {
   const open = control('bar__button bar__open', OPEN_LABEL);
   const refresh = control('bar__button bar__refresh', REFRESH_LABEL);
   refresh.disabled = true;
-  bar.append(path, open, refresh);
+  const branches = mountBranchControl();
+  const theme = themeControl();
+  bar.append(path, open, refresh, ...branches.parts, theme.label, theme.select);
 
   const stage = element('div', 'stage');
 
@@ -96,6 +151,13 @@ export function mountShell(root: HTMLElement): Shell {
     stage,
     open,
     refresh,
+    branches,
+    theme: theme.select,
+    showTheme: (choice: ThemeChoice): void => {
+      document.documentElement.dataset['theme'] = choice;
+      theme.select.value = choice;
+      theme.select.disabled = false;
+    },
     showPath: (chosen: string | null): void => {
       path.textContent = repositoryLabel(chosen);
     },

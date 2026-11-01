@@ -13,11 +13,33 @@ type ApplicationInfoResponse = import("./result").Failure | import("./result").S
 
 value BRIDGE_GLOBAL_NAME: "gitGraphical"
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; }
+interface BranchEntry {
+    readonly label: string
+    readonly name: string
+}
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info"
+interface BranchMenu {
+    readonly branches: readonly string[]
+    readonly pressedFromEvery: boolean
+    readonly showAll: boolean
+}
+
+interface BranchSelection {
+    readonly branches: readonly string[] | null
+    readonly showRemoteBranches: boolean
+}
+
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
+
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info" | "theme:choice" | "theme:choose"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
+
+interface ChooseThemeRequest {
+    readonly choice: "light" | "dark" | "system"
+}
+
+type ChooseThemeResponse = import("./result").Failure | import("./result").Success<import("./ipc").ThemeSetting>
 
 interface ChosenFolder {
     readonly path: string
@@ -52,10 +74,12 @@ value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository
 interface GitGraphicalBridge {
     readonly applicationInfo: () => Promise<ApplicationInfoResponse>
     readonly chooseFolder: () => Promise<ChooseFolderResponse>
+    readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>
     readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
     readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
     readonly startupRepository: () => Promise<StartupRepositoryResponse>
+    readonly themeChoice: () => Promise<ThemeChoiceResponse>
 }
 
 interface GraphPage {
@@ -88,9 +112,19 @@ type LoadMoreCommitsResponse = import("./result").Failure | import("./result").S
 
 interface OpenRepositoryRequest {
     readonly path: string
+    readonly showRemoteBranches?: boolean
 }
 
-type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
+type OpenRepositoryResponse = import("./result").Failure | import("./result").Success<import("./ipc").OpenedPage>
+
+interface OpenedPage {
+    readonly commits: CommitColumns
+    readonly hasMore: boolean
+    readonly layout: LayoutRows
+    readonly refs: Refs
+    readonly selection: BranchSelection
+    readonly workingTree: WorkingTree
+}
 
 interface Person {
     readonly email: string
@@ -108,7 +142,9 @@ value RefFlag: { readonly CheckedOut: 1; readonly AnnotatedTag: 2; readonly Deta
 type RefKind = 0 | 1 | 2 | 4 | 3
 value RefKind: { readonly LocalHead: 0; readonly RemoteBranch: 1; readonly Tag: 2; readonly RemoteSymbolicHead: 3; readonly Stash: 4; }
 
-type RefreshRequest = { [x: string]: never; }
+interface RefreshRequest {
+    readonly selection?: BranchSelection
+}
 
 type RefreshResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
 
@@ -126,6 +162,10 @@ type Result<TValue> = import("./result").Failure | import("./result").Success<TV
 type RowFlag = 1 | 2 | 4 | 8 | 16 | 32
 value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; }
 
+value SHOW_ALL: BranchMenu
+
+value SHOW_ALL_LABEL: "Show All"
+
 interface StartupRepository {
     readonly path: string | null
 }
@@ -135,6 +175,15 @@ type StartupRepositoryResponse = import("./result").Failure | import("./result")
 interface Success<TValue> {
     readonly ok: true
     readonly value: TValue
+}
+
+type ThemeChoice = "light" | "dark" | "system"
+value ThemeChoice: { readonly Light: "light"; readonly Dark: "dark"; readonly System: "system"; }
+
+type ThemeChoiceResponse = import("./result").Failure | import("./result").Success<import("./ipc").ThemeSetting>
+
+interface ThemeSetting {
+    readonly choice: "light" | "dark" | "system"
 }
 
 value UNKNOWN_INDEX: 4294967295
@@ -150,13 +199,29 @@ interface WorkingTree {
 
 value authorOf: (columns: CommitColumns, row: number) => Person
 
+value boxText: (menu: BranchMenu, entries: readonly BranchEntry[]) => string
+
+value branchEntries: (refs: Refs, showRemoteBranches: boolean) => BranchEntry[]
+
 value commitCount: (columns: CommitColumns) => number
 
 value committerOf: (columns: CommitColumns, row: number) => Person
 
 value hexHashOf: (columns: CommitColumns, row: number) => string
 
+value isChecked: (menu: BranchMenu, name: string) => boolean
+
+value keptSelection: (value: unknown) => BranchSelection | null
+
+value matchingEntries: (entries: readonly BranchEntry[], text: string) => BranchEntry[]
+
+value menuOf: (selection: BranchSelection) => BranchMenu
+
+value openingSelection: (kept: BranchSelection | null, showRemoteBranches: boolean | undefined) => BranchSelection
+
 value parentsOf: (columns: CommitColumns, row: number) => Uint32Array
+
+value pressShowAll: (menu: BranchMenu, clicks: number, entries: readonly BranchEntry[]) => BranchMenu
 
 value refCommitOf: (refs: Refs, ref: number) => number
 
@@ -168,4 +233,16 @@ value refKindOf: (refs: Refs, ref: number) => RefKind
 
 value refNameOf: (refs: Refs, ref: number) => string
 
+value sameEntries: (a: readonly BranchEntry[], b: readonly BranchEntry[]) => boolean
+
+value sameSelection: (a: BranchSelection, b: BranchSelection) => boolean
+
+value selectionOf: (menu: BranchMenu, showRemoteBranches: boolean) => BranchSelection
+
+value showingRemotes: (menu: BranchMenu, show: boolean) => BranchMenu
+
 value subjectOf: (columns: CommitColumns, row: number) => string
+
+value survivingSelection: (selection: BranchSelection, refs: Refs) => BranchSelection
+
+value toggleBranch: (menu: BranchMenu, name: string) => BranchMenu

@@ -165,9 +165,12 @@ What the editor provided around the extension, rebuilt as a desktop application.
 - A Branches dropdown offers Show All, multi-selection of branches, a filter box, and predefined glob
   patterns (`customBranchGlobPatterns`); double-clicking Show All toggles every branch; a branch's context
   menu can select or unselect it; the selection persists per repository. → M01 **MVP** (all but glob
-  patterns and the context-menu action, which need E05-M01)
+  patterns and the context-menu action, which need E05-M01). The reference extension was observed on
+  2026-10-25 opening a reopened repository on Show All; the owner ruled on 2026-10-28 that this application
+  keeps the selection per repository all the same, as an improvement over the original (E03-M01-S12).
 - A Show Remote Branches checkbox, persisted per repository (`showRemoteBranches`), and per-remote
-  visibility from the repository settings (E06-M01). → M01 **MVP** (checkbox)
+  visibility from the repository settings (E06-M01). → M01 **MVP** (checkbox; kept by the main process so that
+  instances open at once share it, owner's ruling of 2026-10-28)
 - Repositories with over a thousand branches or very many tags load; colour codes from `color.branch=always`
   never leak into names; remote svn branches display. → M01 **MVP**
 - A Find widget (shortcut, or button on the control bar) matches a phrase against message, date, author,
@@ -178,6 +181,8 @@ What the editor provided around the extension, rebuilt as a desktop application.
 | --- | --- | --- |
 | **E03-M01** | Branches dropdown | Show all, select, filter, remote toggle, persistence. **MVP** |
 | E03-M02 | Find widget | Phrase search across the loaded commits with navigation. |
+
+E03-M01 is planned in `docs/plan/E03-branch-filtering-and-find/M01-branches-dropdown/MILESTONE.md` (2026-10-23).
 
 ### E04 · Commit details, comparison and diff
 
@@ -327,7 +332,7 @@ code.** They are decided in two documents, and this section only says where.
 | Clean architecture: four rings, dependencies inward only | ADR-0002 §1 | the boundaries gate, mechanically |
 | Separation of concerns: no rule in the renderer, none in the adapters | ADR-0002 §1 and §5 | the boundaries gate and code review |
 | Clean code, in its checkable part | ADR-0002 §7 | lint, types, the placeholder gate |
-| Usual quality gates, plus **mutation testing** | `docs/ADR-0003-quality-gates-and-ci.md` §2 and §3 | fifteen gates behind one `npm run gates` |
+| Usual quality gates, plus **mutation testing** | `docs/ADR-0003-quality-gates-and-ci.md` §2 and §3 | fifteen gates behind the tiered scripts of `AGENTS.md` §11 |
 | Delivered work does not regress | ADR-0003 §5 | four committed baselines that move in one direction only |
 | CI as one expandable line per pull request | ADR-0003 §6 and §7 | a single workflow file, a single required check |
 
@@ -340,7 +345,7 @@ remembers. Each is scheduled into the milestone that follows E01-M01 and is not 
 | --- | --- | --- |
 | **Give `src/ui/` colocated unit tests, and move the two pure suites home.** S05 had to put the renderer's pure tests on the end-to-end runner because the dependency rule had no carve-out for a test file beside the renderer. S06 adds the carve-out; moving the two existing suites is separate work. | The suites work where they are, so nothing is wrong today. What it costs is that they sit outside the unit gate's coverage report and run in the slowest gate instead of the fastest. | Two files, `test/e2e/graph-geometry.spec.ts` and the pure half of `test/e2e/graph-table.spec.ts`, as listed by review round 14. |
 | **Taken up as E01-M01-S09, no longer deferred.** Decide the two clocks the mutation gate runs under. The mutation runner's budget is set deliberately; the test runner's inner timeout is the framework's unset default that nobody chose, and it fires first. | Changing either moves every verdict in the report the gate's own clauses are measured against, and that report has to hold still while those clauses are being built. | Detections resting on a clock rather than an assertion were **73, 82, 88 and 100 across four runs of the configured scope on identical source**, against a runner timeout count that sat at 44 to 46 in the same four. The quantity moves with machine load and the single figure of 83 that an earlier draft of this row carried was one draw from that range, not the value. |
-| **Taken up as E01-M01-S12, no longer deferred.** Run the unit suite with `isolate: false` under the mutation gate. S09 measured it and did not take it. | It shares one module registry across every test file, so it changes what a test sees; taking it needs evidence that no file depends on another's module state. | S09's measurement, recorded in its slice document: seven concurrent copies of the gate's command in 5.7 s with it against 25–30 s without, about four times the throughput, which would take `gates:mutation` from about an hour to about a quarter of one. |
+| **Taken up as E01-M01-S12, no longer deferred.** Run the unit suite with `isolate: false` under the mutation gate. S09 measured it and did not take it. | It shares one module registry across every test file, so it changes what a test sees; taking it needs evidence that no file depends on another's module state. | S09's measurement, recorded in its slice document: seven concurrent copies of the gate's command in 5.7 s with it against 25–30 s without, about four times the throughput, from which S09 predicted about a quarter of an hour for `gates:mutation`. S12 measured the gate itself at 77.5 minutes with isolation and 35.0 without, back to back, with no other project's run in its minute samples (not `AGENTS.md` §11's measured load). |
 
 ### Raised during E01-M01, placement open for the owner
 
@@ -399,12 +404,11 @@ marked as such.
     without the label the S12 document gives it; "`gates:unit` … runs the same suite", which is
     `gates:unit:modules`.
 11. `vitest.config.js` header and the S09 document quote the per-mutant command without `--no-isolate`; S09
-    says the flag was not taken and predicted a quarter of an hour, where S12 measured 77.5 against 35.0 minutes;
-    this file's deferred-items table keeps that prediction.
-12. Stale since S11: `AGENTS.md` §11's sentence that `npm run gates` is the only entry point until S11 merges;
-    `MILESTONE.md` *Gates* ("run by every slice after it"); `README.md` ("`npm run gates` — every quality
-    gate"); this file's "fifteen gates behind one `npm run gates`". Unmeasured: `AGENTS.md` §11's "most fix lanes
-    after the fifth wave … changed no file it reads".
+    says the flag was not taken and predicted a quarter of an hour, where S12 measured 77.5 against 35.0 minutes.
+    (This file's deferred-items row was corrected by the orchestrator on 2026-10-23, `b67b360`.)
+12. **Done by the orchestrator, 2026-10-18 and 2026-10-23** (`27498c8`, `b67b360`): the stale sentences of
+    `AGENTS.md` §11, E01-M01's `MILESTONE.md` *Gates*, `README.md` and this file, and §11's unmeasured "most fix
+    lanes", which now carries its count (19 of 24).
 13. S12 slice document: "on a free machine" there means no other project's run in minute samples, not §11's
     measured load; "this is the mutant and the load, not the flag" is an inference, unlabelled.
 
@@ -427,6 +431,20 @@ marked as such.
     in every round.
 20. **Answered by review round 22:** `launchBudgeted` refused one launch of the memory case under load in round
     21; no launch was refused in round 22's 14 free-machine runs.
+
+**From the first continuous-integration run (2026-10-18, run 39157409731 at `27498c8`): gates red on Linux**
+
+These two are defects of gates — red on an unchanged product — and so of `AGENTS.md` §7's blocking class; they
+were found after E01-M01's promotion, which a defect never reopens (§8), so **E03-M01's first wave repairs them
+before anything else that relies on CI**. Every other job of that run passed: build, unit, end to end,
+performance (Node pinned to 24.18.0, the allocation V8 pin), budgets, size.
+
+- **`gates:licences` refuses `lightningcss-linux-x64-gnu@1.33.0` (MPL-2.0)**, the Linux build of a package whose
+  Windows build this machine installs instead; the allow-list was only ever met with the Windows one.
+- **`gates:mutation` refuses its run on the runner:** "1314 of the 1314 killed mutants' recorded output names no
+  failing test", with counts equal to the local runs' (1 314 killed, 36 timeout, 3 survived). By the
+  orchestrator's inference — the log does not show a mutant's raw output — the test runner's output on that
+  runner is shaped differently from this machine's and the gate's reading of failing tests does not match it.
 
 **From review round 22: sentences**
 
@@ -463,6 +481,152 @@ marked as such.
 31. `package.json` `engines` (`>=24.0.0`) admits Node versions under which `gates:perf` refuses to compare, while
     CI is pinned to 24.18.0 (FIX-35).
 32. Kills resting on vitest's own per-test clock are not re-measured by the mutation gate's re-measure clause.
+
+### Carried into E04-M01 from E03-M01's reviews
+
+Classed as **carried** under `AGENTS.md` §7 by E03-M01's review round 01 (2026-10-25, at `6cc54f9`); E04-M01's
+first wave takes them. Stated in full because review files are deleted at promotion. (Round 01's items 11 to 13,
+sentences in the orchestrator's own documents, were corrected in `bd9c65e`.)
+
+1. `scripts/gates/mutation-survivors.json` names the `BRIDGE_GLOBAL_NAME` mutant by line and column, so E03-M01-S01
+   shaped `src/contracts/bridge.ts` for the gate (an import on the line where a blank line was, to keep the constant
+   on line 14). Any line added above it reddens the gate while the guarantee is unchanged. Key the entry by
+   something that survives a moved line, then restore the blank line.
+2. `main.cjs` is at 5 095 of its 5 120-byte budget (round 01's gate run): 25 bytes for the next lane that adds
+   main-process code. Plan the budget question before such a lane, under `AGENTS.md` §11's ratchet.
+3. A failed write of the theme choice is reported only on the main process's standard error, so a person who did
+   not start the application from a terminal never learns the choice will not be kept. Whether the window should
+   say so is the owner's product choice.
+4. Every end-to-end suite but `theme.spec.ts` launches on the default user-data directory, so a stored theme choice
+   a person leaves there carries into their runs. None reads a colour today (round 01 searched).
+5. The window's background following the scheme is held by no check: round 01's mutation of it stayed green in all
+   five cases.
+6. Owed observations: the title-bar pixels under each choice, and a live change of the operating system's
+   preference with System chosen.
+7. Owed by the first push the owner asks for: E03-M01-S02's inference that `windows-latest` installs the win32-x64
+   binary, and E03-M01-S03's whole guarantee on the runner, with `gates:licences` and `gates:commits` in the
+   static job.
+8. Two loose sentences of the licences gate: `licences.js` prints "which is not on the allow-list" also for a package
+   refused despite an exception under another licence; the allow-list's `comment` does not mention the exceptions.
+9. Not measured: how often Stryker's `os.EOL` join splits plain text, `Tests` line included, and whether the
+   re-measure clause then always recovers the kill.
+10. No check that runs on this machine exercises `scripts/gates/mutation-output.js`: round 01's mutation of it kept
+    every local gate green, and only a hand-made coloured replay caught it. A committed coloured fixture replayed by
+    a check would hold it.
+
+From E03-M01's review round 02 (2026-10-25, at `bcfef2e`):
+
+11. `scripts/gates/commits.js`'s range selection is held by no committed check: round 02's mutation of it (removing
+    `--no-contains=HEAD`) kept every gate green and would leave each promotion's release merge read by no range. At
+    `main`'s tip `f1e3db7` the default range is `v0.0.0..HEAD` and red on that commit's subject, as before
+    E03-M01-S07; a CI run on `main` before the next promotion would show it.
+12. `test/fixtures/shared-store.ts`'s "one past the highest" copy numbering is held by no case (round 02's mutation of
+    it survived 36 of 36).
+13. `test/fixtures/shared-store.test.ts` is at 298 of the 300 lines `max-lines` allows, so the next store case needs
+    the file split first.
+14. `vitest.fixtures.config.js`'s header says two suites live there; it now also collects `test/e2e-partition.test.ts`.
+15. "No number is used twice" (`shared-store.ts` header, the S05 slice document, the last case's comment) overstates
+    the code: by round 02's reading, a process that lists the copies after another removed the only copy, and
+    before that one publishes the next, builds copy 1 again.
+16. Under saturated load the application project's waits run out (round 02 and E03-M01-S07 saw 60 s test timeouts in
+    `open-repository.spec.ts` and `graph-table.spec.ts`, and a 10 s `expect` in `stale-load-more.spec.ts`). Whether
+    `gates:e2e` needs a load rule of its own or longer limits is the owner's call.
+17. `gates:e2e` took 20.0 minutes at 100 % load against round 01's 3.1 minutes; the quick tier's cost on a loaded
+    machine is dominated by it.
+18. `gates:budgets` had no kept reading in round 02; the last kept one is E03-M01-S05's. Owed on a free machine.
+    **Closed** by round 03 (at `4c7ff80`): every case had a kept reading, every kept reading green, across two
+    invocations (the round's own record).
+
+From E03-M01's review round 03 (2026-10-25, at `4c7ff80`, verdict PASS):
+
+19. E03-M01-S06 was merged with its audit `INCOMPLETE` on its three dedicated `npm run gates:mutation` runs, which
+    `AGENTS.md` §4 sends to a new executor instead. Round 03 took the runs (0 refusals of unchanged code in 5
+    draws). Whether a lane whose only open item is a measurement may be merged with it recorded as owed is the
+    owner's to rule, written into §4, or it is not done again.
+20. `scripts/gates/mutation-remeasure.js`'s verdicts are held by no committed check: round 03's mutation of
+    `pastTheOuterClock` (the starvation guard removed) kept every committed check green and was seen only by an
+    uncommitted doctored replay. A committed fixture report replayed by a check would hold them (as item 10 asks
+    for `mutation-output.js`).
+21. The row-budget case of `test/e2e/graph-table.spec.ts` (line 366) stayed green 5 of 5 with E03-M01-FIX-02's waits
+    removed (round 03, 67 % load): no red seen depends on its new poll.
+22. `test/e2e/budgets-frames.spec.ts:183/186/190` and `:59` read counts after fixed 300 ms and 100 ms waits. Their
+    verdicts are upper bounds, so a regression (a frame per scroll event) can pass when its frame misses the wait.
+    Wait on the probe's `registered`/`fired` frame counts instead (round 03 measured 11 of 11 green).
+23. The re-measure clause's outer clock is `timeoutMS` alone (120 s), below Stryker's own per-mutant budget
+    (1.5 × the dry run + `timeoutMS`): in two of round 03's four draws a re-run went past it (`hash-index.ts` 120:7)
+    and counted only through `01fb07d`'s reading.
+
+From E03-M01's review round 04 (2026-10-25, at `e81a68c`, reworded since as `e88e08f` with the identical tree):
+
+24. The sentences that no tag, `HEAD` or `refs/stash` can ride in under a branch's name (`isReadBranch`'s comment in
+    `src/adapters/git-commands.ts`, `src/contracts/ipc.ts`, the S09 slice document) are contradicted: round 04
+    measured `refs/heads/side...refs/stash` and `refs/heads/side..HEAD` passing the prefix check, and git reading the
+    stash's and HEAD's commits. No branch git can create has such a name. Refuse what git's ref-name rules refuse,
+    or narrow the sentences; E03-M01-S10 builds names only from the page's refs.
+25. `revisionArgs`'s comment says `git-page.spec.ts` holds the default argument list; `git-selection.spec.ts`
+    (lines 96–127 at round 04) holds it.
+26. The clause of `select` in `src/app/repository-host.ts` that drops a selection overtaken by a later one
+    (`open.selectedBy > ticket`) is held by no deciding check: removed, `branch-selection.spec.ts` stayed green
+    12 of 12 (round 04).
+27. `gates:budgets` owed at E03-M01-S09's head for the memory case's idle and closing verdicts and the four start
+    cases: neither S09's lane nor round 04 had a kept reading of them. **Closed by review round 05**, whose full
+    run F1 at `d31361f` kept every one of those verdicts green.
+
+From E03-M01's review round 05 (2026-10-28, at `d31361f`):
+
+28. The S07 slice document's table row gives the worst-frame baseline as 7.7 ms (6.9 since E03-M01-FIX-03), and
+    *Two regimes* says that verdict is the lowest of ten worst frames (it is the lowest of ten fifth-slowest
+    frames). E03-M01-FIX-04's boundary holds both lines; if it corrects them, this item is closed by it. **Closed by
+    E03-M01-FIX-04** (review round 06).
+29. The fifth-slowest frame verdict cannot see a slowdown of four or fewer frames in every run; FIX-03's commit
+    `c6edf89` says "Not a loosening" without that exception; and ADR-0002's "no frame over 16.7 ms" is checked
+    literally by no verdict. **The owner ruled on 2026-10-28 that a check of it is wanted, in E04-M01.**
+30. The reset of the branch selection when a repository opens is held by no check (round 05's mutation M1).
+    E03-M01-S12 replaces the reset with the restored selection and holds that by checks; if it does, this item is
+    closed by it.
+31. The colour override is held for `PARSING_CONFIGURATION` and the two hand-written argument lists, not for
+    `stashArgs`, `statusArgs` or `repositoryProbeArgs` (round 05's mutation M3: `stashArgs` without it kept the
+    fixtures suite green).
+32. "code-unit order … is also the order git itself lists references in" (`src/contracts/branch-menu.ts`, the S10
+    slice document) is contradicted for names mixing supplementary characters with U+E000 to U+FFFF.
+33. `perf/refs.perf.test.ts` attributes the `many-refs` fixture to `test/fixtures/generate.ts`; it is built in
+    `src/adapters/reference-fixtures.spec-support.ts`.
+34. A second instance on the same user-data directory opened with Show Remote Branches checked whatever was stored.
+    **Taken by E03-M01-S12** (owner's ruling, 2026-10-28).
+35. The plan and E03-M01's goal say the branch selection persists per repository; the observed reference and the
+    product did not. **Taken by E03-M01-S12** (owner's ruling, 2026-10-28: keep it per repository). Items 30, 34 and
+    35 are **closed by E03-M01-S12** (review round 06: its mutation M1 and the built application).
+36. The check mark drawn by `.branches__option[aria-selected='true']::before` becomes part of each checked row's
+    accessible name ("✓ main"); `aria-selected` already says it.
+37. Short wall-clock readings are judged on samples longer than the reading: the parse benchmark takes about 3 s and
+    `AGENTS.md` §11 allows sampling every 5 s.
+
+From E03-M01's review round 06 (2026-10-30, at `f15ad50`):
+
+38. `test/e2e/branch-selection.spec.ts` runs on the default user-data directory and, since E03-M01-S12, writes a
+    kept record into the real profile of whoever runs the suite (measured by the reviewer); its header still says
+    no control applies a selection.
+39. Before a repository's first page, the disabled Show Remote Branches checkbox shows checked whatever is kept
+    (measured 14 to 703 ms on a restart by the reviewer), as before E03-M01-S12.
+40. `AGENTS.md` §5 does not say whether a fix task may run beside a slice lane; E03-M01-FIX-04 ran beside S12
+    from a different base, and only review round 06 gated the two together.
+
+Round 06's C-42 (the scrolled fifth-slowest baseline kept above its re-measured median) is not carried: the
+owner ruled on 2026-10-30 to tighten it before v0.2.0, by E03-M01-FIX-05. Its C-45, the orchestrator's
+tree-identical reword of 2026-10-25 made before `AGENTS.md` §2 listed one, was ratified by the owner on 2026-10-30.
+
+From E03-M01's review round 07 (2026-11-01, at `02ec06a`):
+
+41. Under a load that slows the renderer more than its processor share shows, the scrolled verdicts read a
+    regression smaller: E03-M01-FIX-05 measured its 5 ms-a-frame plant green under a game at 32.7 and 34.0 % other
+    load, which `AGENTS.md` §11 counts as a free machine (not reproduced by the reviewer, whose synthetic memory
+    load left the plant red). The repair round 07 names is an amendment of §11 that discards a reading whose own
+    reference time goes beyond a bound, measured first. **The owner ruled on 2026-11-01 to promote v0.2.0 and take
+    it in E04-M01.**
+42. `launchBudgeted` (`test/e2e/support/budgets.ts`) adds its five init scripts after `electron.launch` has
+    released the application's ready event, so the first window can get four (round 07 read Playwright 1.63.0's
+    launcher; not reproduced). FIX-05 saw it once, at a load §11 discards; its rate on a free machine is unmeasured.
+    The comment above it draws a conclusion the launcher does not support.
 
 ### What shapes the plan rather than the code
 

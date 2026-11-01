@@ -56,8 +56,8 @@ The split is by case, not by file, because two files hold both kinds:
 | `budgets-memory.spec.ts` | its one case: private memory after a settle, five idle minutes of processor time and wake-ups, memory after closing | — |
 | `budgets-frames.spec.ts` | *main-thread work per frame while scrolling*: two frame costs in milliseconds | *live row elements* and *canvas redraws*: counts |
 | `open-repository.spec.ts` | *the main process keeps answering while the whole of a large load runs*: asserts the worst round trip under 500 ms | its other eight cases |
-| `budgets-git.spec.ts` | — | its one case: git processes per request and stored bytes, all counts |
-| `golden-graph.spec.ts` and the seven other files | — | every case: counts, texts, orders and one byte comparison |
+| `budgets-git.spec.ts` | — | its one case: git processes per open, Refresh and Load More, and the ratio of the commits the fifth Load More reads to the first's, all counts |
+| `golden-graph.spec.ts` and the seven other files (eight since E03-M01-S01 added `theme.spec.ts`) | — | every case: counts, texts, orders and one byte comparison |
 
 Measured on 2026-10-10 with `playwright test --list`, at `dab51b5` by this slice's third session and again at
 `b60051f` by its fourth: 45 cases in 13 files with no project named, 39 in 11 files for
@@ -65,7 +65,10 @@ Measured on 2026-10-10 with `playwright test --list`, at `dab51b5` by this slice
 lists and the two together are the 45. The list at this slice's base, `ef3981f`, was taken by this slice's
 second session, the same day, from an unpacked copy of that commit: 45 cases in 13 files, the same ones once
 the tag is removed from six titles. That session saw its comparison fail: with one line removed from the
-application list it reported the partition broken.
+application list it reported the partition broken. At E03-M01-S04's base, `6cc54f9`, on 2026-10-24, the same
+three lists read 50 cases in 14 files, 44 in 12 and 6 in 4: the five cases of `theme.spec.ts` joined the
+application set, and the budgets set's six titles are the six of the table above (counted and read by
+E03-M01-S04; the application list was not compared by title).
 
 How each untagged case was judged: every `expect` in `test/e2e/*.spec.ts` that compares a magnitude, and every
 read of a clock, was listed by search on 2026-10-10 by the third session. Outside the six tagged cases the
@@ -107,7 +110,7 @@ benchmarks:
 | `parseBufferBytesPerCommit`, `layoutBufferBytesPerRow` | typed-array bytes allocated: a count, no tolerance | `gates:perf` |
 | `parseHeapBytesPerCommit`, `layoutHeapBytesPerRow` | heap bytes allocated in a child process with no collection inside the run: not a time, held to 1.001 and 1.01 times the baseline | `gates:perf` |
 | `parseMicrosecondsPerCommit` | **a time**: the fastest of five timed parses | `gates:budgets` |
-| `layoutMicrosecondsPerCommit` | **a time**: the fastest of five timed layouts | `gates:budgets` |
+| `layoutMicrosecondsPerCommit` | **a time**: the fastest of five timed layouts, and of twenty-five since E01-M01-FIX-37 (2026-10-17) | `gates:budgets` |
 | `buildMilliseconds` | **a time**: the slowest of three timed builds, held to ten times its baseline | `gates:budgets` |
 
 The two heap entries read a number that differs a little from process to process (their `unit` strings record
@@ -152,15 +155,18 @@ equals its original; nothing keeps them equal afterwards. A helper module both f
 outside what this slice could add.
 
 One thing about the layout timing is different and no limit moved for it: it used to run after the two
-counted cases in the same file, which had already laid the page out three times, and now runs after its own
-single warm-up pass, as its comment always said it did. Its baseline is 0.59 microseconds a commit and its
+counted cases in the same file, which had already laid the page out three times, and after this slice ran
+after its own single warm-up pass, as its comment always said it did. (Since E01-M01-FIX-37, 2026-10-17, it
+makes those three passes itself before timing, and takes the fastest of twenty-five runs in five batches: the
+S07 slice document, *Parse and layout throughput*.) Its baseline is 0.59 microseconds a commit and its
 limit 0.885; in the seven budgets runs of 2026-10-10 that ran to their end it read 0.552 to 0.641 in five and
 0.807 and 1.195 in the other two, on a loaded machine every time (*The budgets gate on its own*).
 
 **What nothing checks.** A new timed benchmark written in a file without `.timed.` in its name runs in
 `gates:perf`, inside the tiers. Nothing counts the three. And `perf/baselines.json`, which this slice could
-not touch, still says in the `unit` of the parse entry that it was measured by `perf/parse.perf.test.ts`, a
-name that no longer exists; the gate prints that string with every verdict.
+not touch, said in the `unit` of the parse entry that it was measured by `perf/parse.perf.test.ts`, a name
+that no longer exists, and the gate printed that string with every verdict; E03-M01-S04 corrected the sentence
+on 2026-10-24.
 
 ## What a Markdown-only change can move: `gates:static`
 
@@ -198,9 +204,10 @@ any job it needs was skipped. The job does not download the `dist` artefact: `ga
 itself, there as in a worktree. The `e2e` job still calls `npm run gates:e2e`, which is now the application
 set, and the `perf` job still calls `npm run gates:perf`, which is now the counted benchmarks.
 
-**Unproven.** No run of this workflow has happened since the scaffold, and none will until the owner asks for
-a push. Whether the job starts, whether the budget cases and the timed benchmarks hold on a hosted runner
-under the wide regime `CI` selects, and how long they take there, are all unmeasured.
+**Unproven when this slice ended.** No run of this workflow had happened since the scaffold. The first, on
+2026-10-18 (run 39157409731 at `27498c8`), passed its `budgets` job by the orchestrator's record in
+`docs/PLAN.md`, which E03-M01-S04 repeats without having read the run; how long the job took there, and how
+near its readings came to the wide regime's limits, that record does not say.
 
 ## How the scripts were proved
 
@@ -261,7 +268,7 @@ What the table does not show, said plainly:
 **`npm run gates:quick` at `b60051f`, 09:25:01 to 09:29:14: exit 0.** It ran the fourteen gates of its list in
 order, the list `gates` holds without mutation: 380 unit tests in 25 files and 70 in 5 against fixture
 repositories, the build, **39 end-to-end cases, the application set**, in 1.2 minutes, 9 benchmarks in 3
-files, the production build at 48 087 of 54 272 budgeted bytes, and the five gates after it. The sampled load
+files, the production build at 48 087 of 54 272 budgeted bytes, and the four gates after it. The sampled load
 during it averaged 64.3 per cent and was over 75 in nineteen of its forty-nine samples, with another
 project's unit run in the process table. It exited 0 once more, at 09:34, with the planted budgets-case
 assertion of the table above in the tree.
@@ -363,7 +370,9 @@ and build processes that did not descend from this lane's own runner; before 09:
 tell this lane's processes from another's, so for run 1 only the entries that name another project or a
 mutation run are used.
 
-A run was started only when the twelve samples before it averaged under 40 per cent and none was over 75.
+A run was to be started only when the twelve samples before it averaged under 40 per cent and none was over
+75. The table of stopped runs below shows that rule broken twice: runs 14 and 37 started after a minute that
+averaged 41.0 and 40.0 per cent. Why is not recorded (E03-M01-S04, from that table, 2026-10-24).
 A run that met a sample over 75 per cent in its first six minutes was already discarded, and was stopped
 there — this lane's own process tree and nothing else — to give the time back; later than that it ran to its
 end. (Run 2 is the exception: it was stopped at 8.2 minutes, before the six-minute bound was written.) No
@@ -510,10 +519,16 @@ The runs that were stopped, with the readings each had printed by then:
   read when they were taken. `AGENTS.md` §11 on `dev`, read at `0439a82` on 2026-10-10, now says that the
   load counted is that of everything except the reading's own process tree. No run of this slice was judged
   that way: the sampler read one figure for the whole machine and did not separate the gate's own share.
-- **How rare a free stretch was.** Between 08:50 and 16:43 the load series holds five stretches of nine
-  minutes or more with no sample over 75 per cent: 08:55 to 09:13, 09:13 to 09:23, 09:26 to 09:41, 11:01 to
-  11:10 and 16:21 to 16:30. The third held this slice's own quick-tier and planted-failure runs. Runs 2, 3, 8
-  and 64 each ran inside one of the others until the sample over 75 that ended the stretch.
+- **How rare a free stretch was.** By the fourth session's reading of its load series, between 08:50 and
+  16:43 it held five stretches of nine minutes or more with no sample over 75 per cent: 08:55 to 09:13, 09:13
+  to 09:23, 09:26 to 09:41, 11:01 to 11:10 and 16:21 to 16:30, and runs 2, 3, 8 and 64 each ran inside one of
+  the first, second, fourth and fifth until the sample over 75 that ended it. **That list sits badly with this
+  document's own tables** (E03-M01-S04, 2026-10-24): the quick tier of 09:25:01 to 09:29:14, under *What the
+  tiers measured*, met nineteen samples over 75 per cent in its forty-nine and overlaps the third stretch by
+  more than two minutes, and run 3, 09:14 for 9.4 minutes, met eight and overlaps the second by about nine.
+  Both hold together only if every one of those samples fell outside the stretch, at a minute's edge the
+  times given here round away, and nothing recorded shows that. The series is not in the repository, so which
+  account is wrong was not established; the list is not evidence of a free stretch.
 
 ### The third session's four runs, on a quiet machine that was not free
 
@@ -560,23 +575,28 @@ files was not established. The suites rebuild a fixture only when its folder is 
 exists and is damaged is used as it is.
 
 Neither session touched those folders. Each set `TEMP` and `TMP` to a directory of this lane's own for every
-run, the suites built fresh fixtures there, and the same case passed (34 of 34 in that file). **Until those
-two folders are removed, `npm run gates` and `npm run gates:quick` run on this machine with the default
-temporary directory are red at `gates:unit`** — measured by the third session, once in the full tier and
-once with the file run alone — and the end-to-end cases would open repositories with a deleted file in their
-working tree, which was not run. The fourth session did not look at the folders again.
+run, the suites built fresh fixtures there, and the same case passed (34 of 34 in that file). **While those
+two folders were the ones the suites read, `npm run gates` and `npm run gates:quick` run on this machine with
+the default temporary directory were red at `gates:unit`** — measured by the third session, once in the full
+tier and once with the file run alone — and the end-to-end cases would have opened repositories with a deleted
+file in their working tree, which was not run. The fourth session did not look at the folders again. Since
+E01-M01-FIX-33 (2026-10-17) neither suite reads them: the two stores publish under names of their own,
+`git-graphical-standalone-e2e-verified-` and `git-graphical-standalone-unit-verified-` where they had been
+`…-e2e-shared-` and `…-unit-shared-`, and check each repository against a record before handing it out
+(`test/fixtures/shared-store.ts`; the names read from the two store files at `ade2dd6~1` and at
+E03-M01-S04's base by E03-M01-S04, 2026-10-24, which did not run the gates with the default directory).
 
 ## What is unproven
 
-- **Every run in this document used a private temporary directory.** None of the four scripts has been seen
-  green on this machine with the default one, for the reason above, and the shared caches were left as they
-  were found.
+- **Every run of this slice used a private temporary directory.** None of the four scripts was seen green
+  on this machine with the default one while this slice ran, for the reason above, and the shared caches were
+  left as they were found.
 - **`npm run gates` at this slice's head.** One full run, at `dab51b5`, green through mutation and the
   end-to-end set and red at the timings that have since moved; its verdict at `b60051f` and at `71d141c`
   is the inference under *What the tiers measured*.
 - **`npm run gates` on any planted failure, and `gates:quick` on the two benchmark plants**: inferences from
   composition, labelled above.
-- **No `gates:budgets` run since the split has been taken on a free machine.** 69 runs were taken to read the
+- **No `gates:budgets` run of this slice was taken on a free machine.** 69 runs were taken to read the
   gate, not counting the three that carried a planted failure, and all 69 are discarded. The fourth
   session's 65 each met a five-second sample over 75 per cent: the highest sample of a run was 75.1 to 100
   per cent, the mean load in the minute before one 13.7 to 41.0 per cent, and the mean during the seven
@@ -588,11 +608,16 @@ working tree, which was not run. The fourth session did not look at the folders 
   cases and for the three benchmarks that joined it. What is measured is what the gate holds and that it
   can fail: it runs the three timed benchmarks and the six tagged cases and nothing else (the lists above),
   and it went red on a planted failure in a case and in a benchmark (*The planted failures*).
-- **The first kept run is owed by whoever next has a free machine.** `AGENTS.md` §11 has the reviewer run
-  `npm run gates:budgets` on a free machine at the reviewed commit every round.
+- **The first kept run was owed by whoever next had a free machine.** `AGENTS.md` §11 has the reviewer run
+  `npm run gates:budgets` on a free machine at the reviewed commit every round. Kept readings were taken after
+  this slice: by E01-M01-FIX-37 on 2026-10-17, of the layout timing and the frame case (the S07 slice
+  document), and by review round 22, whose 14 kept readings of the memory case `docs/PLAN.md` records;
+  E03-M01-S04 repeats both without having reproduced them.
 - **Whether a run of the gate can meet the rule on this machine.** Under the whole-load reading its own
   cold-start cases reached 77.7 per cent in a five-second sample with no other run listed. Under the reading
-  `dev` now states, which leaves out the reading's own process tree, nothing has been measured.
-- **The `budgets` job in continuous integration**: never run.
+  `dev` now states, which leaves out the reading's own process tree, this slice measured nothing; the kept
+  readings of the item above were judged under it, by their takers' accounts.
+- **The `budgets` job in continuous integration**: never run while this slice was in flight; the first run of
+  the workflow, on 2026-10-18, passed it (under *Continuous integration*).
 - **This document's last commit**: the runs above are at `71d141c` or earlier. The commit after it changes
   this one Markdown file, which of the fifteen gates only `gates:provenance` and `gates:commits` read.

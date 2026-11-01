@@ -88,6 +88,10 @@ audit files; merge, push or tag; touch any remote or the hosted repository's set
 - Commit to `main`, **only** promotion merge commits (§8).
 - Create and remove worktrees and branches; merge; tag; copy sequence files between the primary checkout and
   worktrees.
+- Replace its own commits on `dev` that are **not yet pushed** by commits with **identical trees** whose messages
+  differ, to repair a message a gate refuses, saying so in the handoff and to the next reviewer. (Owner's ruling,
+  2026-10-27: review round 04 of E03-M01 found a 101-character body line in an orchestrator commit, and no other
+  role may change a commit on `dev`.)
 - **Push, only when the owner explicitly asks for it in the current session.**
 - **Create, rename, delete or reconfigure a remote, or change the hosted repository's visibility or settings,
   only when the owner explicitly asks for it in the current session.** Never otherwise.
@@ -167,8 +171,11 @@ so **each task file is written for a context that has no memory of anything else
 
 ### Lifecycle
 
-1. The orchestrator writes **every** slice task of the milestone at the root of the primary checkout
-   **before creating any worktree**. Writing them together is what surfaces collisions.
+1. The orchestrator writes **every** slice task of a wave at the root of the primary checkout **before creating
+   any of that wave's worktrees**. Writing them together is what surfaces collisions. A later wave's tasks may
+   be written while an earlier wave runs, and each is checked against every task of the milestone not yet
+   merged. (Amended 2026-10-23: E03-M01's later slices need the reference extension observed first, and its
+   first wave shares no file with them; holding the first wave for that observation bought nothing.)
 2. When it creates a lane's worktree, the orchestrator **copies** the task file into the worktree root. A new
    worktree is a clean checkout, so ignored files do not exist in it.
 3. The executor writes its audit at the worktree root as its last act. It does not edit or delete the task.
@@ -191,6 +198,11 @@ If an executor context ends before its task is done, it writes the audit with `S
 exactly what is done and what is left. The orchestrator starts a **new** executor context on the same task in
 the same worktree. That context continues the work and rewrites the audit to cover the whole task, keeping
 each session's account under `## Sessions`. One task, one audit.
+
+**Only a lane whose audit says `Status: COMPLETE` is merged.** A lane left `INCOMPLETE`, even on a measurement
+alone, goes to a new executor context until it is complete; it is never merged with the rest recorded as owed.
+(Owner's ruling, 2026-10-27: work is delivered whole, never cut. E03-M01-S06 was merged with three measurements
+owed, and review round 03 had to take them.)
 
 ---
 
@@ -417,11 +429,15 @@ milestone.
 
 ```
 git switch main
-git merge --no-ff dev -m "chore(release): E<ee>-M<mm> <milestone title>"
+git merge --no-ff dev -m "chore(release): e<ee>-m<mm> <milestone title in lower case>"
 git tag -a v0.<minor>.<patch> -m "E<ee>-M<mm> <milestone title>"
 git switch dev
 git merge --ff-only main
 ```
+
+The merge subject is in lower case because §9's commit gate refuses an upper-case start (commitlint's
+`subject-case`): E01-M01's promotion used `E01-M01 First graph` and that commit, `f1e3db7`, fails the gate whenever
+a range includes it (measured by E03-M01-S03, 2026-10-24). Amended 2026-10-24.
 
 Then delete the sequence files from the root. Push `main`, `dev` and the tag **only when the owner explicitly
 asks for it in the current session**.
@@ -480,7 +496,9 @@ wrong moment, against work already merged.
 ### Gate tiers: a lane runs the gates its change can move
 
 Every lane used to run every gate, and the mutation gate alone took 88 minutes in E01-M01-FIX-28's last run;
-most fix lanes after the fifth wave of the first milestone changed no file it reads. **The task file names the
+19 of the 24 fix lanes merged after the fifth wave of the first milestone (FIX-13 to FIX-37) changed no file it
+reads (the orchestrator's count of 2026-10-23 over each merge's diff, counting `src/core/`, `src/contracts/`,
+every `*.test.ts` under `src/`, `stryker.config.json`, `vitest.config.js` and `scripts/gates/mutation*`). **The task file names the
 lane's tier, and the tier is a boundary** like the mutation scope: an executor may not narrow it to pass or widen
 it to look thorough. (Owner's ruling, 2026-10-09.)
 
@@ -499,8 +517,7 @@ on an unchanged product (E01-M01-FIX-28, 2026-10-04).
 **The reviewer runs everything**, `npm run gates` and then `npm run gates:budgets` on a free machine, at the
 reviewed commit, every round. That is what bounds the exposure of a narrower tier to one round.
 
-These scripts are landed by E01-M01-S11; until it is merged, `npm run gates` is the only entry point and holds
-every gate.
+These scripts were landed by E01-M01-S11, merged on 2026-10-10.
 
 ### Where evidence comes from
 
@@ -529,7 +546,11 @@ A committed baseline — coverage thresholds, mutation thresholds, performance c
 budgets — **moves in the improving direction only**. Loosening one is a commit that says why, inside the
 diff the reviewer reads. An executor that cannot meet a baseline raises it as a blocker in its audit; it
 never edits the target to match its result. A gate that flaps is a defect of the gate, fixed as one, and
-never a reason to relax a threshold.
+never a reason to relax a threshold **by itself**. When a fix task assigned to that flapping verdict measures
+that no verdict at the strict limit is both green on the unchanged product and red on a planted regression, it
+relaxes the threshold to the smallest value green on every kept reading of a free series, keeps it red on the
+planted regression, and argues both with the readings in the commit body. (Owner's ruling, 2026-10-27: finishing
+the work comes first; E03-M01's scrolled worst-frame verdict flapped twice on unchanged code.)
 
 ### Wall-clock gates on a shared machine
 

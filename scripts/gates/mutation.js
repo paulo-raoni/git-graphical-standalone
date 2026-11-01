@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { remeasure } from './mutation-remeasure.js';
+import { plainFiles, remeasure } from './mutation-remeasure.js';
 import { repositoryRoot, report } from './tree.js';
 
 /**
@@ -24,8 +24,9 @@ import { repositoryRoot, report } from './tree.js';
  * So the score is not the only thing read back. Stryker's own JSON report carries
  * `testsCompleted` per mutant — one completed test per mutant whose suite reached
  * an exit status under this runner, and none for a mutant that timed out — and
- * `statusReason`, the runner's whole captured output. Five properties of the
- * report refuse the build on their own:
+ * `statusReason`, the runner's whole captured output, which every clause reads
+ * with its terminal escape sequences taken out (`mutation-output.js`, since
+ * E03-M01-S03). Five properties of the report refuse the build on their own:
  *
  * 1. **Every killed and every surviving mutant carries a completed test run.**
  *    Both verdicts are statements about what the tests did, so both need a test
@@ -47,14 +48,16 @@ import { repositoryRoot, report } from './tree.js';
  *    non-zero", and a suite that exits non-zero without failing a test did not
  *    assert anything about the mutant.
  * 5. **No kill rests on a suite that could not get memory, that died before it
- *    ran a test, or that printed nothing.** Every killed mutant whose output
- *    names no failing test, or says its suite ran out of memory or lost its
- *    worker, is run again alone once Stryker has finished, and is counted by
- *    what that second run says: a failing test or a crash of its own module is
- *    a kill, a pass is a survivor for the survivor clause below, and anything
- *    else refuses the build. Added by E01-M01-FIX-36; the clause, its reasons
- *    and the line it hinges on are in `mutation-remeasure.js` beside this file,
- *    called once, below, before the survivor clause reads the report.
+ *    ran a test, that printed nothing, or on vitest's own clock alone.** Every
+ *    killed mutant whose output names no failing test, says its suite ran out of
+ *    memory or lost its worker, or carries vitest's own test timeout, is run
+ *    again alone once Stryker has finished, and is counted by what that second
+ *    run says: a failing test, a crash of its own module or vitest's clock again
+ *    is a kill, a pass is a survivor for the survivor clause below, and anything
+ *    else refuses the build. Added by E01-M01-FIX-36, and extended to the clock
+ *    by E03-M01-S06; the clause, its reasons and the line it hinges on are in
+ *    `mutation-remeasure.js` beside this file, called once, below, with
+ *    `VITEST_CLOCK`, before the survivor clause reads the report.
  *
  * No clause is the tests-per-mutant figure itself, because a genuinely
  * non-terminating mutant is a legitimate detection with no test result: 43 of the
@@ -79,8 +82,9 @@ import { repositoryRoot, report } from './tree.js';
  * `vitest.config.js` includes, once per mutant, its files one at a time, and —
  * since E01-M01-S12 — **without isolating the test files from one another**: with `--no-isolate`
  * the files of one run share a module registry instead of each getting a fresh
- * one. That flag is on the command line and nowhere else, so `gates:unit`, which
- * runs the same suite from the same configuration without it, keeps isolation.
+ * one. That flag is on the command line and nowhere else, so
+ * `gates:unit:modules`, which runs the same suite from the same configuration
+ * without it, keeps isolation.
  *
  * **The flag is the line the gate's speed and its equivalence both hinge on.**
  * It was taken only because S12 ran this gate over the configured scope both
@@ -291,7 +295,7 @@ import { repositoryRoot, report } from './tree.js';
  * transcript of it cannot be read as a green mutation gate. `npm run gates:mutation`
  * passes no such flag and is unchanged.
  *
- * ## Beside the four shape clauses: a committed survivor baseline
+ * ## Beside the five shape clauses: a committed survivor baseline
  *
  * Stryker's own `break` threshold compares **one global score**, and at this
  * project's size that number cannot fail for anything smaller than a collapse.
@@ -768,8 +772,7 @@ const replay = replayPathOf(process.argv.slice(2));
 const LABEL = replay === null ? 'mutation' : 'mutation-replay';
 
 const json = replay ?? reportPath();
-const inTree = fileNameOf(json);
-const shownPath = inTree.startsWith('..') ? json : inTree;
+const shownPath = fileNameOf(json).startsWith('..') ? json : fileNameOf(json);
 
 if (replay === null) {
   rmSync(json, { force: true });
@@ -786,12 +789,13 @@ const provenance =
 const findings = [];
 
 if (existsSync(json)) {
-  const { files } = JSON.parse(readFileSync(json, 'utf8'));
+  const files = plainFiles(JSON.parse(readFileSync(json, 'utf8')).files);
   const counted = tally(files);
   const metrics = metricsOf(counted);
   describe(metrics, provenance);
   findings.push(...shapeFindings(metrics, counted.unknown));
-  const against = survivorFindings(await remeasure(files, LABEL, findings), readSurvivors());
+  const remeasured = await remeasure(files, LABEL, findings, VITEST_CLOCK);
+  const against = survivorFindings(remeasured, readSurvivors());
   for (const note of against.notes) {
     process.stdout.write(note);
   }

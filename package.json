@@ -7,7 +7,7 @@
   "license": "MIT",
   "main": "dist/main.cjs",
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.18.0"
   },
   "scripts": {
     "build": "node scripts/build.js",

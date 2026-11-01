@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generateRepository, readSpecification } from '../../fixtures/generate';
-import { removeDirectory, verifiedCopy } from '../../fixtures/shared-store';
+import { removeDirectory, removeOldStores, verifiedCopy } from '../../fixtures/shared-store';
 
 /**
  * The fixture repositories of the end-to-end suites that open repositories, and
@@ -32,10 +32,11 @@ import { removeDirectory, verifiedCopy } from '../../fixtures/shared-store';
  * anything, so no budget's window holds it.
  *
  * The directory is not the `git-graphical-standalone-e2e-shared-` one the code
- * before E01-M01-FIX-33 published into, whose repositories carry no record and
- * which a checkout of that code still reads as it finds it; nor the
- * `git-graphical-standalone-e2e-` one E01-M01-FIX-18 used. Different names keep
- * each protocol's files in different directories.
+ * before E01-M01-FIX-33 published into, whose repositories carry no record; nor
+ * the `git-graphical-standalone-e2e-` one E01-M01-FIX-18 used. Different names
+ * keep each protocol's files in different directories. The first of them is
+ * removed when this module loads, by `removeOldStores` of
+ * `test/fixtures/shared-store.ts`, which says why that is safe.
  *
  * **A repository a case writes into is that run's own** ({@link ownFixture}):
  * built into a fresh `mkdtemp` directory no other run can name, and removed by
@@ -60,6 +61,8 @@ export const fixtureRoot = join(tmpdir(), `git-graphical-standalone-e2e-verified
  * name ends in `-` and a digest, or in that and a copy number.
  */
 const stagingRoot = join(fixtureRoot, '.staging');
+
+removeOldStores(tmpdir());
 
 /** The private directories this process has made, removed by {@link removeOwnFixtures}. */
 const own: string[] = [];
