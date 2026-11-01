@@ -263,15 +263,35 @@ async function framesAt(
  * of. Twenty readings of that kept at FIX-04's `044b3fa`, interleaved with those
  * and spread the same way, at 6.5 to 37.9 per cent: means 4.786 to 6.111,
  * fifth-slowest 5.8 to 9.834, none red. The mean's baseline went down to their
- * median, 4.94; the fifth-slowest's stays 6.9, its median 6.691 being too close
- * to the highest. On a quiet machine a regression must add 3.87 to 4.55 to the
- * new fifth-slowest to turn it red, against 3.45 to 4.35 to the old: planted in
- * `paint`, 3 ms in every frame read 9.09 to 9.932, green in three kept readings,
- * 4 ms 10.036 to 10.465, red in one of three, 5 ms red in three of three, as was
- * 6 ms in every tenth frame; the mean was red on 3 ms in two of three and on 4 ms
- * in three. Neither verdict can see a regression that slows the reference as
- * much as the frames, such as a style rule costly for every element of the page;
- * the slice document, *Main-thread work per frame while scrolling*, has the rest.
+ * median, 4.94; the fifth-slowest's stayed 6.9 in that lane, its median 6.691
+ * leaving the highest 0.2 ms under its limit. Against that limit of 10.35, on a
+ * quiet machine, planted in `paint`, 3 ms in every frame read 9.09 to 9.932,
+ * green in three kept readings, 4 ms 10.036 to 10.465, red in one of three, 5 ms
+ * red in three of three, as was 6 ms in every tenth frame; the mean was red on
+ * 3 ms in two of three and on 4 ms in three.
+ *
+ * **The fifth-slowest's baseline is 6.691 since E03-M01-FIX-05** (2026-11-01),
+ * that median, by the owner's ruling of 2026-10-30, so its limit is 10.0365.
+ * FIX-05 kept sixteen readings of this case at its first commit, judged as
+ * FIX-04's were, at 7.7 to 37.7 per cent other load, nine of them over 25 per
+ * cent and that load almost all a game played on the machine: 6.037 to 7.541,
+ * none red; its first session had kept twelve, 5.959 to 9.095. On a quiet
+ * machine a regression must now add 3.36 to 4.0 to turn it red (its four kept
+ * readings under 15 per cent, 6.037 to 6.681): planted in `paint`, 4 ms in every
+ * frame read 10.076 to 10.405, red in three kept readings of three, 5 ms 11.291
+ * to 11.5, red in three of three, and removed, green. Under two synthetic busy
+ * threads, at 27.7 and 29.7 per cent, 5 ms read 11.235 and 13.87, red; under the
+ * game, at 32.7 and 34.0 per cent, 9.237 and 9.246, green. There the reference's
+ * run middles read 3.6 to 9.6 ms against 2.2 to 2.5 under 10 per cent: the load
+ * slowed layout more than script, so a regression of script time is divided by
+ * a reference slowed more than it. In the lowest mean per reference the 5 ms
+ * busy-wait added 4.80 quiet and 1.33 under the game, and a fixed loop of
+ * arithmetic in every frame 2.34 and 1.45 (FIX-05's averages over its kept
+ * readings). Neither verdict can see a regression that slows the reference as
+ * much as the frames, such as a style rule costly for every element of the page,
+ * and the fifth-slowest cannot see one that slows four or fewer frames of every
+ * run; the slice document, *Main-thread work per frame while scrolling*, has the
+ * rest.
  */
 test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);

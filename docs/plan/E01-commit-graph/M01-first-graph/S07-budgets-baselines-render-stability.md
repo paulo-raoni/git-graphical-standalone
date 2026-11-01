@@ -41,7 +41,7 @@ cent, and free physical memory 0.66 to 5.17 GB of 16. Each figure from that day 
 | Structural memory per loaded commit | ≤ 96 bytes | 85.519 at the worst size | the committed baseline, re-run at the lane's base | meets |
 | Memory, all processes, 50 000 commits: the sum of their private bytes | ≤ 400 MB | median **157 372 416 bytes** (150.1 MiB), read once the load's memory has come back | five runs on 2026-10-03, 147.6 to 154.1 MiB | meets |
 | Resident memory growth over 5 minutes idle | ≤ 2 % | **+0.2 %** (ratio 1.002), from the settled reading | five five-minute runs on 2026-10-03: 0.853 to 1.006 | meets |
-| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **4.94 ms** per reference since E03-M01-FIX-04 (S07: **5.24 ms**), fifth-slowest frame **6.9 ms** since E03-M01-FIX-03 (S07: worst frame **7.7 ms**) | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6; since FIX-04 each frame per a reference, twenty kept on 2026-10-30: means 4.786 to 6.111, fifth-slowest 5.8 to 9.834 | meets |
+| Main-thread work per frame while scrolling | ≤ 8 ms, no frame over 16.7 ms | mean **4.94 ms** per reference since E03-M01-FIX-04 (S07: **5.24 ms**), fifth-slowest frame **6.691 ms** per reference since E03-M01-FIX-05 (FIX-03: **6.9 ms**; S07: worst frame **7.7 ms**) | five runs of 240 frames: means 5.13 to 5.34, worsts 7.3 to 8.1; since E01-M01-FIX-37 the lowest of ten runs, seven kept on 2026-10-17: means 5.02 to 5.67, worsts 7.0 to 10.6; since FIX-04 each frame per a reference, twenty kept on 2026-10-30: means 4.786 to 6.111, fifth-slowest 5.8 to 9.834; FIX-05, sixteen kept on 2026-10-31 and 2026-11-01: means 4.629 to 4.912, fifth-slowest 6.037 to 7.541 | meets |
 | Live DOM row elements | ≤ viewport rows + 2 × overscan | **37**, at 300 and at 10 000 commits | every run | meets, at the bound |
 | CPU while idle, no timer wakeups | ≈ 0 % | **0.063 %** of one core; **0** wakeups in the page and the main process | five five-minute runs: 0.063 to 0.453 % | meets |
 
@@ -579,17 +579,19 @@ fifth-slowest 1.49 times, where the raw figures read 2.12 and 2.83 times.
 Twenty readings of the new reading kept at FIX-04's `044b3fa`, which changes no product file, interleaved with
 those twenty at `d31361f` and spread the same way, at other load of 6.5 to 37.9 per cent: the lowest mean per
 reference 4.786 to 6.111, the lowest fifth-slowest per reference 5.8 to 9.834, none red. **The mean's baseline went
-down from 5.24 to 4.94**, the median of the twenty, so its limit is 7.41; **the fifth-slowest's stays 6.9**,
-because its median, 6.691, would have left the highest reading 0.2 ms under its limit. The tolerances and the
-ceilings are unchanged. On the readings kept at under 15 per cent other load, what a regression must add to turn
-a verdict red was, in its own unit, 2.45 to 2.60 for the new mean against 2.47 to 2.84 for the old, and 3.87 to
-4.55 for the new fifth-slowest against 3.45 to 4.35 for the old: **on a quiet machine the fifth-slowest verdict is
-up to 0.4 ms less sensitive**, and that is what it costs not to go red at the load where the old one did. With the
+down from 5.24 to 4.94**, the median of the twenty, so its limit is 7.41; **the fifth-slowest's stayed 6.9** in
+that lane, because its median, 6.691, would have left the highest reading 0.2 ms under its limit (E03-M01-FIX-05
+lowered it to that median, below). The tolerances and the ceilings are unchanged. On the readings kept at under
+15 per cent other load, what a regression must add to turn a verdict red was, in its own unit, 2.45 to 2.60 for
+the new mean against 2.47 to 2.84 for the old, and 3.87 to 4.55 for the new fifth-slowest at the limit of 10.35
+against 3.45 to 4.35 for the old: **on a quiet machine the fifth-slowest verdict was up to 0.4 ms less
+sensitive** until FIX-05, and that was what it cost not to go red at the load where the old one did. With the
 reference beside it a frame itself read a few per cent slower on a quiet machine, a lowest raw mean of 5.25 to
 5.62 against 5.02 to 5.39 without it; the baselines were measured with it.
 
-Planted at the top of the view's `paint` and rebuilt, each read in kept readings at 6.2 to 19.1 per cent other load:
-a busy-wait of 2 ms in every frame read a lowest mean of 6.738 to 6.797 and a fifth-slowest of 7.995 to 9.476,
+Planted at the top of the view's `paint` and rebuilt, each read in kept readings at 6.2 to 19.1 per cent other load,
+the fifth-slowest against FIX-04's limit of 10.35: a busy-wait of 2 ms in every frame read a lowest mean of 6.738
+to 6.797 and a fifth-slowest of 7.995 to 9.476,
 green on both in three of three; of 3 ms, a mean of 7.406 to 7.765, red in two of three, and a fifth-slowest of
 9.09 to 9.932, green; of 4 ms, a mean of 8.562 to 8.818, red in three of three, and a fifth-slowest of 10.036 to
 10.465, red in one of three; of 5 ms, 9.623 to 9.809 and 11.171 to 11.5, red on both in three of three. Of 4 ms
@@ -599,6 +601,35 @@ to 5.407 and 5.805 to 8.433, green. FIX-03's raw reading had caught 3 ms in ever
 and 4 ms in three of three on the fifth-slowest. The reference does none of the view's code, so the readings
 cannot see a regression that slows the reference as much as the frames, such as a style rule costly for every
 element of the page, and the fifth-slowest still cannot see one that slows four or fewer frames of every run.
+
+**Since E03-M01-FIX-05 (2026-11-01) the fifth-slowest's baseline is 6.691**, the median of FIX-04's twenty, by the
+owner's ruling of 2026-10-30 on review round 06's finding C-42, so its limit is 10.0365; the reading, the tolerance
+and the ceiling are unchanged. FIX-05 judged its readings as FIX-04 did: its own processes in a Windows job object,
+the machine sampled every 2 s, other load under 40 per cent on average over the minute before and over the
+reading, no sample over 75. Its second session kept sixteen readings of the case alone at its first commit,
+`65e6bce`, which changes only that baseline, on 2026-10-31 and 2026-11-01, at other load of 7.7 to 37.7 per cent
+during the reading, nine of them at 29.0 to 37.7 and that load almost all a game being played on the machine: the
+lowest fifth-slowest per reference read 6.037 to 7.541, median 7.014, none red, and the lowest mean 4.629 to
+4.912; nine more were discarded. Its first session, on 2026-10-30, had kept twelve at 6.5 to 33.3 per cent, 5.959
+to 9.095, and two of the whole gate, 6.0 and 6.072, none red. No reading of the unchanged product kept by FIX-04,
+review round 06 or FIX-05 is over 10.0365 (the first two by their own records): the highest is FIX-04's 9.834.
+
+Planted at the top of `paint` and rebuilt, against the new limit, in readings kept at 7.4 to 9.0 per cent other
+load: a busy-wait of 4 ms in every frame read 10.076 to 10.405, red in three of three (the first session's three
+at 5.6 to 7.2 per cent read 9.932 to 10.245, red in two); of 5 ms, 11.291 to 11.5, red in three of three. Removed,
+the four kept under 15 per cent read 6.037 to 6.681, green, so on a quiet machine a regression must add 3.36 to
+4.0 to turn the verdict red. Under load it depends on the load. With a synthetic load outside the job, two Node
+threads busy for 80 per cent of every 50 ms, 5 ms read 11.235 and 13.87, red, at 27.7 and 29.7 per cent, as the
+first session's two at 25.1 and 25.6 per cent read 13.34 and 13.173; that such a load stands in for other
+projects' is an inference. Under the game, at 32.7 and 34.0 per cent, 5 ms read 9.237 and 9.246, **green**. There
+the reference's run middles read 3.6 to 9.6 ms, against 2.2 to 2.5 under 10 per cent, and the frames' raw run
+means 9.2 to 19.9 against 5.4 to 7.4 under 15 per cent: the load slowed layout more than script, and each frame
+is divided by a layout workload. Averaged over the kept readings of each, the 5 ms busy-wait, a fixed time, added
+4.80 to the lowest mean per reference on a quiet machine and 1.33 under the game; a fixed loop of arithmetic in
+every frame, planted the same way, added 2.34 and 1.45 (two kept readings of each; its fifth-slowest read 8.324
+quiet and 9.377 to 9.625 under the game, green). **Under a load that slows layout more than script the verdict
+reads a regression of script time smaller, and one of 5 ms went unseen.** It still cannot see a regression that
+slows the reference as much as the frames, nor one that slows four or fewer frames of every run.
 
 ### Live row elements
 
