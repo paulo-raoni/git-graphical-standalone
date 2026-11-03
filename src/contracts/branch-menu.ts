@@ -84,8 +84,14 @@ function namesOf(entries: readonly BranchEntry[]): string {
  * The entries the list offers, in its order: the checked-out branch, the other
  * local branches by name, then, while they are shown, the remote-tracking
  * branches by name, each remote's HEAD among them. Tags and the stash are not
- * listed. Names are in code-unit order, the default order of `sort`, which is
- * also the order git itself lists references in.
+ * listed. Names are in code-unit order, the default order of `sort`. Git lists
+ * references in code-point order, the byte order of their UTF-8 spelling, and the
+ * two orders differ only where two names first differ by a character above U+FFFF
+ * against one from U+E000 to U+FFFF: code-unit order puts the first ahead, git the
+ * second. Measured by E04-M01-S03 on 2026-11-03 with git 2.51.0 on Windows,
+ * through `for-each-ref` and `branch --list`, loose and packed, over thirteen
+ * names from U+005A to U+20000. That the two orders agree on every other pair
+ * follows from how UTF-16 spells a character above U+FFFF, and was not measured.
  */
 export function branchEntries(refs: Refs, showRemoteBranches: boolean): BranchEntry[] {
   const current: string[] = [];
