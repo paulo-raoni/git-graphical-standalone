@@ -42,7 +42,8 @@ The table whose first column is the drawn graph, with Description, Date, Author 
   (heads, remotes, tags shown); M02 (toggles, remote heads)
 - Commits reachable only from tags are included (`showCommitsOnlyReferencedByTags`). → M02
 - Stashes appear as rows, drawn differently from commits, including stashes based on commits of deleted
-  branches (`showStashes`). → M02
+  branches (`showStashes`). → M02; **the stash rows themselves are taken by E04-M01** (owner's ruling,
+  2026-11-02: a stash's details need its row), and `showStashes` stays with M02.
 - Uncommitted changes appear as a row at the top when present, counted from the working tree and,
   optionally, untracked files (`showUncommittedChanges`, `showUntrackedFiles`). → M01 **MVP**
 - Commit order is date, author-date or topological (`commits.order`), overridable per repository from the
@@ -193,7 +194,9 @@ E03-M01 is planned in `docs/plan/E03-branch-filtering-and-find/M01-branches-drop
 - Changed files appear as a tree or a list (`fileView.type`), switchable per repository from controls on
   the view; folders with a single child folder compact (`compactFolders`); merge commits show the right
   files; filenames with quotes, non-ASCII and URI separators work; A, M, D, R, U indicators can be shown
-  (`enhancedAccessibility`). → M01 **MVP**
+  (`enhancedAccessibility`). → M01 **MVP**. Each setting this section names for E04-M01 is built in E04-M01 with
+  its alternative values and a control in the view to choose them (owner's ruling, 2026-11-02); the settings UI
+  of E02-M03 later takes them over.
 - The view's height and divider are draggable and remembered per repository. → M01 **MVP**
 - Up and Down move to the adjacent row; Ctrl/Cmd+Up and Down move to the child or parent on the same
   branch; with Shift the alternative branch is followed at forks and merges. → M01 **MVP**
@@ -492,7 +495,8 @@ sentences in the orchestrator's own documents, were corrected in `bd9c65e`.)
    shaped `src/contracts/bridge.ts` for the gate (an import on the line where a blank line was, to keep the constant
    on line 14). Any line added above it reddens the gate while the guarantee is unchanged. Key the entry by
    something that survives a moved line, then restore the blank line.
-2. `main.cjs` is at 5 095 of its 5 120-byte budget (round 01's gate run): 25 bytes for the next lane that adds
+2. **Closed**: E03-M01-S12 raised the budget to 8 192 bytes with its reason, and measured 6 661.
+   `main.cjs` was at 5 095 of its 5 120-byte budget (round 01's gate run): 25 bytes for the next lane that adds
    main-process code. Plan the budget question before such a lane, under `AGENTS.md` §11's ratchet.
 3. A failed write of the theme choice is reported only on the main process's standard error, so a person who did
    not start the application from a terminal never learns the choice will not be kept. Whether the window should
@@ -539,7 +543,8 @@ From E03-M01's review round 02 (2026-10-25, at `bcfef2e`):
 
 From E03-M01's review round 03 (2026-10-25, at `4c7ff80`, verdict PASS):
 
-19. E03-M01-S06 was merged with its audit `INCOMPLETE` on its three dedicated `npm run gates:mutation` runs, which
+19. **Closed** by the owner's ruling of 2026-10-27, now `AGENTS.md` §4: a lane is never merged with work owed.
+    E03-M01-S06 was merged with its audit `INCOMPLETE` on its three dedicated `npm run gates:mutation` runs, which
     `AGENTS.md` §4 sends to a new executor instead. Round 03 took the runs (0 refusals of unchanged code in 5
     draws). Whether a lane whose only open item is a measurement may be merged with it recorded as owed is the
     owner's to rule, written into §4, or it is not done again.
@@ -598,7 +603,8 @@ From E03-M01's review round 05 (2026-10-28, at `d31361f`):
     35 are **closed by E03-M01-S12** (review round 06: its mutation M1 and the built application).
 36. The check mark drawn by `.branches__option[aria-selected='true']::before` becomes part of each checked row's
     accessible name ("✓ main"); `aria-selected` already says it.
-37. Short wall-clock readings are judged on samples longer than the reading: the parse benchmark takes about 3 s and
+37. **Closed** by `AGENTS.md` §11 as amended on 2026-11-02 (a reading under a minute is sampled every two
+    seconds or oftener). Short wall-clock readings are judged on samples longer than the reading: the parse benchmark takes about 3 s and
     `AGENTS.md` §11 allows sampling every 5 s.
 
 From E03-M01's review round 06 (2026-10-30, at `f15ad50`):
@@ -608,7 +614,7 @@ From E03-M01's review round 06 (2026-10-30, at `f15ad50`):
     no control applies a selection.
 39. Before a repository's first page, the disabled Show Remote Branches checkbox shows checked whatever is kept
     (measured 14 to 703 ms on a restart by the reviewer), as before E03-M01-S12.
-40. `AGENTS.md` §5 does not say whether a fix task may run beside a slice lane; E03-M01-FIX-04 ran beside S12
+40. **Closed** by `AGENTS.md` §5 as amended on 2026-11-02. `AGENTS.md` §5 does not say whether a fix task may run beside a slice lane; E03-M01-FIX-04 ran beside S12
     from a different base, and only review round 06 gated the two together.
 
 Round 06's C-42 (the scrolled fifth-slowest baseline kept above its re-measured median) is not carried: the
