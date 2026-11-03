@@ -1,4 +1,5 @@
 import type { BranchSelection } from '../contracts/index';
+import { isRefName } from '../core/page/index';
 import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse/index';
 
 /**
@@ -86,16 +87,40 @@ const REMOTE_BRANCHES = 'refs/remotes/';
 
 /**
  * Whether one selected name is read: a local branch always, a remote-tracking
- * branch only while remote-tracking branches are shown, anything else never.
+ * branch only while remote-tracking branches are shown, and only when the name is
+ * one git's ref-name rules accept ({@link isRefName}); anything else never.
  *
- * Refusing every other name is what makes the list safe to put on a command line
- * a renderer chose: a name that begins with one of the two prefixes cannot begin
- * with `-`, so no name can be read by git as an option, and no tag, `HEAD` or
- * `refs/stash` can ride in under a branch's name.
+ * The two checks make the list safe to put on a command line a renderer chose,
+ * and each does a part of it. **The prefix**: a name that begins with
+ * `refs/heads/` or `refs/remotes/` cannot begin with `-`, so no name can be read
+ * by git as an option. **The ref-name rules**: the prefix alone let a revision
+ * expression ride in behind a branch's name. Review round 04 of E03-M01 measured
+ * `refs/heads/side...refs/stash` and `refs/heads/side..HEAD` passing it and git
+ * reading the stash's and HEAD's commits; `isRefName` refuses both, because each
+ * holds `..`, and with them every name holding the `~`, `^`, `:`, `@{` or
+ * pattern characters the other revision expressions are made of. The fixtures
+ * suite holds both of round 04's names on the `colour-config` fixture: the page
+ * each selection gives holds neither the stash's commits nor HEAD's, where git
+ * given the same names reads them (`git-colour.spec.ts`). A refused name is
+ * dropped exactly as a name without either prefix is, and the rest of the
+ * selection is read.
+ *
+ * **What neither check refuses.** A name that passes both is still resolved by
+ * git's own rules for a name, which try it under `refs/`, `refs/tags/`,
+ * `refs/heads/` and `refs/remotes/` as well as alone. So where `refs/heads/gone`
+ * names no branch, a tag spelled `refs/heads/gone` — the reference
+ * `refs/tags/refs/heads/gone` — is read in its place: git 2.51.0 printed that
+ * tag's history for `log --ignore-missing refs/heads/gone --` on a scratch
+ * repository with no branch `gone` (measured by E04-M01-S02). The Branches
+ * dropdown builds a selection from the branches a page lists (E03-M01-S10), so
+ * through it such a name can reach git only for a branch deleted since it was
+ * chosen, in a repository holding a reference of that spelling; that is an
+ * inference from how the dropdown builds names, not a measurement.
  */
 function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
   return (
-    name.startsWith(LOCAL_BRANCHES) || (showRemoteBranches && name.startsWith(REMOTE_BRANCHES))
+    (name.startsWith(LOCAL_BRANCHES) || (showRemoteBranches && name.startsWith(REMOTE_BRANCHES))) &&
+    isRefName(name)
   );
 }
 
@@ -106,7 +131,7 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * while they are shown, every tag, and HEAD** — the same set a user sees
  * without having chosen anything. With remote-tracking branches shown, that is
  * exactly the list every page was read with before selections existed, which
- * `git-page.spec.ts` holds to the argument.
+ * `git-selection.spec.ts` holds to the argument.
  *
  * It is spelled out rather than written `--all`, and the reason is measurable:
  * on the `stash` fixture, `--all` returns four commits and this list returns

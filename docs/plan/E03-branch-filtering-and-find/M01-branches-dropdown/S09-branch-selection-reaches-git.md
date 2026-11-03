@@ -40,8 +40,13 @@ the shape is argued from:
   `origin/main` beside the remote-tracking `origin/main` is the same trap between the two kinds of branch.
 - **A full name cannot be read by git as an option.** The list comes from the renderer and ends up on a command
   line. The adapter reads a name only when it begins with `refs/heads/`, or with `refs/remotes/` while remote
-  branches are shown, so no name can begin with `-`, and no tag, `HEAD` or `refs/stash` can ride in under a
-  branch's name. Anything else is not read.
+  branches are shown, so no name can begin with `-`. Anything else is not read. *Corrected by E04-M01-S02:* this
+  bullet said, as written by this lane, that the prefix also kept a tag, `HEAD` or `refs/stash` from riding in
+  under a branch's name. E03-M01's review round 04 measured `refs/heads/side...refs/stash` and
+  `refs/heads/side..HEAD` passing the prefix and git reading the stash's and HEAD's commits. Since E04-M01-S02
+  a name is read only when git's ref-name rules (`git check-ref-format`) accept it as well, which refuses both,
+  and the fixtures suite holds both refused; `isRefName` in `src/core/page/ref-name.ts` and that slice's document
+  say what is refused, and what a name passing both checks can still resolve to.
 
 An empty list reads no commit. It is not a second spelling of every branch: S10 sends `null` for Show All.
 
