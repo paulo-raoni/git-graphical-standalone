@@ -246,6 +246,9 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
   holds. (Added 2026-10-09: review round 20's fixes each run every gate, and FIX-28 found a gate on `dev` that
   goes red inside the full run for a reason no queued task repairs, so the task that repairs it has to run
   before the ones numbered ahead of it.)
+- **A fix task may run beside the lanes of a wave** when its boundary shares no path with theirs, within the
+  wave's three lanes, and the next review is the first to gate them together. (Added 2026-11-02: E03-M01-FIX-04
+  ran beside S12 from a different base, review round 07's C-46, and this section said nothing either way.)
 
 ### Entering the tree
 
@@ -565,7 +568,9 @@ free decides.**
   for a table with no other project's run in it and never got 65 seconds of one, because an idle run of another
   project stayed listed for hours.) The machine is free for a reading when the processor load, sampled every
   five seconds or oftener across all processors, averaged under 40 % over the minute before it and over the
-  reading itself, with no sample over 75 % during it. **The load counted is that of everything except the
+  reading itself, with no sample over 75 % during it. A reading that lasts under a minute is sampled every two
+  seconds or oftener (added 2026-11-02: the parse benchmark takes about three seconds, and E03-M01's review rounds
+  05 to 07 sampled every two seconds to judge it). **The load counted is that of everything except the
   reading's own process tree**: counted whole, a reading can discard itself, as E01-M01-S11 measured on
   2026-10-10 when the gate's own cold-start cases sampled 45.7 to 77.7 % with no other run listed. The two
   numbers are the orchestrator's first choice and are to be re-argued by whoever measures that they are wrong.
