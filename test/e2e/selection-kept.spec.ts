@@ -86,8 +86,7 @@ interface PageScope {
 function recordDrawn(): void {
   const scope = globalThis as unknown as PageScope;
   scope.viewBeforeScript = 'gitGraphicalView' in globalThis;
-  const drawn: string[][] = [];
-  scope.drawnRows = drawn;
+  const drawn: string[][] = (scope.drawnRows = []);
   new scope.MutationObserver(() => {
     const hashes = scope.document.querySelectorAll('.row:not([hidden]) .row__hash');
     const rows = Array.from(hashes, (row) => row.textContent ?? '');
@@ -385,14 +384,16 @@ test('a selection that cannot be kept is said once in the window, and still appl
     // Every message box answered at once, as a click would, and recorded.
     await application.evaluate(({ BrowserWindow, dialog }) => {
       const asked: unknown[] = ((globalThis as { asked?: unknown[] }).asked = []);
-      dialog.showMessageBox = ((window: unknown, options: object) =>
-        asked.push({ ...options, attached: window === BrowserWindow.getAllWindows()[0] })) as never;
+      dialog.showMessageBox = ((window: unknown, { type, message }: Record<string, unknown>) =>
+        asked.push([window === BrowserWindow.getAllWindows()[0], type, message])) as never;
     });
-    // Two writes refused; the second page is drawn only once its write has given up.
-    await apply(page, 'feature', 'topic');
+    // Two writes refused, each page drawn only once its write has given up. Waited on one by
+    // one, because a refresh that a later one supersedes writes nothing.
+    await apply(page, 'feature');
+    await expectGraph(page, remotesRepository, { revisions: [FEATURE], uncommitted: false });
+    await apply(page, 'topic');
     await expectGraph(page, remotesRepository, { revisions: [FEATURE, TOPIC], uncommitted: false });
     const asked = await application.evaluate(() => (globalThis as { asked?: unknown }).asked);
-    const message = 'The branch selection could not be kept.';
-    expect(asked).toMatchObject([{ type: 'warning', message, attached: true }]);
+    expect(asked).toEqual([[true, 'warning', 'The branch selection could not be kept.']]);
   });
 });
