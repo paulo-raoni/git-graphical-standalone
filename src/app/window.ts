@@ -1,4 +1,4 @@
-import { BrowserWindow, nativeTheme, shell } from 'electron';
+import { BrowserWindow, dialog, nativeTheme, shell } from 'electron';
 import { join } from 'node:path';
 
 /** Initial window size, chosen to show a graph column and four text columns. */
@@ -36,6 +36,41 @@ function followScheme(window: BrowserWindow): void {
   window.once('closed', () => {
     nativeTheme.off('updated', follow);
   });
+}
+
+/** The kinds of choice already said to be unkept in this run of the application. */
+const unkeptSaid = new Set<string>();
+
+/**
+ * Say in the window that a choice could not be kept for the next start: `what`
+ * names the choice ("theme choice"), `file` the file that could not be written.
+ *
+ * A warning message box attached to the window, because a person who did not
+ * start the application from a terminal never reads the standard error the
+ * caller also writes to; and not the window's failure view, which replaces the
+ * graph, out of proportion to a choice that still applies until the application
+ * closes. **Each kind is said once per run**: a disk that refuses one write
+ * refuses the next, and a box at every choice would make the application
+ * unusable for the rest of the run. The box is not awaited; nothing waits on its
+ * answer, and the main process goes on serving the window while it is open.
+ */
+export function sayUnkept(what: string, file: string): void {
+  if (unkeptSaid.has(what)) {
+    return;
+  }
+  unkeptSaid.add(what);
+  const options = {
+    type: 'warning' as const,
+    title: 'Not kept',
+    message: `The ${what} could not be kept.`,
+    detail:
+      'It still applies until the application closes, but the next start will not have it. ' +
+      `This file could not be written:\n${file}`,
+  };
+  const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+  void (window === undefined
+    ? dialog.showMessageBox(options)
+    : dialog.showMessageBox(window, options));
 }
 
 /**

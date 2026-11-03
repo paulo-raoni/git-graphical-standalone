@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,9 +44,7 @@ type Scheme = 'light' | 'dark';
 type Choice = Scheme | 'system';
 
 /** What `surface` is for a scheme. */
-function surfaceOf(scheme: Scheme): string {
-  return scheme === 'dark' ? DARK_SURFACE : LIGHT_SURFACE;
-}
+const surfaceOf = (scheme: Scheme): string => (scheme === 'dark' ? DARK_SURFACE : LIGHT_SURFACE);
 
 interface Launched {
   readonly application: ElectronApplication;
@@ -102,13 +100,9 @@ test.afterEach(() => {
 
 /** Launch the built application on `home`. */
 async function launch(home: string, options: LaunchOptions): Promise<Launched> {
+  const open = options.open === undefined ? [] : [options.open];
   const application = await electron.launch({
-    args: [
-      '.',
-      ...(options.open === undefined ? [] : [options.open]),
-      `--user-data-dir=${home}`,
-      ...(options.switches ?? []),
-    ],
+    args: ['.', ...open, `--user-data-dir=${home}`, ...(options.switches ?? [])],
     cwd: repositoryRoot,
     colorScheme: options.emulated === undefined ? 'light' : options.emulated,
   });
@@ -137,9 +131,7 @@ async function withApplication<T>(
 }
 
 /** The control, found the way assistive technology finds it: by its role and its name. */
-function control(page: Page): Locator {
-  return page.getByRole('combobox', { name: 'Theme' });
-}
+const control = (page: Page): Locator => page.getByRole('combobox', { name: 'Theme' });
 
 /** Runs in the page: its background, the scheme its root resolves, and `data-theme`. */
 function readShown(): { surface: string; scheme: string; pinned: string } {
@@ -177,16 +169,10 @@ test('System is the first start, and follows the preference both ways', async ()
     const { page } = launched;
     await expect(control(page)).toBeEnabled();
     await expect(control(page)).toHaveValue('system');
-    expect(await control(page).locator('option').allTextContents()).toEqual([
-      'Light',
-      'Dark',
-      'System',
-    ]);
-    expect(await shown(page)).toEqual({
-      surface: LIGHT_SURFACE,
-      scheme: 'light dark',
-      pinned: 'system',
-    });
+    const labels = await control(page).locator('option').allTextContents();
+    expect(labels).toEqual(['Light', 'Dark', 'System']);
+    const first = { surface: LIGHT_SURFACE, scheme: 'light dark', pinned: 'system' };
+    expect(await shown(page)).toEqual(first);
     expect((await native(launched)).source).toBe('system');
 
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -197,13 +183,7 @@ test('System is the first start, and follows the preference both ways', async ()
 });
 
 /** Runs in the page: what a theme change must leave alone. */
-function readUntouched(): {
-  loads: number;
-  marker: unknown;
-  offset: number;
-  rows: number;
-  scroller: string;
-} {
+function readUntouched(): Record<string, unknown> {
   const scope = globalThis as unknown as PageScope;
   const scroller = scope.document.querySelector('.graph__scroll');
   return {
@@ -371,5 +351,60 @@ test('the light golden image of the graph canvas holds with the window in Dark',
     const drawn = Buffer.from((await page.evaluate(readCanvas)).rgba, 'base64');
     expect((await shown(page)).surface).toBe(DARK_SURFACE);
     expect(drawn.equals(golden)).toBe(true);
+  });
+});
+
+test("the window's own background follows Light, Dark and System", async () => {
+  // Whichever scheme the operating system prefers, Light or Dark moves the colour from it.
+  await withApplication(freshHome(), { emulated: null }, async (launched) => {
+    // The window's own colour, `backgroundColor` of `src/app/window.ts`, not the page's.
+    const background = (): Promise<string | undefined> =>
+      launched.application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.getBackgroundColor().toUpperCase(),
+      );
+    await expect(control(launched.page)).toHaveValue('system');
+    for (const choice of ['light', 'dark', 'system'] as const) {
+      await control(launched.page).selectOption(choice);
+      await expect.poll(async () => (await native(launched)).source).toBe(choice);
+      // System is whichever scheme the operating system prefers on this machine.
+      const dark = (await native(launched)).dark;
+      await expect.poll(background).toBe(dark ? '#1F1F1F' : '#FFFFFF');
+    }
+  });
+});
+
+/**
+ * Runs in the main process: answer every message box at once, as a click on its
+ * button would, recording whether it was attached to the window and what it said.
+ */
+function answerMessageBoxes(electronModule: { BrowserWindow: unknown; dialog: object }): void {
+  const windows = electronModule.BrowserWindow as { getAllWindows(): unknown[] };
+  const asked: unknown[][] = [];
+  Object.assign(globalThis, { asked });
+  Object.assign(electronModule.dialog, {
+    showMessageBox: (window: unknown, { type, message, detail }: Record<string, unknown>) => {
+      asked.push([windows.getAllWindows().includes(window), type, message, detail]);
+      return Promise.resolve({ response: 0, checkboxChecked: false });
+    },
+  });
+}
+
+test('a theme choice that cannot be kept is said once in the window, and still applies', async () => {
+  const home = freshHome();
+  // A directory where the file goes: every write of it is refused, as a disk would refuse it.
+  mkdirSync(join(home, 'theme'));
+  await withApplication(home, {}, async (launched) => {
+    const { application } = launched;
+    let errors = '';
+    application.process().stderr?.on('data', (chunk: Buffer) => (errors += chunk.toString()));
+    const said = (): number => errors.split('The theme could not be kept').length - 1;
+    await application.evaluate(answerMessageBoxes);
+    await choose(launched, 'dark', DARK_SURFACE);
+    await expect.poll(said).toBe(1);
+    await choose(launched, 'light', LIGHT_SURFACE);
+    await expect.poll(said).toBe(2);
+    const asked = await application.evaluate(() => (globalThis as { asked?: unknown }).asked);
+    const detail = expect.stringMatching(/^It still applies until the application closes.*theme$/s);
+    expect(asked).toEqual([[true, 'warning', 'The theme choice could not be kept.', detail]]);
   });
 });
