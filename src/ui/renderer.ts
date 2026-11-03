@@ -269,6 +269,8 @@ async function open(
     if (!sameSelection(shown, selection)) {
       reply = await window.gitGraphical.refresh({ selection: shown });
     }
+    // Indeterminate until here, because nothing had said what this repository keeps.
+    shell.branches.remotes.indeterminate = false;
     shell.branches.remotes.checked = shown.showRemoteBranches;
   }
   receive(shell, view, session, reply, true);

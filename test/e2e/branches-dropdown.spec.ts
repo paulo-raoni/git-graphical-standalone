@@ -100,14 +100,19 @@ function gitLog(revisions: readonly string[]): string[] {
   return printed.toString().split('\n').filter(Boolean);
 }
 
-/** Launch on `repository` with `home` as its user-data directory, run `body`, close it. */
-async function withWindow(repository: string, home: string, body: () => Promise<unknown>) {
-  const args = ['.', repository, `--user-data-dir=${home}`];
+/**
+ * Launch on `repository`, or on none, with `home` as its user-data directory, run
+ * `body`, close it. On none, no page arrives until one is opened: the control is
+ * required disabled, as it is before a first page.
+ */
+async function withWindow(repository: string | null, home: string, body: () => Promise<unknown>) {
+  const args = ['.', ...(repository === null ? [] : [repository]), `--user-data-dir=${home}`];
   const application = await electron.launch({ args, cwd: repositoryRoot });
   const child = application.process();
   try {
     page = await application.firstWindow();
-    await expect(box()).toBeEnabled();
+    if (repository === null) await expect(remotes()).toBeDisabled();
+    else await expect(box()).toBeEnabled();
     await body();
   } finally {
     await application.close();
@@ -248,6 +253,10 @@ test('the bar shows Branches, the box and the checkbox, and the list opens under
     await expect(list()).toBeHidden();
     // `main` first is the checked-out branch first: by name it would follow `feature`.
     await play([{ do: 'open', checked: ALONE, listed: ENTRIES }]);
+    // Found by its exact name: the check mark is drawn, and `aria-selected` alone says it.
+    const checked = list().getByRole('option', { name: 'Show All', exact: true, selected: true });
+    await expect(checked).toHaveCSS('content', '"✓ " / ""', { pseudo: 'before' });
+    await expect(entry('feature')).toHaveCSS('content', 'none', { pseudo: 'before' });
     await expect(box()).toHaveAttribute('aria-expanded', 'true');
     await expect(filter()).toHaveAttribute('placeholder', 'Filter branches…');
     const [popup, opened] = [await rect(page.locator('.branches__popup')), await rect(box())];
@@ -339,6 +348,8 @@ test('Refresh and Load More keep the selection; a restart keeps it and Show Remo
     await expect(remotes()).not.toBeChecked();
     await play([feature, { do: 'open', checked: ['feature'], listed: ['Show All', ...LOCALS] }]);
   });
+  // Before a first page, nothing has said what is kept: the checkbox is in neither state.
+  await withWindow(null, home, () => expect(remotes()).toBeChecked({ indeterminate: true }));
   // Another repository on the same user-data directory has a choice of its own.
   await withWindow(manyRepository, home, () => expect(remotes()).toBeChecked());
 });
