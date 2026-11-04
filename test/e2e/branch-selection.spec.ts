@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
 
-import { RefKind, UNKNOWN_INDEX } from '../../src/contracts/index';
+import { FailureKind, RefKind, UNKNOWN_INDEX } from '../../src/contracts/index';
 import type { BranchSelection, GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { fixture, withOwnProfile } from './support/fixtures';
@@ -325,4 +325,43 @@ test('a selection racing a load more and a refresh ends on the selection asked f
       expect(kept.names).toEqual(gitLog([TOPIC], FIRST_PAGE_COMMITS));
     }
   });
+});
+
+/** How many times the race below is run in one window. */
+const RACES = 3;
+
+test('a selection overtaken by a later one is dropped when its reply would arrive last', async () => {
+  test.setTimeout(SLOW_TEST_MS);
+  const info = test.info();
+  // The earlier selection reads a first page of `feature`; the later one names no
+  // branch, so the utility process runs no log for it (`selectsAnyRevision` in
+  // `src/adapters/git-commands.ts`) and its read ends first. That order is what
+  // the drop of an overtaken selection in `select` (`src/app/repository-host.ts`,
+  // `open.selectedBy > ticket`) is for: without it the earlier reply is applied
+  // and drawn after the later one, and the selection read again is the earlier.
+  // Measured by E04-M01-S04 on 2026-11-04 through this pair sent together: the
+  // earlier one was answered cancelled and the later one drawn in 50 of 50 rounds,
+  // 40 of them with every five-second sample of processor load at 100 %; with that
+  // clause removed this case went red in 2 of 2 runs. The slice document has the
+  // rest of the readings.
+  const earlier = select(FEATURE);
+  const later: Step = { call: 'refresh', selection: { branches: [], showRemoteBranches: true } };
+  let dropped = 0;
+  await withWindow(async (page) => {
+    for (let round = 0; round < RACES; round += 1) {
+      await one(page, everyBranch(true), info);
+      const replies = await page.evaluate(drive, { steps: [earlier, later], together: true });
+      const last = replies.filter((reply) => reply.ok).at(-1);
+      expect([last?.step, last?.names]).toEqual([1, []]);
+      const kept = await one(page, { call: 'refresh' }, info);
+      expect(kept.names).toEqual([]);
+      dropped += replies.filter(
+        (reply) => !reply.ok && reply.step === 0 && reply.kind === FailureKind.Cancelled,
+      ).length;
+    }
+  });
+  // At least one round ran the race this case is about, the earlier reply's read
+  // ending after the later one was applied, so the case cannot pass on rounds
+  // that only ever read in the order they were asked.
+  expect(dropped).toBeGreaterThan(0);
 });
