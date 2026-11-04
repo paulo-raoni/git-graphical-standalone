@@ -68,6 +68,37 @@ export function plainOutput(text) {
   return String(text).replace(ESCAPE_SEQUENCE, '');
 }
 
+/** The lines of a captured run that say what happened, for the excerpt below. */
+const OUTCOME_LINE = /^(?:Test Files|Tests|Errors)\s|\bFAIL\b|Error:|timed out in \d+ ?ms/i;
+
+/** How much of a thousands-of-lines capture the excerpt shows, and how wide. */
+const EXCERPT_LINES = 6;
+const EXCERPT_WIDTH = 160;
+
+/**
+ * An excerpt of a mutant's recorded output, which is the whole vitest run, under
+ * a line that says what it is, every line labelled with `label`.
+ *
+ * The lines chosen are the ones that name a verdict — vitest's `Test Files` and
+ * `Tests` counters, a `FAIL` header, anything carrying `Error:`, and vitest's own
+ * test timeout — and of those, the last few, because the counters come last. The
+ * bound is stated in the line that introduces the excerpt so that a reader knows
+ * what was left out rather than guessing. It lives here, beside the rest of what
+ * reads a recorded output, since E04-M01-S01 moved it out of `mutation.js`.
+ */
+export function excerptOf(reason, label) {
+  const lines = String(reason)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => OUTCOME_LINE.test(line))
+    .slice(-EXCERPT_LINES);
+  if (lines.length === 0) lines.push('(no line of its recorded output names a verdict)');
+  return (
+    `${label}:   an excerpt of the runner's captured output for it, which is a whole vitest run: the last ${String(EXCERPT_LINES)} lines of it that name a verdict — the Test Files and Tests counters, a FAIL header, an Error: line, or vitest's own test timeout — each cut at ${String(EXCERPT_WIDTH)} characters\n` +
+    lines.map((line) => `${label}:     ${line.slice(0, EXCERPT_WIDTH)}\n`).join('')
+  );
+}
+
 /** The report's files with every mutant's recorded output as plain text, nothing else changed. */
 export function plainFiles(files) {
   const plain = {};

@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { plainFiles, remeasure } from './mutation-remeasure.js';
+import { excerptOf, fileNameOf, originalOf, plainFiles, remeasure } from './mutation-remeasure.js';
 import { repositoryRoot, report } from './tree.js';
 
 /**
@@ -315,26 +315,30 @@ import { repositoryRoot, report } from './tree.js';
  * that list fails the build**, whatever the score, which is what catches the
  * first new survivor in a file of any size.
  *
- * The comparison is the whole of the guarantee, so it is exact: an entry matches
- * a mutant on **file, line, column, mutator and replacement**, all five. Four of
- * them are not enough — Stryker emits two `ConditionalExpression` mutants at the
- * same line and column of an `if`, one replacing the condition with `true` and
- * one with `false`, so an entry that named only the position would excuse both
- * when only one survives. The cost of exactness is that an edit **above** a
- * listed line moves it, and the entry then names no mutant at all; that is the
- * case the second half of the clause reports, and it says so rather than passing
- * quietly.
+ * The comparison is the whole of the guarantee, so it is exact about what a
+ * mutant does and silent about where it sits: an entry names a mutant by its
+ * **file, mutator, the source text it replaces and the replacement**, and **one
+ * entry excuses one surviving mutant**. Until E04-M01-S01 the key was the file,
+ * the start line and column, the mutator and the replacement, and any line added
+ * above a listed mutant turned the gate red on an unchanged guarantee, which is
+ * why E03-M01-S01 put an import where a blank line was in
+ * `src/contracts/bridge.ts`. The source text tells apart what the position did:
+ * Stryker's two `ConditionalExpression` mutants of one `if`, `true` and `false`,
+ * differ in their replacement, and a compound condition mutated once whole and
+ * once in part, which shared all five old fields, differs in its text.
  *
- * All five are still not a **unique** key, and the gate does not pretend they
- * are: measured on the recorded run, 12 of 1195 mutants share all five with
- * another, every one of them a `ConditionalExpression` Stryker emits twice where
- * a compound condition is mutated once whole and once in part. None of the 12 is
- * on the list and every group of them was killed outright, but the clause counts
- * mutants rather than identities so that the survivors it reports and the
- * survivors Stryker reports are the same number, and it says how many mutants an
- * identity covered when that is more than one. Stryker's own mutant `id` would
- * be unique and is not used: it is positional, so it would move under any edit
- * anywhere in the file, which is the flapping this identity is chosen to avoid.
+ * Text is not a unique key either: the same expression mutated the same way in
+ * two places of one file shares it. That cannot widen the list, because a key is
+ * matched by count and not by presence: a run with more survivors of one key
+ * than the list has entries for it refuses the extra ones, so a second copy of a
+ * listed mutant pasted anywhere in the file is refused as surely as a new
+ * mutant. What a key cannot say is which of two such copies an entry was written
+ * for, and it does not need to, since the two survive for the same reason. An
+ * entry whose text the source no longer holds names nothing, which is the case
+ * the second half of the clause reports, and it says so rather than passing
+ * quietly. Stryker's own mutant `id` is not used: it is positional, so it moves
+ * under any edit anywhere in the file. The measurements behind the key are in
+ * S01's slice document.
  *
  * What the clause does **not** do is fail when a listed mutant comes back
  * detected, because that verdict is not deterministic. Under the command runner
@@ -397,7 +401,7 @@ const STATUSES =
   'Killed Timeout Survived NoCoverage RuntimeError CompileError Ignored Pending'.split(' ');
 
 /** Vitest's own test timeout, the inner clock: the narrow reading of a stopwatch. */
-const VITEST_CLOCK = /\b(?:test|hook) timed out in \d+ ?ms\b/i;
+export const VITEST_CLOCK = /\b(?:test|hook) timed out in \d+ ?ms\b/i;
 
 /**
  * The broad reading: `timeout` and its near spellings as a whole word, in any
@@ -415,13 +419,6 @@ const POOL_LINE = /^[^\S\r\n]*(?:Error: )?\[vitest-pool\]:.*$/gm;
 
 /** Vitest's summary counter, which is where a run says a test actually failed. */
 const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
-
-/** The lines of a captured run that say what happened, for the excerpt below. */
-const OUTCOME_LINE = /^(?:Test Files|Tests|Errors)\s|\bFAIL\b|Error:|timed out in \d+ ?ms/i;
-
-/** How much of a thousands-of-lines capture the excerpt shows, and how wide. */
-const EXCERPT_LINES = 6;
-const EXCERPT_WIDTH = 160;
 
 /** The report a replay was handed, or `null` when this is the gate itself. */
 function replayPathOf(argv) {
@@ -448,11 +445,6 @@ function runStryker(argv) {
       resolveRun(signal === null ? (code ?? 1) : 1);
     });
   });
-}
-
-/** A report key as a reader's path: repository-relative, with `/` separators. */
-function fileNameOf(key) {
-  return (isAbsolute(key) ? relative(repositoryRoot, key) : key).split('\\').join('/');
 }
 
 /** One mutant named the way the clear-text reporter names it, plus its replacement. */
@@ -489,7 +481,7 @@ function readKill(mutant, file, kills) {
 }
 
 /** Mutants by status, the completed test runs behind them, and what the kills rest on. */
-function tally(files) {
+export function tally(files) {
   const counts = Object.fromEntries(STATUSES.map((status) => [status, 0]));
   const unknown = new Set();
   const kills = { clock: [], unreadable: [], noFailure: [] };
@@ -585,39 +577,54 @@ function shapeFindings(metrics, unknown) {
 }
 
 /**
- * **The line this gate's guarantee hinges on.** An entry of the baseline stands
- * for exactly one mutant, and this is what "the same mutant" means: the same
- * file, the same start line and column, the same mutator and the same
- * replacement. Loosen any of the five and one entry starts excusing mutants
- * nobody wrote it for, which is an allow-list turning into a blanket; the
- * position alone already covers two mutants wherever Stryker replaces a
- * condition with both `true` and `false`.
+ * **The line this gate's guarantee hinges on.** What "the same mutant" means to
+ * the baseline: the same file, the same mutator, the same source text replaced
+ * (`originalOf`, white space read as one space) and the same replacement. A line
+ * moved above it changes none of the four. Loosen any of them and one entry
+ * starts excusing mutants nobody wrote it for, which is an allow-list turning
+ * into a blanket; the count in `unlistedFindings` is what keeps one entry to one
+ * survivor where the same four are shared.
  */
-function identityOf(file, line, column, mutator, replacement) {
-  return JSON.stringify([file, line, column, mutator, replacement ?? null]);
+function identityOf(file, mutator, original, replacement) {
+  return JSON.stringify([file, mutator, original, replacement ?? null]);
 }
 
-/** The committed list, by identity, with the entry kept for its message. */
-function readSurvivors() {
+/** An entry as a reader names it, with no position, since its key holds none. */
+function entryName(entry) {
+  return `${entry.file} ${entry.mutator} (${JSON.stringify(entry.original)} to ${JSON.stringify(entry.replacement ?? null)})`;
+}
+
+/** A run's group of mutants as a reader names it: its first position, and the text it replaces. */
+function groupName(group) {
+  const { file, line, column, mutator, replacement, original } = group;
+  return `${nameOf(file, line, column, mutator, replacement)} over ${JSON.stringify(original)}`;
+}
+
+/** The committed list by identity: every entry of one key, each of which excuses one survivor. */
+export function readSurvivors(path = SURVIVORS) {
   const listed = new Map();
-  for (const entry of JSON.parse(readFileSync(SURVIVORS, 'utf8')).survivors) {
-    const key = identityOf(entry.file, entry.line, entry.column, entry.mutator, entry.replacement);
-    listed.set(key, entry);
+  for (const entry of JSON.parse(readFileSync(path, 'utf8')).survivors) {
+    const key = identityOf(entry.file, entry.mutator, entry.original, entry.replacement);
+    listed.set(key, [...(listed.get(key) ?? []), entry]);
   }
   return listed;
+}
+
+/** A new group for the mutant's identity. */
+function groupOf(file, mutant, original) {
+  const { line, column } = mutant.location.start;
+  const { mutatorName: mutator, replacement = null } = mutant;
+  return { file, line, column, mutator, replacement, original, mutants: 0, survived: 0 };
 }
 
 /**
  * The run by identity, with the files it covered.
  *
  * An identity can cover more than one mutant, which is why a group is counted
- * rather than overwritten: measured on the recorded run, 12 of 1195 mutants
- * share a file, line, column, mutator **and** replacement with another, all of
- * them Stryker's `ConditionalExpression` emitted twice where a compound
- * condition is mutated once whole and once in part. Every such group was killed
- * outright and none is on the list, but counting them keeps the number this gate
- * prints equal to the number Stryker printed three lines above it, which is the
- * property whose absence let four green runs measure nothing.
+ * rather than overwritten: the same expression mutated the same way twice in one
+ * file shares all four fields. Counting keeps the number this gate prints equal
+ * to the number Stryker printed above it, which is the property whose absence
+ * let four green runs measure nothing.
  *
  * The group also keeps one recorded output, taken from a mutant of it that was
  * detected, because that is the one the note below quotes and a survivor's
@@ -630,19 +637,11 @@ function indexRun(files) {
     const name = fileNameOf(key);
     mutated.add(name);
     for (const mutant of file.mutants ?? []) {
-      const { line, column } = mutant.location.start;
-      const identity = identityOf(name, line, column, mutant.mutatorName, mutant.replacement);
-      const group = produced.get(identity) ?? {
-        file: name,
-        line,
-        column,
-        mutator: mutant.mutatorName,
-        replacement: mutant.replacement ?? null,
-        survived: 0,
-        reason: '',
-        statuses: new Set(),
-      };
-      group.statuses.add(mutant.status);
+      const original = originalOf(file.source, mutant);
+      const identity = identityOf(name, mutant.mutatorName, original, mutant.replacement);
+      const group = produced.get(identity) ?? { ...groupOf(name, mutant, original), reason: '' };
+      group.statuses = new Set([...(group.statuses ?? []), mutant.status]);
+      group.mutants += 1;
       if (mutant.status === 'Survived') group.survived += 1;
       else group.reason = String(mutant.statusReason ?? '');
       produced.set(identity, group);
@@ -651,20 +650,19 @@ function indexRun(files) {
   return { mutated, produced };
 }
 
-/** The refusal: a mutant survived and the committed list does not name it. */
+/** The refusal: more mutants of one identity survived than the committed list names. */
 function unlistedFindings(produced, listed) {
   const found = [];
   const unlisted = [];
   let survivors = 0;
   for (const [identity, group] of produced) {
-    if (group.survived === 0 || listed.has(identity)) {
-      continue;
-    }
-    survivors += group.survived;
+    const extra = group.survived - (listed.get(identity)?.length ?? 0);
+    if (extra <= 0) continue;
+    survivors += extra;
     unlisted.push(group);
-    const name = nameOf(group.file, group.line, group.column, group.mutator, group.replacement);
-    const shared = ` survived in ${String(group.survived)} mutants that share this position, mutator and replacement`;
-    const what = group.survived === 1 ? `${name} survived` : `${name}${shared}`;
+    const shared = ` survived in ${String(group.survived)} mutants that share this file, text, mutator and replacement, ${String(extra)} more than the list names,`;
+    const what =
+      group.survived === 1 ? `${groupName(group)} survived` : `${groupName(group)}${shared}`;
     found.push(
       `${what} and is not in ${SURVIVORS_NAME}: either the test that would kill it has not been written, which is the test to write, or no behavioural test can kill it, which is an entry to add with the reason — and adding one is a commit a reviewer reads (AGENTS.md section 11)`,
     );
@@ -672,48 +670,27 @@ function unlistedFindings(produced, listed) {
   return { found, unlisted, survivors };
 }
 
-/** The message for an entry that names no mutant, and whether a line moved under it. */
+/** The message for an entry that names no mutant, and whether its text was edited under it. */
 function staleMessage(entry, unlisted) {
-  const name = nameOf(entry.file, entry.line, entry.column, entry.mutator, entry.replacement);
   const replacement = entry.replacement ?? null;
-  const moved = unlisted.find(
+  const edited = unlisted.find(
     (one) =>
       one.file === entry.file && one.mutator === entry.mutator && one.replacement === replacement,
   );
   return (
-    `${SURVIVORS_NAME} lists ${name}, and this run mutated that file and produced no such mutant: the entry names nothing, so it protects nothing and nobody is checking it` +
-    (moved === undefined
+    `${SURVIVORS_NAME} lists ${entryName(entry)}, and this run mutated that file and produced no such mutant: the entry names nothing, so it protects nothing and nobody is checking it` +
+    (edited === undefined
       ? '. Re-record it against a run, or remove it'
-      : `. The same mutator and replacement survives at ${String(moved.line)}:${String(moved.column)} of that file, which is what a line that moved looks like: correct this entry rather than adding a second one`)
+      : `. The same mutator and replacement survives at ${String(edited.line)}:${String(edited.column)} of that file over ${JSON.stringify(edited.original)}, which is what an edit to the listed text looks like: correct this entry rather than adding a second one`)
   );
-}
-
-/**
- * An excerpt of a mutant's recorded output, which is the whole vitest run.
- *
- * The lines chosen are the ones that name a verdict — vitest's `Test Files` and
- * `Tests` counters, a `FAIL` header, anything carrying `Error:`, and vitest's own
- * test timeout — and of those, the last few, because the counters come last. The
- * bound is stated in the line that introduces the excerpt so that a reader knows
- * what was left out rather than guessing.
- */
-function excerptOf(reason) {
-  const lines = String(reason)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => OUTCOME_LINE.test(line))
-    .slice(-EXCERPT_LINES);
-  if (lines.length === 0) lines.push('(no line of its recorded output names a verdict)');
-  return lines.map((line) => `${LABEL}:     ${line.slice(0, EXCERPT_WIDTH)}\n`).join('');
 }
 
 /** The line printed for an entry whose mutant this run detected rather than left alive. */
 function detectedNote(entry, group) {
   const status = [...group.statuses].join(' and ');
   return (
-    `${LABEL}: ${nameOf(entry.file, entry.line, entry.column, entry.mutator, entry.replacement)} is on the list and this run reports it ${status}. If a test now kills it, drop the entry from ${SURVIVORS_NAME} in the commit that wrote that test: a shrinking list is the direction AGENTS.md section 11 lets a baseline move on its own. This does not refuse the build, because the verdict is not deterministic — the command runner counts any non-zero exit of the suite as a detection, and runs of identical source have been measured disagreeing about a mutant, in the mutation section of docs/plan/E01-commit-graph/M01-first-graph/S02-gates-and-store.md\n` +
-    `${LABEL}:   an excerpt of the runner's captured output for it, which is a whole vitest run: the last ${String(EXCERPT_LINES)} lines of it that name a verdict — the Test Files and Tests counters, a FAIL header, an Error: line, or vitest's own test timeout — each cut at ${String(EXCERPT_WIDTH)} characters\n` +
-    excerptOf(group.reason)
+    `${LABEL}: ${entryName(entry)} is on the list and this run reports it ${status}. If a test now kills it, drop the entry from ${SURVIVORS_NAME} in the commit that wrote that test: a shrinking list is the direction AGENTS.md section 11 lets a baseline move on its own. This does not refuse the build, because the verdict is not deterministic — the command runner counts any non-zero exit of the suite as a detection, and runs of identical source have been measured disagreeing about a mutant, in the mutation section of docs/plan/E01-commit-graph/M01-first-graph/S02-gates-and-store.md\n` +
+    excerptOf(group.reason, LABEL)
   );
 }
 
@@ -731,85 +708,94 @@ function staleFindings(listed, { mutated, produced }, unlisted) {
   const found = [];
   const notes = [];
   const counts = { matched: 0, detected: 0, outOfScope: 0 };
-  for (const [identity, entry] of listed) {
-    if (!mutated.has(entry.file)) {
-      counts.outOfScope += 1;
+  for (const [identity, entries] of listed) {
+    if (!mutated.has(entries[0].file)) {
+      counts.outOfScope += entries.length;
       continue;
     }
     const group = produced.get(identity);
-    if (group === undefined) {
-      found.push(staleMessage(entry, unlisted));
-      continue;
-    }
-    counts.matched += 1;
-    if (group.survived === 0) {
-      counts.detected += 1;
-      notes.push(detectedNote(entry, group));
-    }
+    const named = Math.min(entries.length, group?.mutants ?? 0);
+    for (const entry of entries.slice(named)) found.push(staleMessage(entry, unlisted));
+    const detected = Math.max(0, named - (group?.survived ?? 0));
+    counts.matched += named;
+    counts.detected += detected;
+    if (detected > 0) notes.push(detectedNote(entries[0], group));
   }
   return { found, notes, counts };
 }
 
 /** The run against the committed list: what it refuses, and what it merely reports. */
-function survivorFindings(files, listed) {
+export function survivorFindings(files, listed) {
   const run = indexRun(files);
   const unlisted = unlistedFindings(run.produced, listed);
   const stale = staleFindings(listed, run, unlisted.unlisted);
   const { matched, detected, outOfScope } = stale.counts;
+  const entries = [...listed.values()].flat().length;
   return {
     found: [...unlisted.found, ...stale.found],
     notes: [
-      `${LABEL}: survivor baseline — ${String(listed.size)} entries; matched a mutant of this run ${String(matched)}, of those detected rather than left alive ${String(detected)}; in a file this run did not mutate ${String(outOfScope)}; survivors of this run not on the list ${String(unlisted.survivors)}\n`,
+      `${LABEL}: survivor baseline — ${String(entries)} entries; matched a mutant of this run ${String(matched)}, of those detected rather than left alive ${String(detected)}; in a file this run did not mutate ${String(outOfScope)}; survivors of this run not on the list ${String(unlisted.survivors)}\n`,
       ...stale.notes,
     ],
   };
 }
 
-const started = Date.now();
 const replay = replayPathOf(process.argv.slice(2));
 
 /** What every line of this transcript is labelled with. The two are never the same. */
 const LABEL = replay === null ? 'mutation' : 'mutation-replay';
 
-const json = replay ?? reportPath();
-const shownPath = fileNameOf(json).startsWith('..') ? json : fileNameOf(json);
-
-if (replay === null) {
-  rmSync(json, { force: true });
-} else {
-  process.stdout.write(
-    `${LABEL}: stryker did NOT run. This replays the gate's clauses over ${shownPath}, which is whatever the caller handed it and may have been doctored, and it reports under the label ${LABEL} for that reason: it is a diagnostic, it is not the mutation gate, and a transcript of it is not evidence that npm run gates:mutation passed\n`,
-  );
-}
-
-const status = replay === null ? await runStryker(process.argv.slice(2)) : 0;
-const elapsed = Date.now() - started;
-const provenance =
-  replay === null ? `${(elapsed / 1000).toFixed(1)} seconds` : `report read from ${shownPath}`;
-const findings = [];
-
-if (existsSync(json)) {
-  const files = plainFiles(JSON.parse(readFileSync(json, 'utf8')).files);
+/** Every clause over the report at `json`, its refusals pushed into `findings`. */
+async function readReport(json, provenance, findings) {
+  const parsed = JSON.parse(readFileSync(json, 'utf8'));
+  const files = plainFiles(parsed.files);
   const counted = tally(files);
   const metrics = metricsOf(counted);
   describe(metrics, provenance);
   findings.push(...shapeFindings(metrics, counted.unknown));
-  const remeasured = await remeasure(files, LABEL, findings, VITEST_CLOCK);
+  const given = { config: parsed.config };
+  const remeasured = await remeasure(files, LABEL, findings, VITEST_CLOCK, given);
   const against = survivorFindings(remeasured, readSurvivors());
   for (const note of against.notes) {
     process.stdout.write(note);
   }
   findings.push(...against.found);
-} else if (replay === null) {
-  findings.push(
-    `stryker wrote no report to ${shownPath}, so the shape of the run cannot be read, and a run whose shape cannot be read is not a measurement`,
-  );
-} else {
-  findings.push(`there is no report at ${shownPath} to replay the clauses over`);
 }
 
-if (status !== 0) {
-  findings.push(`stryker exited with status ${String(status)}`);
+/** The gate: Stryker, or the report a replay was handed, then every clause. */
+async function main() {
+  const started = Date.now();
+  const json = replay ?? reportPath();
+  const shownPath = fileNameOf(json).startsWith('..') ? json : fileNameOf(json);
+  if (replay === null) {
+    rmSync(json, { force: true });
+  } else {
+    process.stdout.write(
+      `${LABEL}: stryker did NOT run. This replays the gate's clauses over ${shownPath}, which is whatever the caller handed it and may have been doctored, and it reports under the label ${LABEL} for that reason: it is a diagnostic, it is not the mutation gate, and a transcript of it is not evidence that npm run gates:mutation passed\n`,
+    );
+  }
+  const status = replay === null ? await runStryker(process.argv.slice(2)) : 0;
+  const elapsed = Date.now() - started;
+  const provenance =
+    replay === null ? `${(elapsed / 1000).toFixed(1)} seconds` : `report read from ${shownPath}`;
+  const findings = [];
+  if (existsSync(json)) {
+    await readReport(json, provenance, findings);
+  } else if (replay === null) {
+    findings.push(
+      `stryker wrote no report to ${shownPath}, so the shape of the run cannot be read, and a run whose shape cannot be read is not a measurement`,
+    );
+  } else {
+    findings.push(`there is no report at ${shownPath} to replay the clauses over`);
+  }
+  if (status !== 0) {
+    findings.push(`stryker exited with status ${String(status)}`);
+  }
+  report(LABEL, findings);
 }
 
-report(LABEL, findings);
+/**
+ * Run as a program, the gate; imported, as `test/gates/` does to hold its clauses,
+ * nothing runs.
+ */
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) await main();

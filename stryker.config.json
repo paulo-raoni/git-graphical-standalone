@@ -18,7 +18,10 @@
     "low": 95,
     "break": 85
   },
-  "reporters": ["progress", "clear-text", "html", "json"],
+  "reporters": ["progress", "clear-text", "html", "json", "event-recorder"],
+  "eventReporter": {
+    "baseDir": "reports/mutation/events"
+  },
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
   },

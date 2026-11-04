@@ -1,0 +1,173 @@
+{
+  "comment": "Cut from run r1 of E04-M01-S01: node scripts/gates/mutation.js over the configured scope, at the lane base 9f5a1ac with the blank line of src/contracts/bridge.ts restored, with FORCE_COLOR=1, CI=true and GITHUB_ACTIONS=true set, 2026-11-03 18:28 to 19:41 UTC-3, every recorded output with its escape codes taken out, as the gate reads it, and the run's root written <root>. config: timeoutFactor and timeoutMS of that report's config. dryRun: the timing of its dry run as Stryker's event recorder wrote it (00000-onDryRunCompleted.json); Stryker planned every one of its 1568 mutants at 147832.5 ms, which is 1.5 times 18553 plus 120000 plus 3. mutants, by the role each case gives it, each alone in its file, every other field of the report left out: failing test: lane-layout.ts 390:15, its output as recorded, naming its failing test, so not chosen. no failing test: growth.ts 44:26, its output as recorded with one os.EOL join put inside the word Tests of vitest's summary line, as Stryker's join would leave it; doctored: no kill of the run had its Tests line split (the slice document counts the joins). clock alone: segment-buffer.ts 97:7, its output as recorded: one test timed out on vitest's 15000 ms clock and nothing else failed. clock and starved: hash-index.ts 120:7 ConditionalExpression, its output as recorded, a timeout on the same clock, with the two lines of the starved run below appended; doctored: no kill of the run starved. starved: pending-parents.ts 57:56, its output replaced by the starved run below; doctored. runs, the second runs a case hands the clause: clean and passing: the per-mutant command run once with no mutant planted, in the lane's worktree after the run, its output and how long it took (18744 ms). failing: lane-layout.ts 390:15's recorded output. clock: segment-buffer.ts 97:7's recorded output. starved: the per-mutant command run with node's heap capped at 8 MB (node --max-old-space-size=8 node_modules/vitest/vitest.mjs run with the command's flags and --execArgv=--max-old-space-size=8), which died before it ran a test, exit 134, 2982 ms; its native stack trace is left out. past the outer clock: a run stopped by the clause's clock, which collects whatever the run printed until then; the run met two (hash-index.ts 120:7, both mutants), whose output the gate does not keep, so it is empty here. The ms of a recorded output is 0: Stryker does not record how long a run took, and the clause reads ms only of the run with no mutant planted.",
+  "config": {
+    "timeoutFactor": 1.5,
+    "timeoutMS": 120000
+  },
+  "dryRun": {
+    "net": 18553,
+    "overhead": 3
+  },
+  "mutants": {
+    "failing test": "431",
+    "no failing test": "1460",
+    "clock alone": "513",
+    "clock and starved": "1521",
+    "starved": "1547"
+  },
+  "files": {
+    "src/core/layout/lane-layout.ts": {
+      "source": "",
+      "mutants": [
+        {
+          "id": "431",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "status": "Killed",
+          "statusReason": "\n\r\n RUN  v5.0.0 <root>\n\r\n\n\r\nx\r\n\n\r\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n\r\n FAIL  src/core/layout/lane-layout.test.ts > a page with nothing in it > is no rows, no segments and one lane of width\n\r\nTypeError: Cannot read properties of undefined (reading 'rowCount')\n\r\n ❯ src/core/layout/lane-layout.test.ts:71:17\n\r\n     69|   it('is no rows, no segments and one lane of width', () => {\n     70|     const rows = laidOut([]);\n     71|     expect(rows.rowCount).toBe(0);\n       |                 ^\n     72|     expect([...rows.segmentOffsets]).toEqual([0]);\n     73|     expect(rows.segmentFromLane.length).toBe(0);\n\r\n\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\r\n\n\r\n Test Files  1 failed | 27 skipped (28)\n\r\n      Tests  1 failed (441)\n\r\n   Start at  18:42:34\n\r\n   Duration  3.97s (transform 65%, import 29%, worker 4%, tests 2%)\n\r\n\n",
+          "testsCompleted": 1,
+          "location": {
+            "end": {
+              "column": 2,
+              "line": 427
+            },
+            "start": {
+              "column": 15,
+              "line": 390
+            }
+          }
+        }
+      ]
+    },
+    "src/core/store/growth.ts": {
+      "source": "",
+      "mutants": [
+        {
+          "id": "1460",
+          "mutatorName": "ArithmeticOperator",
+          "replacement": "capacity * GROWTH_NUMERATOR * GROWTH_DENOMINATOR",
+          "status": "Killed",
+          "statusReason": "\n\r\n RUN  v5.0.0 <root>\n\r\n\n\r\n·\r\n·\r\n·············\r\n···\r\n·\r\n·\r\n····\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n···\r\n···\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n···\r\n·\r\n·\r\n··\r\n·\r\nx\r\n\n\r\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n\r\n FAIL  src/core/store/commit-store.test.ts > a store that outgrows its columns > reallocates geometrically and keeps every commit\n\r\nAssertionError: expected 2 to be greater than or equal to 3\n\r\n ❯ src/core/store/commit-store.test.ts:260:44\n\r\n    258|       appendCommit(builder, commitOf(seed, seed === 0 ? [] : [seed - 1…\n    259|     }\n    260|     expect(builder.counters.reallocations).toBeGreaterThanOrEqual(3);\n       |                                            ^\n    261|     const columns = buildCommitColumns(builder);\n    262|     expect(columns.count).toBe(20);\n\r\n\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\r\n\n\r\n Test Files  1 failed | 2 passed | 25 skipped (28)\n\r\n      Te\r\nsts  1 failed | 61 passed (441)\n\r\n   Start at  19:21:52\n\r\n   Duration  7.36s (transform 64%, import 18%, tests 17%)\n\r\n\n",
+          "testsCompleted": 1,
+          "location": {
+            "end": {
+              "column": 76,
+              "line": 44
+            },
+            "start": {
+              "column": 26,
+              "line": 44
+            }
+          }
+        }
+      ]
+    },
+    "src/core/layout/segment-buffer.ts": {
+      "source": "",
+      "mutants": [
+        {
+          "id": "513",
+          "mutatorName": "ConditionalExpression",
+          "replacement": "true",
+          "status": "Killed",
+          "statusReason": "\n\r\n RUN  v5.0.0 <root>\n\r\n\n\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n··\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n···\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n···\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n··\r\nx\r\n\n\r\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n\r\n FAIL  src/core/layout/lane-layout-pages.test.ts > the colour of a lane > cycles once the graph is wider than the contract has indices\n\r\nError: Test timed out in 15000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n\r\n ❯ src/core/layout/lane-layout-pages.test.ts:221:3\n\r\n    219|   });\n    220|\n    221|   it('cycles once the graph is wider than the contract has indices', (…\n       |   ^\n    222|     const shape = Array.from({ length: 300 }, () => [999]);\n    223|     const rows = layoutPage(createLayoutState(), pageTo(shape, 300), 0…\n\r\n\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\r\n\n\r\n Test Files  1 failed | 3 passed | 24 skipped (28)\n\r\n      Tests  1 failed | 75 passed (441)\n\r\n   Start at  18:45:55\n\r\n   Duration  24.50s (tests 93%, transform 4%, import 2%)\n\r\n\n",
+          "testsCompleted": 1,
+          "location": {
+            "end": {
+              "column": 42,
+              "line": 97
+            },
+            "start": {
+              "column": 7,
+              "line": 97
+            }
+          }
+        }
+      ]
+    },
+    "src/core/store/hash-index.ts": {
+      "source": "",
+      "mutants": [
+        {
+          "id": "1521",
+          "mutatorName": "ConditionalExpression",
+          "replacement": "true",
+          "status": "Killed",
+          "statusReason": "\n\r\n RUN  v5.0.0 <root>\n\r\n\n\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n··\r\n···\r\n·\r\n·\r\n·\r\n···\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\nx\r\n\n\r\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n\r\n FAIL  src/core/store/commit-store.test.ts > a store that outgrows its columns > reallocates geometrically and keeps every commit\n\r\nError: Test timed out in 15000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n\r\n ❯ src/core/store/commit-store.test.ts:255:3\n\r\n    253|\n    254| describe('a store that outgrows its columns', () => {\n    255|   it('reallocates geometrically and keeps every commit', () => {\n       |   ^\n    256|     const builder = createCommitStoreBuilder(2);\n    257|     for (let seed = 0; seed < 20; seed += 1) {\n\r\n\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\r\n\n\r\n Test Files  1 failed | 2 passed | 25 skipped (28)\n\r\n      Tests  1 failed | 61 passed (441)\n\r\n   Start at  19:27:57\n\r\n   Duration  41.83s (tests 87%, transform 11%, import 2%)\n\r\n\n\n[26512:000001B3E62D6000]      402 ms: Mark-Compact 6.0 (10.0) -> 5.2 (10.0) MB, pooled: 0 MB, 8.86 / 0.00 ms  (average mu = 0.962, current mu = 0.972) background allocation failure; GC in old space requested\r\n[26512:000001B3E62D6000]      599 ms: Mark-Compact 8.8 (12.1) -> 7.7 (16.3) MB, pooled: 0 MB, 10.35 / 0.00 ms  (average mu = 0.954, current mu = 0.947) allocation failure; GC in old space requested\r\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\r\n",
+          "testsCompleted": 1,
+          "location": {
+            "end": {
+              "column": 81,
+              "line": 120
+            },
+            "start": {
+              "column": 7,
+              "line": 120
+            }
+          }
+        }
+      ]
+    },
+    "src/core/store/pending-parents.ts": {
+      "source": "",
+      "mutants": [
+        {
+          "id": "1547",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "status": "Killed",
+          "statusReason": "\r\n<--- Last few GCs --->\r\n\r\n[26512:000001B3E62D6000]      402 ms: Mark-Compact 6.0 (10.0) -> 5.2 (10.0) MB, pooled: 0 MB, 8.86 / 0.00 ms  (average mu = 0.962, current mu = 0.972) background allocation failure; GC in old space requested\r\n[26512:000001B3E62D6000]      599 ms: Mark-Compact 8.8 (12.1) -> 7.7 (16.3) MB, pooled: 0 MB, 10.35 / 0.00 ms  (average mu = 0.954, current mu = 0.947) allocation failure; GC in old space requested\r\n\r\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\r\n",
+          "testsCompleted": 1,
+          "location": {
+            "end": {
+              "column": 2,
+              "line": 69
+            },
+            "start": {
+              "column": 56,
+              "line": 57
+            }
+          }
+        }
+      ]
+    }
+  },
+  "runs": {
+    "clean": {
+      "code": 0,
+      "timedOut": false,
+      "output": "\n RUN  v5.0.0 <root>\n\n·························································································································································································································································································································································································································································\n\n Test Files  28 passed (28)\n      Tests  441 passed (441)\n   Start at  19:47:33\n   Duration  12.41s (transform 50%, import 26%, tests 24%)\n\n",
+      "ms": 18744
+    },
+    "passing": {
+      "code": 0,
+      "timedOut": false,
+      "output": "\n RUN  v5.0.0 <root>\n\n·························································································································································································································································································································································································································································\n\n Test Files  28 passed (28)\n      Tests  441 passed (441)\n   Start at  19:47:33\n   Duration  12.41s (transform 50%, import 26%, tests 24%)\n\n",
+      "ms": 18744
+    },
+    "failing": {
+      "code": 1,
+      "timedOut": false,
+      "output": "\n\r\n RUN  v5.0.0 <root>\n\r\n\n\r\nx\r\n\n\r\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n\r\n FAIL  src/core/layout/lane-layout.test.ts > a page with nothing in it > is no rows, no segments and one lane of width\n\r\nTypeError: Cannot read properties of undefined (reading 'rowCount')\n\r\n ❯ src/core/layout/lane-layout.test.ts:71:17\n\r\n     69|   it('is no rows, no segments and one lane of width', () => {\n     70|     const rows = laidOut([]);\n     71|     expect(rows.rowCount).toBe(0);\n       |                 ^\n     72|     expect([...rows.segmentOffsets]).toEqual([0]);\n     73|     expect(rows.segmentFromLane.length).toBe(0);\n\r\n\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\r\n\n\r\n Test Files  1 failed | 27 skipped (28)\n\r\n      Tests  1 failed (441)\n\r\n   Start at  18:42:34\n\r\n   Duration  3.97s (transform 65%, import 29%, worker 4%, tests 2%)\n\r\n\n",
+      "ms": 0
+    },
+    "clock": {
+      "code": 1,
+      "timedOut": false,
+      "output": "\n\r\n RUN  v5.0.0 <root>\n\r\n\n\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n··\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n···\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n·\r\n···\r\n·\r\n·\r\n··\r\n·\r\n·\r\n·\r\n·\r\n·\r\n··\r\n·\r\n·\r\n··\r\nx\r\n\n\r\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n\r\n FAIL  src/core/layout/lane-layout-pages.test.ts > the colour of a lane > cycles once the graph is wider than the contract has indices\n\r\nError: Test timed out in 15000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n\r\n ❯ src/core/layout/lane-layout-pages.test.ts:221:3\n\r\n    219|   });\n    220|\n    221|   it('cycles once the graph is wider than the contract has indices', (…\n       |   ^\n    222|     const shape = Array.from({ length: 300 }, () => [999]);\n    223|     const rows = layoutPage(createLayoutState(), pageTo(shape, 300), 0…\n\r\n\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\r\n\n\r\n Test Files  1 failed | 3 passed | 24 skipped (28)\n\r\n      Tests  1 failed | 75 passed (441)\n\r\n   Start at  18:45:55\n\r\n   Duration  24.50s (tests 93%, transform 4%, import 2%)\n\r\n\n",
+      "ms": 0
+    },
+    "starved": {
+      "code": 134,
+      "timedOut": false,
+      "output": "\r\n<--- Last few GCs --->\r\n\r\n[26512:000001B3E62D6000]      402 ms: Mark-Compact 6.0 (10.0) -> 5.2 (10.0) MB, pooled: 0 MB, 8.86 / 0.00 ms  (average mu = 0.962, current mu = 0.972) background allocation failure; GC in old space requested\r\n[26512:000001B3E62D6000]      599 ms: Mark-Compact 8.8 (12.1) -> 7.7 (16.3) MB, pooled: 0 MB, 10.35 / 0.00 ms  (average mu = 0.954, current mu = 0.947) allocation failure; GC in old space requested\r\n\r\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\r\n",
+      "ms": 2982
+    },
+    "past the outer clock": {
+      "code": null,
+      "timedOut": true,
+      "output": "",
+      "ms": 0
+    }
+  }
+}

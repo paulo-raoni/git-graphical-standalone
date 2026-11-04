@@ -16,11 +16,11 @@ import { plainOutput } from './mutation-output.js';
 import { GENERATED, repositoryRoot, walkFiles } from './tree.js';
 
 /**
- * Re-exported for `mutation.js`, which reads the report through it before any
- * clause does and is at its module's line limit, so it imports from this module
- * alone.
+ * Re-exported for `mutation.js`, which reads the report through `plainFiles`
+ * before any clause does and quotes a recorded output through `excerptOf`, and
+ * is near its module's line limit, so it imports from this module alone.
  */
-export { plainFiles } from './mutation-output.js';
+export { excerptOf, plainFiles } from './mutation-output.js';
 
 /**
  * The mutation gate's fifth clause: **no kill rests on a suite that could not get
@@ -48,9 +48,9 @@ export { plainFiles } from './mutation-output.js';
  *
  * So every such kill is measured again, here, **alone and after the run**, when
  * the seven workers are gone, by the very command Stryker ran it with
- * (`commandRunner.command` of `stryker.config.json`) and under Stryker's own
- * outer clock (`timeoutMS`), over a copy of the tree with that one mutant
- * planted. A kill is chosen for it when its recorded output names no failing
+ * (`commandRunner.command` of `stryker.config.json`) and under the outer clock
+ * Stryker itself gave it (*The outer clock* below), over a copy of the tree
+ * with that one mutant planted. A kill is chosen for it when its recorded output names no failing
  * test, or says its suite ran out of memory or lost its worker, or carries
  * vitest's own test timeout, in each of the last two cases whether or not a test
  * failed beside it: a test that failed because the suite could not get memory,
@@ -141,6 +141,32 @@ export { plainFiles } from './mutation-output.js';
  * matching it; four lines of `scripts/gates/`, three of them in this file and one
  * in `mutation.js`, whose frames no run of the unit suite prints.
  *
+ * ## The outer clock
+ *
+ * A second run is stopped once it has run as long as Stryker would have let it
+ * run: `timeoutFactor` times the dry run's net time, plus `timeoutMS`, plus the
+ * dry run's overhead, which is `createMutantRunPlan` in `mutant-test-planner.js`
+ * of `@stryker-mutator/core` 10.0.0, read there by E04-M01-S01; with
+ * `coverageAnalysis` off every mutant's net time is the whole dry run. Until S01
+ * it was `timeoutMS` alone, 120 000 ms, shorter than that by one and a half dry
+ * runs, and E03-M01's review round 03 saw a second run of `hash-index.ts` 120:7
+ * go past it in two of four draws. Each value is read from what the run used:
+ * `timeoutFactor` and `timeoutMS` from the report's own `config`, which is
+ * Stryker's options with its defaults filled in (`stryker.config.json`, and
+ * Stryker's default factor of 1.5, for a report that carries none); the dry
+ * run's net time and overhead from the record Stryker's `event-recorder`
+ * reporter writes of it, `*-onDryRunCompleted.json` under
+ * `eventReporter.baseDir`. The net time taken is the larger of that record's and
+ * this clause's own run with no mutant planted, which is the same command over
+ * the same tree, so a replay with no record of its run still gets a budget, and
+ * a record left by another run can only lengthen it. What S01 measured of it is
+ * in its slice document.
+ *
+ * Every run goes through `runs`, the copy of the tree unless a caller hands
+ * another: `test/gates/` replays committed reports through this clause with
+ * recorded runs in the copy's place, so that each verdict is held by a check
+ * that `npm run gates:unit` runs.
+ *
  * The copy of the tree is every file the gates read, which leaves out what a run
  * generates and the lanes' worktrees, with a junction to `node_modules`, under
  * `.stryker-tmp/`, removed when the clause is done. Before any mutant is planted
@@ -186,6 +212,16 @@ const REMEASURED_AT_MOST = 50;
 /** How much of an output a refusal quotes, from its end, where vitest prints its verdict. */
 const QUOTED_CHARACTERS = 600;
 
+/** Stryker's own defaults, from its schema, for a configuration that sets neither. */
+const STRYKER_DEFAULTS = {
+  timeoutFactor: 1.5,
+  timeoutMS: 5000,
+  baseDir: 'reports/mutation/events',
+};
+
+/** A dry run nothing recorded. */
+const NO_DRY_RUN = { net: 0, overhead: 0 };
+
 /**
  * **The line this clause hinges on.** A kill whose output gives it no test result to rest on,
  * read with the gate's own reading of vitest's clock, `clock`. See the header.
@@ -194,7 +230,7 @@ const chosen = (reason, clock) =>
   !FAILING_TESTS.test(reason) || STARVED.test(reason) || clock.test(reason);
 
 /** A report key as a reader's path: repository-relative, with `/` separators. */
-function fileNameOf(key) {
+export function fileNameOf(key) {
   return (isAbsolute(key) ? relative(repositoryRoot, key) : key).split('\\').join('/');
 }
 
@@ -217,19 +253,33 @@ function suspectsOf(files, clock) {
   return suspects;
 }
 
-/** The source with the mutant's replacement over its location; lines and columns count from one. */
-function mutatedSource(source, mutant) {
+/** Where the mutant's location starts and ends in the source; lines and columns count from one. */
+function spanOf(source, mutant) {
   const starts = [0];
   for (let at = source.indexOf('\n'); at >= 0; at = source.indexOf('\n', at + 1)) {
     starts.push(at + 1);
   }
   const offsetOf = ({ line, column }) => (starts[line - 1] ?? source.length) + column - 1;
-  const { start, end } = mutant.location;
-  return (
-    source.slice(0, offsetOf(start)) +
-    String(mutant.replacement ?? '') +
-    source.slice(offsetOf(end))
-  );
+  return [offsetOf(mutant.location.start), offsetOf(mutant.location.end)];
+}
+
+/** The source with the mutant's replacement over its location. */
+function mutatedSource(source, mutant) {
+  const [start, end] = spanOf(source, mutant);
+  return source.slice(0, start) + String(mutant.replacement ?? '') + source.slice(end);
+}
+
+/**
+ * The source text the mutant replaces, with every run of white space read as one
+ * space, so that reflowing it does not change it. `mutation.js` keys its survivor
+ * list by it.
+ */
+export function originalOf(source, mutant) {
+  const [start, end] = spanOf(String(source ?? ''), mutant);
+  return String(source ?? '')
+    .slice(start, end)
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -277,6 +327,7 @@ function runAlone(command, budget) {
       windowsHide: true,
     });
     const chunks = [];
+    const began = Date.now();
     let timedOut = false;
     const clock = setTimeout(() => {
       timedOut = true;
@@ -287,9 +338,54 @@ function runAlone(command, budget) {
     child.on('error', (error) => chunks.push(Buffer.from(String(error))));
     child.on('close', (code) => {
       clearTimeout(clock);
-      resolveRun({ code, timedOut, output: plainOutput(Buffer.concat(chunks).toString('utf8')) });
+      const output = plainOutput(Buffer.concat(chunks).toString('utf8'));
+      resolveRun({ code, timedOut, output, ms: Date.now() - began });
     });
   });
+}
+
+/** `stryker.config.json`, as Stryker reads it. */
+function readConfig() {
+  return JSON.parse(readFileSync(join(repositoryRoot, 'stryker.config.json'), 'utf8'));
+}
+
+/** The runs the clause makes in the copy of the tree; a `null` suspect is the run with none planted. */
+const sandboxRuns = {
+  open: makeSandbox,
+  close: removeSandbox,
+  async run(suspect, budget) {
+    const command = String(readConfig().commandRunner?.command ?? '');
+    if (suspect === null) return runAlone(command, budget);
+    const target = join(SANDBOX, suspect.file);
+    writeFileSync(target, mutatedSource(suspect.source, suspect.mutant));
+    const run = await runAlone(command, budget);
+    writeFileSync(target, suspect.source);
+    return run;
+  },
+};
+
+/** The dry run's net time and overhead as Stryker's event recorder wrote them, or none. */
+function recordedDryRun(config) {
+  const folder = join(repositoryRoot, config.eventReporter?.baseDir ?? STRYKER_DEFAULTS.baseDir);
+  const name = existsSync(folder)
+    ? readdirSync(folder)
+        .filter((one) => one.endsWith('-onDryRunCompleted.json'))
+        .sort()
+        .pop()
+    : undefined;
+  if (name === undefined) return NO_DRY_RUN;
+  const { timing } = JSON.parse(readFileSync(join(folder, name), 'utf8'));
+  return { net: Number(timing?.net ?? 0), overhead: Number(timing?.overhead ?? 0) };
+}
+
+/**
+ * **The line the outer clock hinges on.** What Stryker gives one mutant run: `timeoutFactor` times
+ * the dry run's net time, plus `timeoutMS`, plus the dry run's overhead. See the header.
+ */
+export function outerClockOf(config, dryRun) {
+  const factor = Number(config.timeoutFactor ?? STRYKER_DEFAULTS.timeoutFactor);
+  const absolute = Number(config.timeoutMS ?? STRYKER_DEFAULTS.timeoutMS);
+  return factor * dryRun.net + absolute + dryRun.overhead;
 }
 
 /**
@@ -317,29 +413,27 @@ function verdictOf({ code, timedOut, output }, suspect, clock) {
   return { verdict: 'unmeasured', why: 'no test failed and no error names the mutated file' };
 }
 
-/** Each suspect run again, alone, in turn, with the file put back after each. */
-async function rerunAll(suspects, clock) {
-  const options = JSON.parse(readFileSync(join(repositoryRoot, 'stryker.config.json'), 'utf8'));
-  const command = String(options.commandRunner?.command ?? '');
-  const budget = Number(options.timeoutMS ?? 120_000);
+/**
+ * Each suspect run again, alone, in turn, after one run with none planted, each under the outer
+ * clock: the dry run's net time is the larger of Stryker's record and that first run's.
+ */
+async function rerunAll(suspects, clock, { config, dryRun, runs }) {
   const results = [];
-  makeSandbox();
+  runs.open();
   try {
-    const clean = await runAlone(command, budget);
+    const clean = await runs.run(null, outerClockOf(config, dryRun));
     if (clean.timedOut || clean.code !== 0) {
       const why =
         'could not be run at all: the copy of the tree fails its own suite with no mutant planted';
       return suspects.map((suspect) => ({ ...suspect, ...clean, verdict: 'unmeasured', why }));
     }
+    const budget = outerClockOf(config, { ...dryRun, net: Math.max(dryRun.net, clean.ms) });
     for (const suspect of suspects) {
-      const target = join(SANDBOX, suspect.file);
-      writeFileSync(target, mutatedSource(suspect.source, suspect.mutant));
-      const run = await runAlone(command, budget);
-      writeFileSync(target, suspect.source);
-      results.push({ ...suspect, ...run, ...verdictOf(run, suspect, clock) });
+      const run = await runs.run(suspect, budget);
+      results.push({ ...suspect, ...run, budget, ...verdictOf(run, suspect, clock) });
     }
   } finally {
-    removeSandbox();
+    runs.close();
   }
   return results;
 }
@@ -377,6 +471,12 @@ function describeResults(label, results) {
   const lines = [
     `${label}: re-measured alone after the run, ${String(results.length)} killed mutants whose recorded output names no failing test, says the suite could not get memory or lost its worker, or carries vitest's own test timeout — ${String(count('assertion'))} failed a test, ${String(count('clock'))} ran out of a clock again, ${String(count('own crash'))} broke their own module on import, ${String(count('survived'))} survived, ${String(count('unmeasured'))} could not be measured\n`,
   ];
+  const budget = results.find((one) => one.budget !== undefined)?.budget;
+  if (budget !== undefined) {
+    lines.push(
+      `${label}:   each mutant run alone was stopped after ${budget.toFixed(0)} ms, the budget Stryker gives a mutant: timeoutFactor times the dry run, plus timeoutMS, plus the dry run's overhead\n`,
+    );
+  }
   for (const result of results) {
     lines.push(
       `${label}:   ${nameOf(result.file, result.mutant)}: ${result.verdict}, ${result.why}\n`,
@@ -390,8 +490,16 @@ function describeResults(label, results) {
  * every mutant it cannot measure, and returns the report as the survivor clause
  * should read it. `clock` is the gate's narrow reading of vitest's own test
  * timeout, `VITEST_CLOCK` in `mutation.js`, handed in so that there is one copy.
+ * `given` may carry the report's `config`, a recorded `dryRun` and the `runs` to
+ * make; each one left out is read or made as the header says.
  */
-export async function remeasure(files, label, findings, clock) {
+export async function remeasure(files, label, findings, clock, given = {}) {
+  const config = { ...readConfig(), ...given.config };
+  const setup = {
+    config,
+    dryRun: given.dryRun ?? recordedDryRun(config),
+    runs: given.runs ?? sandboxRuns,
+  };
   const suspects = suspectsOf(files, clock);
   if (suspects.length > REMEASURED_AT_MOST) {
     findings.push(
@@ -399,7 +507,7 @@ export async function remeasure(files, label, findings, clock) {
     );
     return files;
   }
-  const results = suspects.length === 0 ? [] : await rerunAll(suspects, clock);
+  const results = suspects.length === 0 ? [] : await rerunAll(suspects, clock, setup);
   describeResults(label, results);
   for (const result of results) {
     if (result.verdict === 'unmeasured') findings.push(unmeasuredFinding(result));
