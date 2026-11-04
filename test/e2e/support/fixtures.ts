@@ -1,15 +1,20 @@
+import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { ElectronApplication } from '@playwright/test';
+
 import { generateRepository, readSpecification } from '../../fixtures/generate';
 import { removeDirectory, removeOldStores, verifiedCopy } from '../../fixtures/shared-store';
 
 /**
  * The fixture repositories of the end-to-end suites that open repositories, and
- * the rules that let any number of runs on one machine share them.
+ * the rules that let any number of runs on one machine share them; and, at the
+ * end, {@link withOwnProfile}, which launches the application on a user-data
+ * directory of its own.
  *
  * `open-repository.spec.ts`, `superseded-reply.spec.ts`, `stale-load-more.spec.ts`,
  * `open-scroll.spec.ts` and `refresh-control.spec.ts` build their repositories
@@ -114,5 +119,83 @@ export function ownFixture(name: string, shape: string, commits: number): string
 export function removeOwnFixtures(): void {
   for (const parent of own.splice(0)) {
     removeDirectory(parent);
+  }
+}
+
+/**
+ * Fail unless `child` has exited: a leaked process is a failure of the gate
+ * whatever the assertions said.
+ */
+function requireExited(child: ChildProcess): void {
+  if (child.exitCode === null && !child.killed) {
+    throw new Error('the application was asked to close and its process is still running');
+  }
+}
+
+/** What {@link withOwnProfile} launches with: a folder to open, and an environment. */
+export interface Launch {
+  /** The folder named on the command line, or none for the empty window. */
+  readonly open?: string;
+  /** The whole environment of the application, or this process's when absent. */
+  readonly env?: Record<string, string>;
+}
+
+/**
+ * Launch the built application on a user-data directory of its own, run `body`
+ * against it, stop it, require its process gone, and remove the directory.
+ *
+ * **Why every suite of the `application` project launches through this.** The
+ * application keeps what a person chose under its user-data directory: the theme
+ * in a file `theme` (`src/app/theme.ts`) and a branch selection per repository in
+ * a folder `branch-selections` (`src/app/selections.ts`), and it reads the theme
+ * back at every start and a repository's selection at every open. Launched with
+ * no `--user-data-dir`, it uses the profile of whoever runs the suite, so a
+ * choice that person left there carries into the run, and a selection a case
+ * applies is kept in their profile after it. A directory of its own per launch
+ * keeps both out: nothing is read that the case did not put there, and nothing it
+ * keeps outlives it.
+ *
+ * **The line the isolation hinges on** is the `--user-data-dir` argument below.
+ * No case reads which profile it ran on, so a suite launched without it again
+ * stays green: E04-M01-S04 put `branch-selection.spec.ts` back on the default
+ * profile, and the suite passed while that profile's `branch-selections` folder
+ * was written. What holds the isolation is a digest of the default profile taken
+ * before and after a full `npm run gates:e2e`, as that slice's audit records. A
+ * launch that does not come through here — a second `electron.launch` written
+ * into a case, or an instance the case starts by itself — is not covered by this
+ * function, and only that digest would show it.
+ *
+ * The directory is made fresh for each launch under the system's temporary
+ * directory and removed once the process has exited, whatever `body` did; a case
+ * that needs two launches to share one profile (a choice kept across a restart)
+ * passes `--user-data-dir` itself, as `theme.spec.ts` and `selection-kept.spec.ts`
+ * do. Playwright is imported here when the launch is asked for, not when the
+ * module loads, because the Vitest suites of `perf/` and `test/fixtures/` import
+ * this module for {@link fixture} and run no Playwright at all.
+ */
+export async function withOwnProfile<T>(
+  launch: Launch,
+  body: (application: ElectronApplication) => Promise<T>,
+): Promise<T> {
+  const { _electron: electron } = await import('@playwright/test');
+  const home = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-profile-'));
+  try {
+    const args = ['.', ...(launch.open === undefined ? [] : [launch.open])];
+    const application = await electron.launch({
+      args: [...args, `--user-data-dir=${home}`],
+      cwd: repositoryRoot,
+      ...(launch.env === undefined ? {} : { env: launch.env }),
+    });
+    // Taken before the close, because `process()` reaches through a connection
+    // that closing tears down.
+    const child = application.process();
+    try {
+      return await body(application);
+    } finally {
+      await application.close();
+      requireExited(child);
+    }
+  } finally {
+    removeDirectory(home);
   }
 }

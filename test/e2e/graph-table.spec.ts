@@ -1,8 +1,5 @@
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-import { _electron as electron, expect, test } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { entryAt } from '../../src/contracts/column-read';
 import { HASH_BYTE_LENGTH, RefKind, RowFlag, UNKNOWN_INDEX } from '../../src/contracts/index';
@@ -10,6 +7,7 @@ import type { CommitColumns, GraphPage, LayoutRows, Refs } from '../../src/contr
 import { createLayoutState, layoutPage } from '../../src/core/layout/index';
 import { OVERSCAN_ROWS, visibleRowCount } from '../../src/ui/geometry';
 import { rowViewAt } from '../../src/ui/row-model';
+import { withOwnProfile } from './support/fixtures';
 
 /**
  * The built application drawing a fixture page, and the row model behind it.
@@ -29,8 +27,6 @@ import { rowViewAt } from '../../src/ui/row-model';
  * The pure arithmetic under this view is in `graph-geometry.spec.ts`, which says
  * why neither file is a colocated `src/ui/*.test.ts`.
  */
-
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** Two authors, so that the author column is not constant. */
 const PEOPLE = {
@@ -281,21 +277,15 @@ function readCounters(): Counters & { due: number } {
 }
 
 /**
- * Launch the built application, run `body` against its window, and stop it.
+ * Launch the built application on a user-data directory of its own, run `body`
+ * against its window, and stop it.
  *
- * Every process this suite starts is stopped by it, and the exit status is read
- * back afterwards: a leaked process is a failure of the gate whatever the
- * assertions said.
+ * Every process this suite starts is stopped by it: `withOwnProfile`
+ * (`./support/fixtures.ts`) reads the exit status back afterwards, because a
+ * leaked process is a failure of the gate whatever the assertions said.
  */
 async function withWindow(body: (page: Page) => Promise<void>): Promise<void> {
-  const app: ElectronApplication = await electron.launch({ args: ['.'], cwd: repositoryRoot });
-  try {
-    await body(await app.firstWindow());
-  } finally {
-    const child = app.process();
-    await app.close();
-    expect(child.exitCode === null && !child.killed).toBe(false);
-  }
+  await withOwnProfile({}, async (application) => body(await application.firstWindow()));
 }
 
 test('a row shows its own commit, in the author’s own time zone', () => {

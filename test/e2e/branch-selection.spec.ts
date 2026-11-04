@@ -3,26 +3,32 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { _electron as electron, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
 
 import { RefKind, UNKNOWN_INDEX } from '../../src/contracts/index';
 import type { BranchSelection, GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
-import { fixture } from './support/fixtures';
+import { fixture, withOwnProfile } from './support/fixtures';
 
 /**
  * A branch selection, driven through the bridge of the built application, reaches
  * git and is kept.
  *
- * No control applies a selection yet (that is E03-M01-S10), so every case here
- * calls `window.gitGraphical` the way that control will: `refresh` with a
- * `selection` to apply one, `refresh({})` and `loadMoreCommits` to read again
- * under it, `openRepository` with `showRemoteBranches` to open without remote
- * branches. Each reply is drawn with the view's own `showPage`, in the order the
+ * The Branches dropdown applies a selection since E03-M01-S10, and
+ * `branches-dropdown.spec.ts` drives it. The cases here go beneath it and call
+ * `window.gitGraphical` as the dropdown does — `refresh` with a `selection` to
+ * apply one — so that they can also send requests together and set their replies
+ * racing on cue, read again under a selection with `refresh({})` and
+ * `loadMoreCommits`, and open without remote branches with `openRepository` and
+ * `showRemoteBranches`. Each reply is drawn with the view's own `showPage`, in the order the
  * replies arrive, as the renderer draws them, and the window is photographed into
  * this run's output directory after each selection so that what was drawn can be
  * looked at.
+ *
+ * Every launch is on a user-data directory of its own (`withOwnProfile`,
+ * `./support/fixtures.ts`), so a selection kept by an earlier run is not what the
+ * first page opens on, and none applied here is kept past the case.
  *
  * The repository is the `remotes` fixture (`test/fixtures/generate.ts`): a trunk
  * of 5 000 commits on `main`, `feature` and `topic` cut from its end, `topic`
@@ -152,19 +158,17 @@ function gitLog(revisions: readonly string[], count: number): string[] {
     .filter((line) => line.length > 0);
 }
 
-/** Launch the built application on the fixture, run `body` once the first page is drawn, stop it. */
+/**
+ * Launch the built application on the fixture, on a user-data directory of its own,
+ * run `body` once the first page is drawn, and stop it.
+ */
 async function withWindow(body: (page: Page) => Promise<void>): Promise<void> {
-  const application = await electron.launch({ args: ['.', where], cwd: repositoryRoot });
-  try {
+  await withOwnProfile({ open: where }, async (application) => {
     const page = await application.firstWindow();
     await expect(page.locator(MORE)).toBeVisible();
     await page.evaluate(installSummariser);
     await body(page);
-  } finally {
-    const child = application.process();
-    await application.close();
-    expect(child.exitCode === null && !child.killed).toBe(false);
-  }
+  });
 }
 
 /** Send one step, photograph what was drawn, and return its reply. */
