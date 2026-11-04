@@ -5,9 +5,12 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { HASH_BYTE_LENGTH } from '../contracts/index';
+import type { BranchSelection } from '../contracts/index';
 import type { RepositoryPage } from '../ports/index';
 
-import { fixtureAt, gitLines, refNameAt } from './fixtures.spec-support';
+import { fixtureAt, gitLines, hexAt, refNameAt } from './fixtures.spec-support';
+import * as commands from './git-commands';
 import {
   commitLogArgs,
   PARSING_CONFIGURATION,
@@ -48,6 +51,17 @@ import { referenceFixtureAt } from './reference-fixtures.spec-support';
  * case that fails when the override is removed, or when it is replaced by
  * `color.ui=never`, which the repository's `color.diff=always` and the
  * environment's both defeat.
+ *
+ * **The override in every argument list.** Holding the override for
+ * `PARSING_CONFIGURATION` says nothing about a list that leaves it out: E03-M01's
+ * review round 05 removed it from `stashArgs` alone and every case above stayed
+ * green. So every argument list `./git-commands` exports is held to carry the
+ * whole configuration ahead of its git command, where git reads it as
+ * configuration rather than as the command's own arguments, and the two whose
+ * formats are coloured by `color.diff`, the log and the stash list, are run as
+ * the reader builds them with a `%C(red)` placeholder put in place of their
+ * format, under each source. The other three print nothing a `%C` placeholder
+ * reaches, so for them the first check is the whole of what can be held.
  */
 
 const ESCAPE = '\u001b';
@@ -226,5 +240,144 @@ describe.each(SOURCES)('colour set in $name, against the override', (source) => 
         expect(read).toBe(withoutColour(bare));
       }
     });
+  });
+});
+
+/** Where `PARSING_CONFIGURATION` begins in `args`, whole and in order, or -1. */
+function configurationAt(args: readonly string[]): number {
+  const length = PARSING_CONFIGURATION.length;
+  for (let at = 0; at + length <= args.length; at += 1) {
+    if (PARSING_CONFIGURATION.every((argument, offset) => args[at + offset] === argument)) {
+      return at;
+    }
+  }
+  return -1;
+}
+
+/** `args` with the reader's configuration taken out, which is how git runs without it. */
+function withoutConfiguration(args: readonly string[]): string[] {
+  const at = configurationAt(args);
+  return [...args.slice(0, at), ...args.slice(at + PARSING_CONFIGURATION.length)];
+}
+
+/** `args` with its `--format=` argument replaced by `format`. */
+function withFormat(args: readonly string[], format: string): string[] {
+  return args.map((argument) =>
+    argument.startsWith('--format=') ? `--format=${format}` : argument,
+  );
+}
+
+/** Every argument list the adapter exports, each built as the reader builds it, and its git command. */
+function exportedLists(where: string): readonly (readonly [string, readonly string[], string])[] {
+  const selected: BranchSelection = { branches: ['refs/heads/side'], showRemoteBranches: false };
+  return [
+    ['repositoryProbeArgs', repositoryProbeArgs(where), 'rev-parse'],
+    ['commitLogArgs', commitLogArgs(where, 100_000), 'log'],
+    ['commitLogArgs, under a selection', commitLogArgs(where, 100_000, selected), 'log'],
+    ['referenceArgs', referenceArgs(where), 'for-each-ref'],
+    ['referenceArgs, remote branches hidden', referenceArgs(where, false), 'for-each-ref'],
+    ['stashArgs', stashArgs(where), 'stash'],
+    ['statusArgs', statusArgs(where), 'status'],
+  ];
+}
+
+describe('the override, in every argument list the adapter exports', () => {
+  it('names every exported argument list, so that a list added later is held here too', () => {
+    const exported = Object.keys(commands).filter((name) => name.endsWith('Args'));
+    const held = new Set(exportedLists('repository').map(([name]) => name.split(',')[0]));
+    expect(exported.toSorted()).toEqual([...held].toSorted());
+  });
+
+  it('carries the whole configuration ahead of the git command, in every list', () => {
+    for (const [name, args, command] of exportedLists('repository')) {
+      const at = configurationAt(args);
+      expect(at, name).toBeGreaterThanOrEqual(0);
+      expect(at + PARSING_CONFIGURATION.length, name).toBeLessThanOrEqual(args.indexOf(command));
+    }
+  });
+});
+
+describe.each(SOURCES)('colour set in $name, against the lists the reader runs', (source) => {
+  it('colours a %C placeholder in the log and the stash list as built, only without the configuration', async () => {
+    const where = source.stashed();
+    const lists = [
+      withFormat(commitLogArgs(where, 1), '%C(red)%s'),
+      withFormat(stashArgs(where), '%C(red)%gd'),
+    ];
+    await under(source.environment(), () => {
+      for (const args of lists) {
+        const bare = printed(withoutConfiguration(args));
+        const read = printed(args);
+        expect(bare.includes(ESCAPE), `${args.join(' ')} without it`).toBe(true);
+        expect(read.includes(ESCAPE), `${args.join(' ')} as built`).toBe(false);
+        expect(read).toBe(withoutColour(bare));
+      }
+    });
+  });
+});
+
+/**
+ * The two names E03-M01's review round 04 sent, on the `colour-config` fixture,
+ * which has the branch `side` one commit below `main`, HEAD on `main` and a
+ * stash on top of it.
+ *
+ * Here rather than in `git-selection.spec.ts` because E04-M01-S02, which refuses
+ * them, had this file and not that one inside its boundary; the fixture is this
+ * file's own, and it was the one with a `side`, a HEAD past it and a stash.
+ */
+describe('a selection naming a revision expression behind a branch’s name', () => {
+  const range = 'refs/heads/side..HEAD';
+  const symmetric = 'refs/heads/side...refs/stash';
+  let where = '';
+
+  beforeAll(() => {
+    where = referenceFixtureAt('colour-config');
+  });
+
+  /** The hashes of the page `branches` gives, remote branches shown. */
+  async function rowsUnder(branches: readonly string[]): Promise<string[]> {
+    const selection: BranchSelection = { branches, showRemoteBranches: true };
+    const outcome = await reader.readPage({ repositoryPath: where, pageSize: 100_000, selection });
+    if (!outcome.ok) {
+      throw new Error(`${outcome.kind}: ${outcome.message}`);
+    }
+    const page = outcome.value;
+    return Array.from({ length: page.commits.count }, (_, row) =>
+      hexAt(page.commits.hashes, row, HASH_BYTE_LENGTH),
+    );
+  }
+
+  /** What git's own log of `revisions` is. */
+  function gitLog(revisions: readonly string[]): string[] {
+    return gitLines(where, ['log', '--format=%H', ...revisions, '--']);
+  }
+
+  it('is a name git, given it, reads HEAD’s and the stash’s commits for', () => {
+    const [head = ''] = gitLines(where, ['rev-parse', 'HEAD']);
+    const stashed = gitLines(where, ['rev-parse', 'refs/stash', 'refs/stash^2']);
+    expect(gitLog([range])).toContain(head);
+    for (const commit of stashed) {
+      expect(gitLog([symmetric])).toContain(commit);
+    }
+  });
+
+  it('reads no commit when it is all that is selected, as a branch that is gone reads none', async () => {
+    expect(await rowsUnder(['refs/heads/gone'])).toEqual([]);
+    expect(await rowsUnder([range])).toEqual([]);
+    expect(await rowsUnder([symmetric])).toEqual([]);
+  });
+
+  it('is dropped beside a branch, which is read alone, as a branch that is gone is dropped', async () => {
+    const head = gitLines(where, ['rev-parse', 'HEAD']);
+    const stashed = gitLines(where, ['rev-parse', 'refs/stash', 'refs/stash^2']);
+    const side = gitLog(['refs/heads/side']);
+    expect(await rowsUnder(['refs/heads/gone', 'refs/heads/side'])).toEqual(side);
+    for (const name of [range, symmetric]) {
+      const rows = await rowsUnder([name, 'refs/heads/side']);
+      expect(rows, name).toEqual(side);
+      for (const commit of [...head, ...stashed]) {
+        expect(rows, name).not.toContain(commit);
+      }
+    }
   });
 });

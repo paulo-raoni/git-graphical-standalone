@@ -62,7 +62,12 @@ export type StartupRepositoryResponse = Result<StartupRepository>;
  *   branch and `refs/remotes/<remote>/<branch>` for a remote-tracking one — the
  *   prefix is what tells a local branch called `origin/main` from the
  *   remote-tracking `origin/main`, and what keeps a tag of the same name from
- *   being read instead. A name with neither prefix is not read. A name git does
+ *   being read instead. A name with neither prefix is not read, and neither is
+ *   one that git's ref-name rules refuse (those of `git check-ref-format`): a
+ *   prefix alone let `refs/heads/side..HEAD` and `refs/heads/side...refs/stash`
+ *   through, which git reads as ranges, taking in HEAD's and the stash's commits
+ *   (E03-M01's review round 04 measured both; the fixtures suite of
+ *   `src/adapters/` holds both refused, by E04-M01-S02). A name git does
  *   not resolve, such as a branch deleted since it was chosen, is skipped, and a
  *   list whose every name is skipped reads no commit at all. An empty list reads
  *   no commit either; it is not a second spelling of every branch.
