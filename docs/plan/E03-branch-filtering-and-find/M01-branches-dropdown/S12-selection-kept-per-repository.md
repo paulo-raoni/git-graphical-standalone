@@ -34,6 +34,11 @@ other point of the control is as `S10-branches-dropdown.md` describes it.
 Before the first page of a repository arrives, the window shows what it showed before, and the disabled checkbox its
 default, checked. The kept choice is given to the control in the same task as the first page is handed to the table,
 and no page under another selection is drawn before it (below).
+*Corrected by E04-M01-S04, 2026-11-04:* since E04-M01-S03 the disabled checkbox is indeterminate before the first
+page, not checked (`remotes.indeterminate = true` in `buildParts`, `src/ui/branch-control.ts`), and `open` in
+`src/ui/renderer.ts` clears that in the same task that sets what the open's reply says is kept. Read from that code and
+from E04-M01-S03's slice document, which records the state seen in the running application; not measured again by
+E04-M01-S04.
 
 ## What is kept, where, and in what form
 
@@ -81,6 +86,10 @@ whichever process opens it.
   selection overtaken by a later one, which the utility process drops (S09), is never kept.
 - **A write that fails** is said on the main process's error stream, as a theme that cannot be kept is; the selection
   still holds in the window, and the next open does not find it.
+  *Corrected by E04-M01-S04, 2026-11-04:* since E04-M01-S03 it is also said in the window, once a run, by a warning
+  message box titled *Not kept* (`sayUnkept` in `src/app/window.ts`, called from the write's `catch` in
+  `src/app/selections.ts`), and so is a theme that cannot be kept; the error stream line stays. Read from that code and
+  from E04-M01-S03's slice document; not measured again by E04-M01-S04.
 
 The selection is written for **the repository opened last**: the main process records the path of every open the
 utility process answered with a page. The utility process answers a selection with a page only while the repository
@@ -275,5 +284,10 @@ The rules themselves are held by their unit tests and by the mutation gate, whos
   a record for the `remotes` fixture's path there. Read from that spec: each of its cases applies a selection, or
   opens with `showRemoteBranches`, before it asserts anything, so the record its last run left does not change what
   it holds; it passed in this lane's run of the whole end-to-end gate.
+  *Corrected by E04-M01-S04, 2026-11-04:* that spec now launches on a user-data directory of its own, made and
+  removed around each launch by `withOwnProfile` in `test/e2e/support/fixtures.ts`, so a run of it leaves no record in
+  the default profile; how that was measured is in E04-M01-S04's slice document.
 - **A write given up.** A rename still refused after its ten attempts, as above, leaves the previous record whole
   and is said on the error stream; the selection holds in the window, and the next open does not find it.
+  *Corrected by E04-M01-S04, 2026-11-04:* since E04-M01-S03 the write given up is also said in the window, once a run,
+  by the *Not kept* message box of the correction above; the error stream line stays.
