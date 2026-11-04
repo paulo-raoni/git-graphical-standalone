@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { ThemeChoice } from '../contracts/index';
+import { sayUnkept } from './window';
 
 /**
  * The colour scheme a person chose, applied to the whole application and kept
@@ -112,12 +113,11 @@ export function openThemeStore(directory: string): ThemeStore {
         .then(() => writeFile(file, requested))
         .catch((error: unknown) => {
           // The scheme is applied for this session whatever happens here; what
-          // is lost is only that the next start will not remember it. The
-          // window's one place for a failure replaces the graph, which is out of
-          // proportion to that, so it is said on the process's own error
-          // stream, where a person who started the application from a terminal
-          // sees it.
+          // is lost is only that the next start will not remember it. Said on
+          // the process's own error stream, and in a message box over the
+          // window, once per run (`sayUnkept` in `./window.ts`).
           process.stderr.write(`The theme could not be kept: ${String(error)}\n`);
+          sayUnkept('theme choice', file);
         });
       await saved;
       return requested;

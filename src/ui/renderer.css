@@ -188,7 +188,7 @@ body {
 
 .branches__option[aria-selected='true']::before {
   margin-left: -14px;
-  content: '✓ ';
+  content: '✓ ' / '';
 }
 
 .stage {

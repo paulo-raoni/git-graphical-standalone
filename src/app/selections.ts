@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { keptSelection } from '../contracts/index';
 import type { BranchSelection } from '../contracts/index';
+import { sayUnkept } from './window';
 
 /**
  * The branch selection last applied to each repository, kept by the main process
@@ -120,8 +121,10 @@ export function openSelectionStore(directory: string): SelectionStore {
         .catch((error: unknown) => {
           // The selection holds in this window whatever happens here; what is
           // lost is that the next open will not find it. Said on the process's
-          // own error stream, as a theme that cannot be kept is (`./theme.ts`).
+          // own error stream, and in a message box over the window once per
+          // run, as a theme that cannot be kept is (`./theme.ts`).
           process.stderr.write(`The branch selection could not be kept: ${String(error)}\n`);
+          sayUnkept('branch selection', file);
         });
       return saved;
     },
