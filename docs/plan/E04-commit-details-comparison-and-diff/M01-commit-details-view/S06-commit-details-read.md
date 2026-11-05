@@ -193,7 +193,10 @@ the uncommitted changes costing about twice a commit's, two processes one after 
 
 ## Bundle size
 
-The details add 5195 production bytes to `repository.cjs` (28903 at Base, 34098 here, `npm run gates:size`
-over a `git archive` of Base and over this lane's head, 2026-11-04), whose budget is 28903, its size at Base; `main.cjs` grows 131 bytes and `preload.cjs` 80, within their budgets. The six modules are named in
-`scripts/gates/module-manifest.json`. The budget is not this slice's to raise (`AGENTS.md` §11); the audit says
-what was asked of the task.
+The details add 5195 production bytes to `repository.cjs`: 28903 at Base, 34098 here (`npm run gates:size` over
+this lane's head, and the same build over a `git archive` of Base, 2026-11-05). Its budget was 28903, its size at
+Base, and under the task's ruling it is reset once to the measured size plus the margin rule of
+`scripts/gates/size-budget.json`, 35840, with the total moving by the same 6937 bytes to 71449. The entry
+`comment-e04-m01-s06` of that file gives the growth by module and what was tried to make it smaller first.
+`main.cjs` grows 131 bytes and `preload.cjs` 80, within their budgets, which did not move. The six new modules
+are named in `scripts/gates/module-manifest.json`.
