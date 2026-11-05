@@ -76,7 +76,9 @@ async function withWindow(repository: string, body: (page: Page) => Promise<void
   running.add(application);
   try {
     const page = await application.firstWindow();
-    await expect(page.locator('.row:not([hidden])').first()).toBeVisible();
+    // Not the 10 s `expect` limit: no verdict here is a time, and at 100 % sampled load the first
+    // row of this fixture once took longer than that to be drawn (E04-M01-S06, 2026-11-04).
+    await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
     await body(page);
   } finally {
     await close(application);
