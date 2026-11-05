@@ -3,26 +3,32 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { _electron as electron, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
 
-import { RefKind, UNKNOWN_INDEX } from '../../src/contracts/index';
+import { FailureKind, RefKind, UNKNOWN_INDEX } from '../../src/contracts/index';
 import type { BranchSelection, GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
-import { fixture } from './support/fixtures';
+import { fixture, withOwnProfile } from './support/fixtures';
 
 /**
  * A branch selection, driven through the bridge of the built application, reaches
  * git and is kept.
  *
- * No control applies a selection yet (that is E03-M01-S10), so every case here
- * calls `window.gitGraphical` the way that control will: `refresh` with a
- * `selection` to apply one, `refresh({})` and `loadMoreCommits` to read again
- * under it, `openRepository` with `showRemoteBranches` to open without remote
- * branches. Each reply is drawn with the view's own `showPage`, in the order the
+ * The Branches dropdown applies a selection since E03-M01-S10, and
+ * `branches-dropdown.spec.ts` drives it. The cases here go beneath it and call
+ * `window.gitGraphical` as the dropdown does — `refresh` with a `selection` to
+ * apply one — so that they can also send requests together and set their replies
+ * racing on cue, read again under a selection with `refresh({})` and
+ * `loadMoreCommits`, and open without remote branches with `openRepository` and
+ * `showRemoteBranches`. Each reply is drawn with the view's own `showPage`, in the order the
  * replies arrive, as the renderer draws them, and the window is photographed into
  * this run's output directory after each selection so that what was drawn can be
  * looked at.
+ *
+ * Every launch is on a user-data directory of its own (`withOwnProfile`,
+ * `./support/fixtures.ts`), so a selection kept by an earlier run is not what the
+ * first page opens on, and none applied here is kept past the case.
  *
  * The repository is the `remotes` fixture (`test/fixtures/generate.ts`): a trunk
  * of 5 000 commits on `main`, `feature` and `topic` cut from its end, `topic`
@@ -152,19 +158,17 @@ function gitLog(revisions: readonly string[], count: number): string[] {
     .filter((line) => line.length > 0);
 }
 
-/** Launch the built application on the fixture, run `body` once the first page is drawn, stop it. */
+/**
+ * Launch the built application on the fixture, on a user-data directory of its own,
+ * run `body` once the first page is drawn, and stop it.
+ */
 async function withWindow(body: (page: Page) => Promise<void>): Promise<void> {
-  const application = await electron.launch({ args: ['.', where], cwd: repositoryRoot });
-  try {
+  await withOwnProfile({ open: where }, async (application) => {
     const page = await application.firstWindow();
     await expect(page.locator(MORE)).toBeVisible();
     await page.evaluate(installSummariser);
     await body(page);
-  } finally {
-    const child = application.process();
-    await application.close();
-    expect(child.exitCode === null && !child.killed).toBe(false);
-  }
+  });
 }
 
 /** Send one step, photograph what was drawn, and return its reply. */
@@ -321,4 +325,43 @@ test('a selection racing a load more and a refresh ends on the selection asked f
       expect(kept.names).toEqual(gitLog([TOPIC], FIRST_PAGE_COMMITS));
     }
   });
+});
+
+/** How many times the race below is run in one window. */
+const RACES = 3;
+
+test('a selection overtaken by a later one is dropped when its reply would arrive last', async () => {
+  test.setTimeout(SLOW_TEST_MS);
+  const info = test.info();
+  // The earlier selection reads a first page of `feature`; the later one names no
+  // branch, so the utility process runs no log for it (`selectsAnyRevision` in
+  // `src/adapters/git-commands.ts`) and its read ends first. That order is what
+  // the drop of an overtaken selection in `select` (`src/app/repository-host.ts`,
+  // `open.selectedBy > ticket`) is for: without it the earlier reply is applied
+  // and drawn after the later one, and the selection read again is the earlier.
+  // Measured by E04-M01-S04 on 2026-11-04 through this pair sent together: the
+  // earlier one was answered cancelled and the later one drawn in 50 of 50 rounds,
+  // 40 of them with every five-second sample of processor load at 100 %; with that
+  // clause removed this case went red in 2 of 2 runs. The slice document has the
+  // rest of the readings.
+  const earlier = select(FEATURE);
+  const later: Step = { call: 'refresh', selection: { branches: [], showRemoteBranches: true } };
+  let dropped = 0;
+  await withWindow(async (page) => {
+    for (let round = 0; round < RACES; round += 1) {
+      await one(page, everyBranch(true), info);
+      const replies = await page.evaluate(drive, { steps: [earlier, later], together: true });
+      const last = replies.filter((reply) => reply.ok).at(-1);
+      expect([last?.step, last?.names]).toEqual([1, []]);
+      const kept = await one(page, { call: 'refresh' }, info);
+      expect(kept.names).toEqual([]);
+      dropped += replies.filter(
+        (reply) => !reply.ok && reply.step === 0 && reply.kind === FailureKind.Cancelled,
+      ).length;
+    }
+  });
+  // At least one round ran the race this case is about, the earlier reply's read
+  // ending after the later one was applied, so the case cannot pass on rounds
+  // that only ever read in the order they were asked.
+  expect(dropped).toBeGreaterThan(0);
 });

@@ -1,15 +1,20 @@
+import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { ElectronApplication } from '@playwright/test';
+
 import { generateRepository, readSpecification } from '../../fixtures/generate';
 import { removeDirectory, removeOldStores, verifiedCopy } from '../../fixtures/shared-store';
 
 /**
  * The fixture repositories of the end-to-end suites that open repositories, and
- * the rules that let any number of runs on one machine share them.
+ * the rules that let any number of runs on one machine share them; and, at the
+ * end, {@link withOwnProfile}, which launches the application on a user-data
+ * directory of its own.
  *
  * `open-repository.spec.ts`, `superseded-reply.spec.ts`, `stale-load-more.spec.ts`,
  * `open-scroll.spec.ts` and `refresh-control.spec.ts` build their repositories
@@ -114,5 +119,180 @@ export function ownFixture(name: string, shape: string, commits: number): string
 export function removeOwnFixtures(): void {
   for (const parent of own.splice(0)) {
     removeDirectory(parent);
+  }
+}
+
+/**
+ * Fail unless `child` has exited: a leaked process is a failure of the gate
+ * whatever the assertions said.
+ */
+function requireExited(child: ChildProcess): void {
+  if (child.exitCode === null && !child.killed) {
+    throw new Error('the application was asked to close and its process is still running');
+  }
+}
+
+/** What {@link withOwnProfile} launches with: a folder to open, and an environment. */
+export interface Launch {
+  /** The folder named on the command line, or none for the empty window. */
+  readonly open?: string;
+  /** The whole environment of the application, or this process's when absent. */
+  readonly env?: Record<string, string>;
+}
+
+/**
+ * Launch the built application on a user-data directory of its own, run `body`
+ * against it, stop it, require its process gone, and remove the directory.
+ *
+ * **Why every suite of the `application` project launches through this.** The
+ * application keeps what a person chose under its user-data directory: the theme
+ * in a file `theme` (`src/app/theme.ts`) and a branch selection per repository in
+ * a folder `branch-selections` (`src/app/selections.ts`), and it reads the theme
+ * back at every start and a repository's selection at every open. Launched with
+ * no `--user-data-dir`, it uses the profile of whoever runs the suite, so a
+ * choice that person left there carries into the run, and a selection a case
+ * applies is kept in their profile after it. A directory of its own per launch
+ * keeps both out: nothing is read that the case did not put there, and nothing it
+ * keeps outlives it.
+ *
+ * **The line the isolation hinges on** is the `--user-data-dir` argument below.
+ * No case reads which profile it ran on, so a suite launched without it again
+ * stays green: E04-M01-S04 put `branch-selection.spec.ts` back on the default
+ * profile, and the suite passed while that profile's `branch-selections` folder
+ * was written. What holds the isolation is a digest of the default profile taken
+ * before and after a full `npm run gates:e2e`, as that slice's audit records. A
+ * launch that does not come through here — a second `electron.launch` written
+ * into a case, or an instance the case starts by itself — is not covered by this
+ * function, and only that digest would show it.
+ *
+ * **Nothing is removed under a running application.** A profile removed while
+ * the application still runs makes its next write fail, and a failed write
+ * raises a *Not kept* message box (`sayUnkept`, `src/app/window.ts`). So the
+ * directory goes only after the process has exited ({@link ended}), never from a
+ * hook that runs beside a case Playwright stopped waiting for; and every
+ * message box the application asks for while the case runs is held and recorded
+ * instead of shown ({@link holdMessageBoxes}), and fails the case.
+ *
+ * The directory is made fresh for each launch under the system's temporary
+ * directory and removed once the process has exited, whatever `body` did; a case
+ * that needs two launches to share one profile (a choice kept across a restart)
+ * passes `--user-data-dir` itself, as `theme.spec.ts` and `selection-kept.spec.ts`
+ * do. Playwright is imported here when the launch is asked for, not when the
+ * module loads, because the Vitest suites of `perf/` and `test/fixtures/` import
+ * this module for {@link fixture} and run no Playwright at all.
+ */
+export async function withOwnProfile<T>(
+  launch: Launch,
+  body: (application: ElectronApplication) => Promise<T>,
+): Promise<T> {
+  const { _electron: electron } = await import('@playwright/test');
+  const home = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-profile-'));
+  let child: ChildProcess | undefined;
+  try {
+    const args = ['.', ...(launch.open === undefined ? [] : [launch.open])];
+    const application = await electron.launch({
+      args: [...args, `--user-data-dir=${home}`],
+      cwd: repositoryRoot,
+      ...(launch.env === undefined ? {} : { env: launch.env }),
+    });
+    // Taken before the close, because `process()` reaches through a connection
+    // that closing tears down.
+    child = application.process();
+    try {
+      await application.evaluate(holdMessageBoxes);
+      const value = await body(application);
+      requireNoMessageBox(await application.evaluate(readMessageBoxes));
+      return value;
+    } finally {
+      await application.close();
+      requireExited(child);
+    }
+  } finally {
+    // The line the teardown's order hinges on: the directory goes only once the
+    // process that could still write into it has ended.
+    if (child !== undefined) await ended(child);
+    removeDirectory(home);
+  }
+}
+
+/** How long {@link ended} waits for the application to exit before it stops it. */
+const EXIT_WAIT_MS = 10_000;
+
+/**
+ * Settle once `child` has exited, stopping it if it has not within
+ * {@link EXIT_WAIT_MS}: it is this run's own process, launched by
+ * {@link withOwnProfile}, and its profile is about to be removed.
+ */
+async function ended(child: ChildProcess): Promise<void> {
+  const gone = (): boolean => child.exitCode !== null || child.signalCode !== null;
+  const exit = (within: number): Promise<void> =>
+    new Promise((resolve) => {
+      if (gone()) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(resolve, within);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  await exit(EXIT_WAIT_MS);
+  if (!gone()) {
+    child.kill();
+    await exit(EXIT_WAIT_MS);
+  }
+}
+
+/** The main-process side of {@link holdMessageBoxes}: the messages asked for. */
+interface MessageBoxScope {
+  messageBoxesAsked?: string[];
+}
+
+/**
+ * Runs in the main process: replace the message boxes of Electron's `dialog`
+ * with a recorder that shows nothing and answers as if OK were pressed.
+ *
+ * A box the application raises while a case runs — the *Not kept* warning of
+ * `sayUnkept` (`src/app/window.ts`), when a write into the profile fails — would
+ * otherwise appear on the screen of whoever runs the suite and stay there until
+ * they press OK; one did, during a test run on 2026-11-04. Recorded instead, it
+ * is a failure of the case ({@link requireNoMessageBox}), since no case launched
+ * here expects one; a case that does replaces `dialog.showMessageBox` itself, as
+ * `theme.spec.ts` does. Installed once the application has started, so a box
+ * raised before that is not caught: the application raises none before a choice
+ * is written (`src/app/theme.ts`, `src/app/selections.ts`).
+ */
+function holdMessageBoxes(electronModule: { dialog: object }): void {
+  const asked: string[] = [];
+  Object.assign(globalThis as MessageBoxScope, { messageBoxesAsked: asked });
+  const said = (options: unknown): string =>
+    String((options as { message?: unknown } | undefined)?.message ?? options);
+  const optionsOf = (args: unknown[]): unknown =>
+    args.find((each) => typeof each === 'object' && each !== null && 'message' in each);
+  Object.assign(electronModule.dialog, {
+    showMessageBox: (...args: unknown[]) => {
+      asked.push(said(optionsOf(args)));
+      return Promise.resolve({ response: 0, checkboxChecked: false });
+    },
+    showMessageBoxSync: (...args: unknown[]) => {
+      asked.push(said(optionsOf(args)));
+      return 0;
+    },
+    showErrorBox: (title: string, content: string) => {
+      asked.push(`${title}: ${content}`);
+    },
+  });
+}
+
+/** Runs in the main process: the messages {@link holdMessageBoxes} recorded. */
+function readMessageBoxes(): string[] {
+  return (globalThis as MessageBoxScope).messageBoxesAsked ?? [];
+}
+
+/** Fail if the application asked for any message box while the case ran. */
+function requireNoMessageBox(asked: readonly string[]): void {
+  if (asked.length > 0) {
+    throw new Error(`the application asked for a message box: ${asked.join(' | ')}`);
   }
 }
