@@ -1,6 +1,13 @@
 import { createGitRepositoryReader } from '../adapters/git-repository-reader';
 import { FailureKind } from '../contracts/index';
-import type { BranchSelection, GraphPage, Result } from '../contracts/index';
+import type {
+  BranchSelection,
+  CommitDetails,
+  DetailsTarget,
+  GraphPage,
+  Result,
+  UncommittedDetails,
+} from '../contracts/index';
 import { createLayoutState, layoutPage } from '../core/layout/index';
 import type { LayoutState } from '../core/layout/index';
 import { addPage, continuesBlock, createRowBlock, FIRST_PAGE_COMMITS } from '../core/page/index';
@@ -332,8 +339,35 @@ async function select(
   return assemble(selected, read.value);
 }
 
+/**
+ * Read the details of `target` in the open repository, on request and never
+ * otherwise: nothing an open, a refresh or a load more does reads them.
+ *
+ * They are read from the repository the state holds, and dropped like a page if
+ * a different repository was opened while they were read, so the window is never
+ * handed the details of a folder it no longer shows. A branch selection applied
+ * meanwhile does not drop them: it changes which commits a page holds, not what a
+ * commit is.
+ */
+async function details(target: DetailsTarget): Promise<Result<CommitDetails | UncommittedDetails>> {
+  const repository = open;
+  if (repository === null) {
+    return failed(FailureKind.Cancelled, 'No repository is open, so there are no details to read.');
+  }
+  const read = await reader.readDetails({ repositoryPath: repository.path, target });
+  if (open?.ticket !== repository.ticket) {
+    return failed(
+      FailureKind.Cancelled,
+      'Another repository was opened while these details were being read, so this reply was dropped.',
+    );
+  }
+  return read;
+}
+
 /** The answer to one request, as a value; nothing here throws at the caller. */
-async function answer(request: RepositoryRequest): Promise<Result<GraphPage | ReaderDescription>> {
+async function answer(
+  request: RepositoryRequest,
+): Promise<Result<GraphPage | ReaderDescription | CommitDetails | UncommittedDetails>> {
   switch (request.kind) {
     case 'open':
       return openRepository(request.path, request.selection);
@@ -343,6 +377,8 @@ async function answer(request: RepositoryRequest): Promise<Result<GraphPage | Re
       return refresh(request.selection);
     case 'describe':
       return reader.describe();
+    case 'details':
+      return details(request.target);
   }
 }
 

@@ -7,6 +7,8 @@ import type {
   ChooseFolderResponse,
   ChooseThemeRequest,
   ChooseThemeResponse,
+  DetailsRequest,
+  DetailsResponse,
   GitGraphicalBridge,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
@@ -42,6 +44,8 @@ const bridge: GitGraphicalBridge = {
     request<LoadMoreCommitsResponse>(CHANNELS.loadMoreCommits, loadRequest),
   refresh: (refreshRequest: RefreshRequest): Promise<RefreshResponse> =>
     request<RefreshResponse>(CHANNELS.refresh, refreshRequest),
+  commitDetails: (detailsRequest: DetailsRequest): Promise<DetailsResponse> =>
+    request<DetailsResponse>(CHANNELS.commitDetails, detailsRequest),
   applicationInfo: (): Promise<ApplicationInfoResponse> =>
     request<ApplicationInfoResponse>(CHANNELS.applicationInfo),
   themeChoice: (): Promise<ThemeChoiceResponse> =>

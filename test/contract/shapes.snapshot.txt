@@ -29,9 +29,17 @@ interface BranchSelection {
     readonly showRemoteBranches: boolean
 }
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info" | "theme:choice" | "theme:choose"
+interface ChangedFile {
+    readonly additions: number | null
+    readonly deletions: number | null
+    readonly oldPath: string | null
+    readonly path: string
+    readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
+}
+
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "application:info" | "theme:choice" | "theme:choose"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
 
@@ -61,6 +69,30 @@ interface CommitColumns {
     readonly subjects: string
 }
 
+interface CommitDetails {
+    readonly author: DetailsPerson
+    readonly committer: DetailsPerson
+    readonly files: readonly ChangedFile[]
+    readonly hash: string
+    readonly message: string
+    readonly parents: readonly string[]
+}
+
+interface DetailsPerson {
+    readonly email: string
+    readonly name: string
+    readonly offsetMinutes: number
+    readonly time: number
+}
+
+interface DetailsRequest {
+    readonly target: { readonly kind: "commit"; readonly hash: string; } | { readonly kind: "uncommitted"; }
+}
+
+type DetailsResponse = import("./result").Failure | import("./result").Success<import("./commit-details").CommitDetails | import("./commit-details").UncommittedDetails>
+
+type DetailsTarget = { readonly kind: "commit"; readonly hash: string; } | { readonly kind: "uncommitted"; }
+
 interface Failure {
     readonly exitCode?: number
     readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
@@ -71,10 +103,13 @@ interface Failure {
 type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
 value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly Cancelled: "cancelled"; }
 
+type FileStatus = "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
+
 interface GitGraphicalBridge {
     readonly applicationInfo: () => Promise<ApplicationInfoResponse>
     readonly chooseFolder: () => Promise<ChooseFolderResponse>
     readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>
+    readonly commitDetails: (request: DetailsRequest) => Promise<DetailsResponse>
     readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
     readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
@@ -188,6 +223,10 @@ interface ThemeSetting {
 
 value UNKNOWN_INDEX: 4294967295
 
+interface UncommittedDetails {
+    readonly files: readonly ChangedFile[]
+}
+
 interface WorkingTree {
     readonly changedFileCount: number
     readonly hasChanges: boolean
@@ -207,9 +246,13 @@ value commitCount: (columns: CommitColumns) => number
 
 value committerOf: (columns: CommitColumns, row: number) => Person
 
+value detailsTargetOf: (value: unknown) => DetailsTarget | null
+
 value hexHashOf: (columns: CommitColumns, row: number) => string
 
 value isChecked: (menu: BranchMenu, name: string) => boolean
+
+value isObjectName: (text: unknown) => boolean
 
 value keptSelection: (value: unknown) => BranchSelection | null
 

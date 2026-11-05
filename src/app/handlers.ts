@@ -7,6 +7,10 @@ import type {
   ChooseFolderResponse,
   ChooseThemeRequest,
   ChooseThemeResponse,
+  CommitDetails,
+  DetailsRequest,
+  DetailsResponse,
+  DetailsTarget,
   GraphPage,
   LoadMoreCommitsRequest,
   OpenRepositoryRequest,
@@ -15,6 +19,7 @@ import type {
   Result,
   StartupRepositoryResponse,
   ThemeChoiceResponse,
+  UncommittedDetails,
 } from '../contracts/index';
 import type { ReaderDescription } from '../ports/index';
 
@@ -26,12 +31,15 @@ import type { ThemeStore } from './theme';
  * Every channel of `src/contracts/ipc.ts`, answered.
  *
  * This is the whole of what the main process does with a repository: it
- * forwards. Four of the eight channels are a message to the utility process and
- * its answer handed back unchanged; one is a folder dialog, which only a process
- * that owns a window can show; one is a string read off the command line at
- * startup; and two read and set the colour scheme, which is the application's
- * and not a repository's (`./theme.ts`). No git process is started here, nothing
- * is parsed here, and nothing here waits on anything but another process's reply
+ * forwards. Five of the nine channels are a message to the utility process and
+ * its answer handed back unchanged, a commit's details among them; one is a
+ * folder dialog, which only a process that owns a window can show; one is a
+ * string read off the command line at startup; and two read and set the colour
+ * scheme, which is the application's and not a repository's (`./theme.ts`). A
+ * request for details is forwarded unchecked, because the reader checks it
+ * (`detailsTargetOf` of `src/contracts/commit-details.ts`). No git process is
+ * started here, nothing is parsed here, and nothing here waits on anything but
+ * another process's reply
  * or the write of a few bytes of settings, which is what
  * `docs/ADR-0002-architecture-and-performance.md` decision 2 requires of the
  * process that owns the window.
@@ -152,6 +160,16 @@ function registerRepositoryHandlers(context: HandlerContext): void {
     CHANNELS.loadMoreCommits,
     (_event: unknown, request: LoadMoreCommitsRequest): Promise<Result<GraphPage>> =>
       context.client.ask<GraphPage>({ kind: 'load-more', count: request.count }),
+  );
+
+  ipcMain.handle(
+    CHANNELS.commitDetails,
+    (_event: unknown, request: DetailsRequest | undefined): Promise<DetailsResponse> =>
+      context.client.ask<CommitDetails | UncommittedDetails>({
+        kind: 'details',
+        // Forwarded unchecked, because it came from the page and the reader checks it.
+        target: request?.target as DetailsTarget,
+      }),
   );
 
   ipcMain.handle(

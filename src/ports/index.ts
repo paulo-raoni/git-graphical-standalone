@@ -6,6 +6,7 @@
  * inside it, so a module can be split without a change at every call site.
  */
 export type {
+  DetailsQuery,
   PageRequest,
   ReaderDescription,
   RepositoryPage,

@@ -1,6 +1,11 @@
 import type { BranchSelection } from '../contracts/index';
 import { isRefName } from '../core/page/index';
-import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse/index';
+import {
+  COMMIT_DETAILS_FORMAT,
+  COMMIT_LOG_FORMAT,
+  REFERENCE_FORMAT,
+  STASH_FORMAT,
+} from '../core/parse/index';
 
 /**
  * Every git invocation this application makes, in one place.
@@ -253,4 +258,63 @@ export function statusArgs(repositoryPath: string): string[] {
     '--untracked-files=all',
     '-z',
   ];
+}
+
+/**
+ * The options both reads of changed files share, after the revisions they are
+ * given: the changed files as `--raw` entries and `--numstat` line counts, every
+ * path ended by a NUL (`-z`) and written as it is, renames detected (`-M`).
+ *
+ * And `--no-relative`, because with `diff.relative=true` a repository opened from
+ * a folder inside it lists only the files under that folder, by paths relative
+ * to it: git 2.51.0 listed `in.txt` alone for a commit that changed `out.txt` and
+ * `sub/in.txt`, run from `sub`, and both by their whole paths with the option
+ * (measured by E04-M01-S06 on a scratch repository). Two settings that look as
+ * though they need the same were measured and do not: a `diff.<driver>.textconv`
+ * changed a patch and left `--numstat`'s counts as they were, in `log` and in
+ * `diff`, and `notes.displayRef` added nothing to a `--format` that does not ask
+ * for `%N` (same measurement).
+ */
+const CHANGED_FILE_OPTIONS = ['--raw', '--numstat', '-z', '-M', '--no-relative'];
+
+/**
+ * Read one commit's details, its changed files with them, in one process.
+ *
+ * The log of `hash` alone (`-1`), its header in {@link COMMIT_DETAILS_FORMAT}
+ * with raw dates and the identities as git recorded them (`--no-use-mailmap`,
+ * as a page reads them). The changed files are against the first parent
+ * (`--diff-merges=first-parent`, an option git documents from 2.31, so a merge
+ * lists what it brought to the branch it was made on) and against the empty
+ * tree for a root commit (`--root`: with `log.showRoot=false`, git 2.51.0
+ * printed a root commit with no changed file at all without it, and every file
+ * as added with it; measured by E04-M01-S06 on a scratch repository).
+ *
+ * `hash` is put on the command line only once `detailsTargetOf` of
+ * `src/contracts/commit-details.ts` has found it a full object name, so it can
+ * never be read as an option.
+ */
+export function commitDetailsArgs(repositoryPath: string, hash: string): string[] {
+  return [
+    ...baseArgs(repositoryPath),
+    'log',
+    '-1',
+    `--format=${COMMIT_DETAILS_FORMAT}`,
+    '--date=raw',
+    '--no-use-mailmap',
+    '--root',
+    '--diff-merges=first-parent',
+    ...CHANGED_FILE_OPTIONS,
+    hash,
+    '--',
+  ];
+}
+
+/**
+ * Read the uncommitted changes of every tracked path: the working tree, staged or
+ * not, against `base`, which is HEAD's commit as the status named it, or the
+ * empty tree when HEAD has none yet (`src/core/parse/uncommitted-files.ts`).
+ * Untracked files are the status's to list (`statusArgs`).
+ */
+export function uncommittedDiffArgs(repositoryPath: string, base: string): string[] {
+  return [...baseArgs(repositoryPath), 'diff', ...CHANGED_FILE_OPTIONS, base, '--'];
 }

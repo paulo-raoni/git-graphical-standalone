@@ -12,12 +12,14 @@ import type { RepositoryPage } from '../ports/index';
 import { fixtureAt, gitLines, hexAt, refNameAt } from './fixtures.spec-support';
 import * as commands from './git-commands';
 import {
+  commitDetailsArgs,
   commitLogArgs,
   PARSING_CONFIGURATION,
   referenceArgs,
   repositoryProbeArgs,
   stashArgs,
   statusArgs,
+  uncommittedDiffArgs,
 } from './git-commands';
 import { createGitRepositoryReader } from './git-repository-reader';
 import { referenceFixtureAt } from './reference-fixtures.spec-support';
@@ -278,6 +280,8 @@ function exportedLists(where: string): readonly (readonly [string, readonly stri
     ['referenceArgs, remote branches hidden', referenceArgs(where, false), 'for-each-ref'],
     ['stashArgs', stashArgs(where), 'stash'],
     ['statusArgs', statusArgs(where), 'status'],
+    ['commitDetailsArgs', commitDetailsArgs(where, '0'.repeat(40)), 'log'],
+    ['uncommittedDiffArgs', uncommittedDiffArgs(where, '0'.repeat(40)), 'diff'],
   ];
 }
 
