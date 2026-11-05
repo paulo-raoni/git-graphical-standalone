@@ -199,21 +199,42 @@ reading's own tree, a run of this suite on this machine cannot be free unless th
 40 %. In the minute before each of the 30 it was 25.0 to 38.5 %, and a game client took about 16 % of the
 machine in each per-process reading.
 
-**What is decided, and what is not.** No limit has changed: `playwright.config.js` is as it was at Base. The rule
-this slice works to raises a limit only for a case that times out under load and not on a free machine, and to
-the smallest value that held every saturated run. Neither half is measured under the measure as written. What the
-readings do show: in the 34 runs of 2026-11-05 whose others averaged 53.5 to 85.6 %, no case ran out of a limit
-(33 green, and the one red above); the limits ran out only in the five runs at 97 % or more. Before that, the
-three runs on a free machine had not been taken because the machine was never free while this lane sampled it:
-of the 3 214 samples it took, all but 12 of them five seconds apart,
-between 21:49 on 2026-11-04 and 06:14 on 2026-11-05, 7 read a processor load under 75 %, the lowest 38.0 %, and
-in the half hour it watched for a free minute, from 05:45 to 06:14, no minute averaged under 77 % (the stretches
-between its runs were not all sampled), and a run that timed out says only that the wait needed more than
-its limit, not how much more. Two readings of the four runs bear on that choice and are recorded for whoever
-takes it. Of the 23 cases, 20 ran out only at a limit the configuration sets, and 3 ran out at least once at a
-limit set elsewhere: the 180 s of `selection-kept.spec.ts` for two of its cases, and Playwright's 30 s action wait
-in a case of `branches-dropdown.spec.ts`, both suites outside this boundary. And the set of cases that ran out changed from one run
-to the next at the same load, from 1 to 16, so three saturated readings bound nothing about the fourth.
+**The three free runs: the orchestrator's ruling.** No run of this suite can meet `AGENTS.md` §11's free measure
+on this machine (above), and 35 runs taken while waiting did not change that. On 2026-11-05 the orchestrator ruled
+that the 30 runs of 13:14 to 17:14, whose minute before was free (25.0 to 38.5 %) and whose load outside the run's
+own tree during the run was 53.5 to 62.0 %, stand in for scope 3's three free runs, and that no further run of the
+suite is taken. They ran under more load than a free machine would carry, and no case of them ran out of a limit.
+That a case green under that load is green on a free machine is an inference, not a reading: none was taken free.
+Before those runs, session 1 had watched for a free machine as well: of the 3 214 samples it took between 21:49
+on 2026-11-04 and 06:14 on 2026-11-05 (all but 12 of them five seconds apart), 7 read a processor load under 75 %,
+the lowest 38.0 %, and from 05:45 to 06:14 no minute averaged under 77 % (the stretches between its runs were not
+all sampled).
+
+**The decision: no limit changes.** `playwright.config.js` is as it was at Base. The readings behind it, all from
+the runs above:
+
+- Limits ran out only in the five runs with others at 97 % or more (four of session 1 and the run of 07:23 on
+  2026-11-05, all on a machine already saturated when they started), and the set of cases that ran out changed from
+  run to run at that load, from 1 to 16 of 64, so a limit raised for the cases of one run would not have held the
+  next.
+- In the 34 runs of 2026-11-05 whose others averaged 53.5 to 85.6 %, no case ran out of a limit: 33 were green, and
+  the one red was an assertion (above), not a limit.
+- The orchestrator's ruling is that no gate of this project is read at 97 % load or more, which is the load at
+  which limits ran out.
+
+A run that timed out says only that a wait needed more than its limit, not how much more. Of the 23 cases that ran
+out in session 1's four runs, 20 ran out only at a limit the configuration sets and 3 ran out at least once at a
+limit set elsewhere (the cases listed below), so a raise decided in this lane could not have made three saturated
+runs green.
+
+**Found outside this lane.** Listed for the orchestrator, who carries them; this lane changed none:
+
+- the 180 s `describe.configure` of `selection-kept.spec.ts`, which ran out for two of its cases under load;
+- Playwright's 30 s action wait in a case of `branches-dropdown.spec.ts`, which ran out once under load;
+- the fixed 300 ms wait before the canvas compare at line 222 of `theme.spec.ts`, behind the one red in 34 runs at
+  moderate load;
+- the order "wait for the application to exit, then remove the profile", which `withOwnProfile` has and
+  `theme.spec.ts` and `selection-kept.spec.ts` lack (the `EPERM` of the latter's `afterAll`, above).
 
 ## The row-budget case's polls
 
