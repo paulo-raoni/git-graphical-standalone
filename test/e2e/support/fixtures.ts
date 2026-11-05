@@ -165,6 +165,14 @@ export interface Launch {
  * into a case, or an instance the case starts by itself — is not covered by this
  * function, and only that digest would show it.
  *
+ * **Nothing is removed under a running application.** A profile removed while
+ * the application still runs makes its next write fail, and a failed write
+ * raises a *Not kept* message box (`sayUnkept`, `src/app/window.ts`). So the
+ * directory goes only after the process has exited ({@link ended}), never from a
+ * hook that runs beside a case Playwright stopped waiting for; and every
+ * message box the application asks for while the case runs is held and recorded
+ * instead of shown ({@link holdMessageBoxes}), and fails the case.
+ *
  * The directory is made fresh for each launch under the system's temporary
  * directory and removed once the process has exited, whatever `body` did; a case
  * that needs two launches to share one profile (a choice kept across a restart)
@@ -179,6 +187,7 @@ export async function withOwnProfile<T>(
 ): Promise<T> {
   const { _electron: electron } = await import('@playwright/test');
   const home = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-profile-'));
+  let child: ChildProcess | undefined;
   try {
     const args = ['.', ...(launch.open === undefined ? [] : [launch.open])];
     const application = await electron.launch({
@@ -188,14 +197,102 @@ export async function withOwnProfile<T>(
     });
     // Taken before the close, because `process()` reaches through a connection
     // that closing tears down.
-    const child = application.process();
+    child = application.process();
     try {
-      return await body(application);
+      await application.evaluate(holdMessageBoxes);
+      const value = await body(application);
+      requireNoMessageBox(await application.evaluate(readMessageBoxes));
+      return value;
     } finally {
       await application.close();
       requireExited(child);
     }
   } finally {
+    // The line the teardown's order hinges on: the directory goes only once the
+    // process that could still write into it has ended.
+    if (child !== undefined) await ended(child);
     removeDirectory(home);
+  }
+}
+
+/** How long {@link ended} waits for the application to exit before it stops it. */
+const EXIT_WAIT_MS = 10_000;
+
+/**
+ * Settle once `child` has exited, stopping it if it has not within
+ * {@link EXIT_WAIT_MS}: it is this run's own process, launched by
+ * {@link withOwnProfile}, and its profile is about to be removed.
+ */
+async function ended(child: ChildProcess): Promise<void> {
+  const gone = (): boolean => child.exitCode !== null || child.signalCode !== null;
+  const exit = (within: number): Promise<void> =>
+    new Promise((resolve) => {
+      if (gone()) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(resolve, within);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  await exit(EXIT_WAIT_MS);
+  if (!gone()) {
+    child.kill();
+    await exit(EXIT_WAIT_MS);
+  }
+}
+
+/** The main-process side of {@link holdMessageBoxes}: the messages asked for. */
+interface MessageBoxScope {
+  messageBoxesAsked?: string[];
+}
+
+/**
+ * Runs in the main process: replace the message boxes of Electron's `dialog`
+ * with a recorder that shows nothing and answers as if OK were pressed.
+ *
+ * A box the application raises while a case runs — the *Not kept* warning of
+ * `sayUnkept` (`src/app/window.ts`), when a write into the profile fails — would
+ * otherwise appear on the screen of whoever runs the suite and stay there until
+ * they press OK; one did, during a test run on 2026-11-04. Recorded instead, it
+ * is a failure of the case ({@link requireNoMessageBox}), since no case launched
+ * here expects one; a case that does replaces `dialog.showMessageBox` itself, as
+ * `theme.spec.ts` does. Installed once the application has started, so a box
+ * raised before that is not caught: the application raises none before a choice
+ * is written (`src/app/theme.ts`, `src/app/selections.ts`).
+ */
+function holdMessageBoxes(electronModule: { dialog: object }): void {
+  const asked: string[] = [];
+  Object.assign(globalThis as MessageBoxScope, { messageBoxesAsked: asked });
+  const said = (options: unknown): string =>
+    String((options as { message?: unknown } | undefined)?.message ?? options);
+  const optionsOf = (args: unknown[]): unknown =>
+    args.find((each) => typeof each === 'object' && each !== null && 'message' in each);
+  Object.assign(electronModule.dialog, {
+    showMessageBox: (...args: unknown[]) => {
+      asked.push(said(optionsOf(args)));
+      return Promise.resolve({ response: 0, checkboxChecked: false });
+    },
+    showMessageBoxSync: (...args: unknown[]) => {
+      asked.push(said(optionsOf(args)));
+      return 0;
+    },
+    showErrorBox: (title: string, content: string) => {
+      asked.push(`${title}: ${content}`);
+    },
+  });
+}
+
+/** Runs in the main process: the messages {@link holdMessageBoxes} recorded. */
+function readMessageBoxes(): string[] {
+  return (globalThis as MessageBoxScope).messageBoxesAsked ?? [];
+}
+
+/** Fail if the application asked for any message box while the case ran. */
+function requireNoMessageBox(asked: readonly string[]): void {
+  if (asked.length > 0) {
+    throw new Error(`the application asked for a message box: ${asked.join(' | ')}`);
   }
 }
