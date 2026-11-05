@@ -159,10 +159,10 @@ others), and Playwright's 30 s wait for an action. `branches-dropdown.spec.ts`, 
 **What is decided, and what is not.** No limit has changed: `playwright.config.js` is as it was at Base. The rule
 this slice works to raises a limit only for a case that times out under load and not on a free machine, and to
 the smallest value that held every saturated run. Neither half is measured yet: the three runs on a free machine
-have not been taken, because the machine was never free while this lane sampled it: of the samples it took
-between 21:49 on 2026-11-04 and 05:45 on 2026-11-05, all but one read a processor load of 83.9 % or more, and
-the one, 38.0 % at 01:08:47, sat between readings of 88.0 and 100 % (the stretches between its runs were not all
-sampled), and a run that timed out says only that the wait needed more than
+have not been taken, because the machine was never free while this lane sampled it: of the 3 214 five-second samples it took
+between 21:49 on 2026-11-04 and 06:14 on 2026-11-05, 7 read a processor load under 75 %, the lowest 38.0 %, and
+in the half hour it watched for a free minute, from 05:45 to 06:14, no minute averaged under 77 % (the stretches
+between its runs were not all sampled), and a run that timed out says only that the wait needed more than
 its limit, not how much more. Two readings of the four runs bear on that choice and are recorded for whoever
 takes it. Of the 23 cases, 20 ran out only at a limit the configuration sets, and 3 ran out at least once at a
 limit set elsewhere: the 180 s of `selection-kept.spec.ts` for two of its cases, and Playwright's 30 s action wait
