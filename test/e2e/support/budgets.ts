@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { _electron as electron, expect } from '@playwright/test';
@@ -15,6 +17,7 @@ import {
   installRedrawCounter,
   installStateReader,
   installTimerCounters,
+  readInstalled,
   readProbe,
 } from './budgets-page';
 import type { PaintMark, PaintState } from './budgets-page';
@@ -55,6 +58,10 @@ export interface Budgeted {
    * ended by itself, `application.process()` can no longer be asked.
    */
   readonly launched: ChildProcess;
+  /** The user-data directory made for this launch, removed by {@link closeBudgeted}. */
+  readonly home: string;
+  /** Whether the first window was reloaded because an init script missed its first document. */
+  readonly reloaded: boolean;
 }
 
 /** What to launch with: a folder, an environment, and Chromium switches. */
@@ -64,57 +71,140 @@ export interface LaunchOptions {
   readonly switches?: readonly string[];
 }
 
+/** The init scripts of `./budgets-page.ts`, in the order they are added and run. */
+const INIT_SCRIPTS = [
+  installProbe,
+  installStateReader,
+  installPaintMarks,
+  installTimerCounters,
+  installRedrawCounter,
+] as const;
+
 /**
- * Launch the built application as the other end-to-end suites do, with the five
- * init scripts of `./budgets-page.ts` added to its browser context before its
- * first window exists, and refuse the launch if any of them ran after the
- * renderer had.
- *
- * `electron.launch` holds the application's `ready` event until Playwright has
- * connected, and `src/app/main.ts` opens the window from `ready`, so a script
- * added here is in place for the first document. That is an account of
- * Playwright's launcher, so it is not trusted: every init script records
- * whether the renderer's view already existed when it ran, and a launch where
- * one did is failed here rather than measured.
+ * The renderer's document of `page` once its view exists, and what the init
+ * scripts recorded in it. Polled from here, with the page's own timers left
+ * alone, because a wait run in the page would be counted by the probe.
  */
-export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budgeted> {
-  const args = [
-    '.',
-    ...(options.open === undefined ? [] : [options.open]),
-    ...(options.switches ?? []),
-  ];
-  const launchedAt = Date.now();
-  const application = await electron.launch({
-    args,
-    cwd: repositoryRoot,
-    ...(options.env === undefined ? {} : { env: options.env }),
-  });
-  const context = application.context();
-  for (const script of [
-    installProbe,
-    installStateReader,
-    installPaintMarks,
-    installTimerCounters,
-    installRedrawCounter,
-  ]) {
-    await context.addInitScript(script);
+async function installedInView(page: Page): Promise<readonly boolean[] | null> {
+  const until = Date.now() + 60_000;
+  for (;;) {
+    const installed = await page.evaluate(readInstalled).catch(() => null);
+    if (installed?.view === true) {
+      return installed.beforeRenderer;
+    }
+    if (Date.now() > until) {
+      throw new Error('the renderer never published its view');
+    }
+    await page.waitForTimeout(20);
   }
-  const page = await application.firstWindow();
-  const installed = await page.evaluate(readProbe);
-  expect(installed.beforeRenderer).toEqual([true, true, true, true, true]);
-  return { application, page, launchedAt, launched: application.process() };
 }
 
 /**
- * Close the application, unless it has already ended by itself, and require the
- * process Playwright started to have exited.
+ * Launch the built application as the other end-to-end suites do, on a
+ * user-data directory of its own, with the five init scripts of
+ * `./budgets-page.ts` in its first window's document before `renderer.js` runs,
+ * and refuse the launch if any of them ran after the renderer had.
+ *
+ * **The scripts can reach the first document late, so a first window that
+ * missed one is reloaded.** `electron.launch` does hold the application's
+ * `ready` until Playwright has connected, but it also releases it before it
+ * returns: Playwright 1.63.0's launcher calls `__playwright_run()` in the main
+ * process from `ElectronApplication.initialize()`, inside the launch (E03-M01's
+ * review round 07 read it, and this lane read it again in
+ * `node_modules/playwright-core/lib/coreBundle.js`). `src/app/main.ts` opens the
+ * window from `whenReady`, so the window can be loading while the five
+ * `addInitScript` calls below are still on their way, and a script that arrives
+ * after the document was created runs only in the next one. E03-M01-FIX-05 saw
+ * a first window with four. Every script is in place once its call has
+ * resolved, so the document of a reload after the last one holds all five,
+ * whatever the order of events before. The reload is only made when one is
+ * missing, because a reload delays the first painted state a start case times;
+ * `budgets-start.spec.ts` times no launch that {@link Budgeted.reloaded}.
+ *
+ * Every init script records whether the renderer's view already existed when it
+ * ran; this reads that in the document that has the view, after the reload if
+ * there was one, and a launch where any is missing or late is failed here, the
+ * application closed and its directory removed, rather than measured.
+ *
+ * **The user-data directory is made for the launch and removed by
+ * {@link closeBudgeted}** (E04-M01-S05), so that a choice the application
+ * keeps, a colour scheme or a branch selection, is never read from another
+ * suite's run or from the person's own profile, and nothing is left behind.
+ */
+export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budgeted> {
+  const home = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-budgets-'));
+  const args = [
+    '.',
+    ...(options.open === undefined ? [] : [options.open]),
+    `--user-data-dir=${home}`,
+    ...(options.switches ?? []),
+  ];
+  const launchedAt = Date.now();
+  let application: ElectronApplication;
+  try {
+    application = await electron.launch({
+      args,
+      cwd: repositoryRoot,
+      ...(options.env === undefined ? {} : { env: options.env }),
+    });
+  } catch (error) {
+    removeHome(home);
+    throw error;
+  }
+  const launched = application.process();
+  try {
+    const context = application.context();
+    for (const script of INIT_SCRIPTS) {
+      await context.addInitScript(script);
+    }
+    const page = await application.firstWindow();
+    const first = await installedInView(page);
+    const reloaded = !allBeforeRenderer(first);
+    if (reloaded) {
+      process.stdout.write(
+        `    the first document holds init scripts ${JSON.stringify(first)}: reloaded\n`,
+      );
+      await page.reload();
+    }
+    const installed = reloaded ? await installedInView(page) : first;
+    // Five, written out: a script dropped from the list must fail here, not shrink the check.
+    expect(installed).toEqual([true, true, true, true, true]);
+    return { application, page, launchedAt, launched, home, reloaded };
+  } catch (error) {
+    await application.close().catch(() => undefined);
+    removeHome(home);
+    throw error;
+  }
+}
+
+/** Whether every init script ran, and ran before the renderer. */
+function allBeforeRenderer(installed: readonly boolean[] | null): boolean {
+  return installed?.length === INIT_SCRIPTS.length && installed.every((before) => before);
+}
+
+/**
+ * Remove a launch's user-data directory. Retried, because on Windows a file an
+ * exited process held can stay locked for a moment.
+ */
+function removeHome(home: string): void {
+  rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+}
+
+/**
+ * Close the application, unless it has already ended by itself, require the
+ * process Playwright started to have exited, and remove the launch's user-data
+ * directory.
  */
 export async function closeBudgeted(budgeted: Budgeted): Promise<void> {
   const child = budgeted.launched;
-  if (child.exitCode === null) {
-    await budgeted.application.close();
+  try {
+    if (child.exitCode === null) {
+      await budgeted.application.close();
+    }
+    expect(child.exitCode === null && !child.killed).toBe(false);
+  } finally {
+    removeHome(budgeted.home);
   }
-  expect(child.exitCode === null && !child.killed).toBe(false);
 }
 
 /** Run `body` against a launched application, and close it whatever happens. */
@@ -263,13 +353,23 @@ export function described(values: readonly number[], digits = 0): string {
  * Hold `measured` to the entry `key` of `perf/baselines.json`, under the regime
  * this run is in, and print the verdict. **Every end-to-end budget reaches the
  * ratchet through the `compareInRegime` call in this function.**
+ *
+ * With `discarded` set the comparison is made and printed as `DISCARDED` in place
+ * of `FAIL` or `ok`, because the reading it comes from does not count either way
+ * (`budgets-frames.spec.ts`, its reference bound); the caller does not assert it.
  */
-export function holdToBaseline(key: string, name: string, measured: number): Comparison {
+export function holdToBaseline(
+  key: string,
+  name: string,
+  measured: number,
+  discarded = false,
+): Comparison {
   const baseline = baselines[key];
   if (baseline === undefined) {
     throw new Error(`perf/baselines.json has no entry named ${key}`);
   }
   const comparison = compareInRegime(name, measured, baseline);
-  process.stdout.write(`  ${comparison.failed ? 'FAIL' : 'ok  '} ${comparison.message}\n`);
+  const verdict = discarded ? 'DISCARDED' : comparison.failed ? 'FAIL' : 'ok  ';
+  process.stdout.write(`  ${verdict} ${comparison.message}\n`);
   return comparison;
 }

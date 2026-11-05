@@ -11,11 +11,14 @@ import type { GitGraphicalBridge, GraphPage } from '../../../src/contracts/index
  *
  * The five `install…` functions are **init scripts**: added to the
  * application's browser context by `launchBudgeted` in `./budgets.ts` straight
- * after launch, in the order they are declared, so that they run in every
- * document before `renderer.js` does. Installed any later they would miss what
- * the renderer registered while mounting, which is exactly where a polling loop
- * would be written. Each records whether the renderer's view already existed
- * when it ran, and the suites refuse a reading taken after it did.
+ * after launch, in the order they are declared, so that they run in a document
+ * before `renderer.js` does. Installed any later they would miss what the
+ * renderer registered while mounting, which is exactly where a polling loop
+ * would be written. They can reach the first document late, because the launch
+ * has already let the application open its window when they are added, so
+ * `launchBudgeted` reloads a first window that missed one (its comment says
+ * why). Each records whether the renderer's view already existed when it ran,
+ * and the suites refuse a reading taken after it did.
  *
  * ### What "painted" means here
  *
@@ -279,6 +282,55 @@ export function readProbe(): ProbeReading {
     redraws: probe.redraws,
     beforeRenderer: [...probe.beforeRenderer],
   };
+}
+
+/**
+ * Runs in the page: whether the renderer's view is in this document, and what
+ * the init scripts recorded in it, without assuming any of them ran: none
+ * recorded when the first, the probe itself, did not.
+ */
+export function readInstalled(): { view: boolean; beforeRenderer: boolean[] } {
+  const scope = globalThis as unknown as Partial<Scope>;
+  const before = scope.budgetProbe?.beforeRenderer ?? [];
+  return { view: 'gitGraphicalView' in scope, beforeRenderer: [...before] };
+}
+
+/**
+ * Runs in the page: wait until every timeout, animation frame and idle callback
+ * the page has asked for has run, and has stayed so through two rendering
+ * updates in a row; then return the canvas redraws counted. It throws after
+ * `limit` milliseconds.
+ *
+ * This replaces a fixed wait before reading a count (E04-M01-S05). A fixed wait
+ * reads whatever had run by then, so a callback that runs later, such as a frame
+ * a regression asks for a while after each scroll event, is not counted and the
+ * count reads green. Here a callback that was asked for is waited for, however
+ * late. The updates are waited through on the page's own scheduler as the probe
+ * took it before counting, so the waiting is not counted itself. Two updates,
+ * because a scroll written in one update is dispatched as an event in the next
+ * one's scroll steps, before its animation-frame callbacks: by the end of the
+ * second update with nothing pending, every scroll written before the wait began
+ * has been dispatched, and whatever its listener asked for has run.
+ *
+ * What it cannot wait for is a callback asked for after two quiet updates, by
+ * something that was not itself a callback the probe counts, such as a reply
+ * arriving from the main process; no case that reads a count after a scroll is
+ * waiting for one.
+ */
+export async function wakeupsSettled(limit: number): Promise<number> {
+  const scope = globalThis as unknown as Scope;
+  const probe = scope.budgetProbe;
+  const started = scope.performance.now();
+  const kinds = ['setTimeout', 'requestAnimationFrame', 'requestIdleCallback'];
+  const pending = (): boolean =>
+    kinds.some((kind) => (probe.registered[kind] ?? 0) !== (probe.fired[kind] ?? 0));
+  for (let quiet = 0; quiet < 2; quiet = pending() ? 0 : quiet + 1) {
+    await new Promise((done) => probe.frame(done));
+    if (scope.performance.now() - started > limit) {
+      throw new Error(`the page still had callbacks pending after ${String(limit)} ms`);
+    }
+  }
+  return probe.redraws;
 }
 
 /** Runs in the page: switch marking on or off, and forget the marks taken. */
