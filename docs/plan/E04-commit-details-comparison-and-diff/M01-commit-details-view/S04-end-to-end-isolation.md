@@ -70,10 +70,10 @@ which worktree's copy of Electron each was:
 
 | run | lane commit | content digest | write digest | launches on the default profile seen during the run |
 | --- | --- | --- | --- | --- |
-| 1 | `8ae298e` | changed | changed | the review's and E04-M01-S06's worktrees, both at this slice's Base, from 00:23 to 00:50; none from this worktree. Sampled from 00:23 only, 27 minutes into the run |
-| 2 | `1df96e3` | unchanged | unchanged | four from this worktree, 02:54 to 02:56; E04-M01-S06's |
-| 3 | `1df96e3` | unchanged | unchanged | four from this worktree, 03:26 to 03:27; another project's |
-| 4 | `1df96e3` | unchanged | unchanged | four from this worktree, 04:22 to 04:26; another project's |
+| 1 | `8f45d71` | changed | changed | the review's and E04-M01-S06's worktrees, both at this slice's Base, from 00:23 to 00:50; none from this worktree. Sampled from 00:23 only, 27 minutes into the run |
+| 2 | `c243c48` | unchanged | unchanged | four from this worktree, 02:54 to 02:56; E04-M01-S06's |
+| 3 | `c243c48` | unchanged | unchanged | four from this worktree, 03:26 to 03:27; another project's |
+| 4 | `c243c48` | unchanged | unchanged | four from this worktree, 04:22 to 04:26; another project's |
 
 The four launches of this worktree in runs 2 to 4 fall in the minutes the three untagged cases of
 `budgets-frames.spec.ts` and `budgets-git.spec.ts` and the one of `golden-graph.spec.ts` ran, the four cases that
@@ -82,6 +82,14 @@ the evidence available: the record was already 74 bytes, not the 59 found at the
 other worktrees at Base, whose `branch-selection.spec.ts` writes that record, launched on the default profile
 during it. A run that went across an edit of `withOwnProfile`, and one cut off when the session running it ended,
 are not counted.
+
+On 2026-11-05, 35 further full runs (*The suite's limits under load*, below), from 07:23 to 17:14, all at
+`819609b`, whose tree is the tree of `cd53626` and whose test files are those of `c243c48`: both digests were
+unchanged around each of the 35. The `git-graphical-standalone-profile-*` directories `withOwnProfile` makes were
+counted in the system's temporary directory after them: one was left, made on 2026-11-04 at 23:01 local time
+(02:01 UTC, 2026-11-05) during the run that went across the edit of `withOwnProfile`, and none from the 35.
+(Commit hashes in this document are those of the lane after its messages were reworded on 2026-11-05; each
+replaced commit kept its tree.)
 
 **The probe.** `branch-selection.spec.ts` alone, put back on the default profile by a launch without
 `--user-data-dir` and run on its own on 2026-11-04 at 23:28 to 23:36: the suite passed, 5 of 5, and both digests
@@ -119,10 +127,11 @@ Two other pairs were tried and not kept: with the later selection naming a branc
 runs a log, the order held in 7 of 10 rounds; with the earlier one naming 1 500 branches that do not exist besides
 `feature`, it held in 10 of 10, at about seven seconds a round.
 
-In the three runs of the whole gate under load on `1df96e3` (below) the case passed each time, in 58 s, 1.1 min
-and 2.1 min; in the run on `8ae298e`, with a load of this lane's own added, it failed at its first page's
-ten-second wait, before any race was sent. No round was read on a free machine: the machine was never free
-(*Wall-clock gates on a shared machine*, `AGENTS.md` §11) while this lane sampled it.
+In the three runs of the whole gate under load on `c243c48` (below) the case passed each time, in 58 s, 1.1 min
+and 2.1 min; in the run on `8f45d71`, with a load of this lane's own added, it failed at its first page's
+ten-second wait, before any race was sent. In the 35 runs of 2026-11-05 it passed each time, in 9.5 to 35.7 s.
+No round was read on a free machine: no run of this lane was free (*Wall-clock gates on a shared machine*,
+`AGENTS.md` §11; the readings are below).
 
 **With the clause removed** from the built application, the case went red in 2 of 2 runs, the page drawn last
 being the earlier selection's 300 commits; restored, the whole suite passed in 2 of 2 runs.
@@ -139,12 +148,16 @@ other lanes' gates).
 
 | run | lane commit | time | load (others) | red | the limits that ran out |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `8ae298e` | 62.3 min | 99.5 % from 00:23 (busy 100 %), own load added | 15 | test 60 s ×7, test 180 s ×2, `expect` 10 s ×6 |
-| 2 | `1df96e3` | 37.2 min | 99.0 % (busy 95.1 to 100 %) | 1 | `expect` 10 s ×1 |
-| 3 | `1df96e3` | 42.0 min | 99.1 % (busy 99.2 to 100 %) | 4 | `expect` 10 s ×2, test 60 s ×1, test 180 s ×1 |
-| 4 | `1df96e3` | 61.8 min | 99.4 % (busy 83.9 to 100 %) | 16 | test 60 s ×6, test 180 s ×1, `expect` 10 s ×7, `expect.poll` 10 s ×1, action 30 s ×1 |
+| 1 | `8f45d71` | 62.3 min | 99.5 % from 00:23 (busy 100 %), own load added | 15 | test 60 s ×7, test 180 s ×2, `expect` 10 s ×6 |
+| 2 | `c243c48` | 37.2 min | 99.0 % (busy 95.1 to 100 %) | 1 | `expect` 10 s ×1 |
+| 3 | `c243c48` | 42.0 min | 99.1 % (busy 99.2 to 100 %) | 4 | `expect` 10 s ×2, test 60 s ×1, test 180 s ×1 |
+| 4 | `c243c48` | 61.8 min | 99.4 % (busy 83.9 to 100 %) | 16 | test 60 s ×6, test 180 s ×1, `expect` 10 s ×7, `expect.poll` 10 s ×1, action 30 s ×1 |
 
-This run's own tree had 0.5 to 1.0 % of the machine on average in each. The cases that ran out were different
+This run's own tree was sampled at 0.5 to 1.0 % of the machine on average in each, which undercounts it: the
+process table misses every process that starts and ends between two samples, and the time a process spent before
+its first sample, and a run of this suite starts about 2 500 processes (counted on 2026-11-05 with a job object,
+below, where the run's own share was 17.8 to 19.0 % at a lower load). So the "others" column above holds some of
+the run's own load, by an amount not measured. The cases that ran out were different
 from run to run: 23 distinct cases over the four, in 9 of the 14 files of the project that launch the application;
 13 of them ran out in one run, 7 in two, 3 in three and none in all four. Run 2's one was the first page of
 `branch-selection.spec.ts`'s first case; runs 3 and 4 were mostly `selection-kept.spec.ts`, `theme.spec.ts`, `branches-dropdown.spec.ts` and `refresh-control.spec.ts`.
@@ -156,10 +169,43 @@ that ran out is set elsewhere: a case's own `test.setTimeout`, or `test.describe
 others), and Playwright's 30 s wait for an action. `branches-dropdown.spec.ts`, `selection-kept.spec.ts` and
 `theme.spec.ts` are outside this slice's boundary.
 
+**On 2026-11-05, waiting for a free machine.** 35 more full runs at `819609b`, each started only after a check
+that no command line named `gates:budgets` or `--project=budgets`, none with a load of this lane's own:
+
+| runs | UTC | how load was read | minute before (average) | during the run, others (average; highest sample) | time | red |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 07:23 to 07:39 | process table, about every 2.5 s | 100.0 % | 97.1 %; 100 % | 15.4 min | 1: `selection-kept.spec.ts:329`, `expect` 10 s |
+| 4 | 12:16 to 13:08 | process table, about every 2.5 s | 32.2 to 41.7 % | 70.8 to 85.6 %; 92.0 to 99.9 % | 6.6 to 8.7 min | none |
+| 30 | 13:14 to 17:14 | job object, about every 2 s | 25.0 to 38.5 % | 53.5 to 62.0 %; 72.6 to 100 % | 6.1 to 7.1 min | 1, not a limit (below) |
+
+The first was started on a busy machine by a fault of this lane's waiting script, which read a minute it could not
+parse as free; it is kept as a loaded reading. The review's `gates:budgets` run began at 12:17:39, a minute after
+the first of the four, and ran beside this lane's run, which was not stopped, to about 12:30. For the
+30, the run was started inside a Windows job object and its own time read from the job's accounting, which counts
+every process the run starts, including those that end between two samples (about 2 500 a run); the run's own
+share was 17.8 to 19.0 % of the machine on average. Total load was read from the system's idle time. The one red
+of the 30, at 15:04 to 15:10, was *Dark and Light override the preference at once, keeping the scroll and the
+page* in `theme.spec.ts`, outside this boundary: the canvas compared at line 222, after a fixed 300 ms wait, was
+not the canvas read before the switch. That is an assertion, not a limit running out.
+
+**Why none of them was free.** In each of the 30 the minute before was free and the run was not: others
+averaged 17.0 to 31.3 points more during the run than in the minute before it, and the next run's minute before
+was free again. Some of that is load the run itself causes
+outside its own tree. Sampling every process every ten seconds during the second of the 30 showed the virus scanner
+(`MsMpEng`) at 13.8 % of the machine and `svchost` at 6.6 % on average, against 1.6 % for the scanner in one
+ten-second reading at rest at 12:58, and 5.6 % and 1.4 % over two minutes at rest at 17:15. That the rest of the
+rise also comes from the run is an inference. By `AGENTS.md` §11's measure, which counts all load outside the
+reading's own tree, a run of this suite on this machine cannot be free unless the load at rest is well under
+40 %. In the minute before each of the 30 it was 25.0 to 38.5 %, and a game client took about 16 % of the
+machine in each per-process reading.
+
 **What is decided, and what is not.** No limit has changed: `playwright.config.js` is as it was at Base. The rule
 this slice works to raises a limit only for a case that times out under load and not on a free machine, and to
-the smallest value that held every saturated run. Neither half is measured yet: the three runs on a free machine
-have not been taken, because the machine was never free while this lane sampled it: of the 3 214 samples it took, all but 12 of them five seconds apart,
+the smallest value that held every saturated run. Neither half is measured under the measure as written. What the
+readings do show: in the 34 runs of 2026-11-05 whose others averaged 53.5 to 85.6 %, no case ran out of a limit
+(33 green, and the one red above); the limits ran out only in the five runs at 97 % or more. Before that, the
+three runs on a free machine had not been taken because the machine was never free while this lane sampled it:
+of the 3 214 samples it took, all but 12 of them five seconds apart,
 between 21:49 on 2026-11-04 and 06:14 on 2026-11-05, 7 read a processor load under 75 %, the lowest 38.0 %, and
 in the half hour it watched for a free minute, from 05:45 to 06:14, no minute averaged under 77 % (the stretches
 between its runs were not all sampled), and a run that timed out says only that the wait needed more than
