@@ -26,18 +26,24 @@ literal 16.7 ms frame check and the bound on a reading's reference time the owne
 | S05 | budgets and the reference bound | 2 | The literal 16.7 ms frame check, a reading whose reference time is out of bound discarded, the launch race closed and the fixed waits replaced. |
 | S06 | commit details read | 2 | The details of a commit and of the uncommitted changes, with every changed file, its status and its line counts, read from git on request and handed to the window. |
 | S07 | fixture store and gate messages | 3 | The fixture store's numbering held and its sentences true, and the licences and commits gates' messages and range held by checks. |
-| S08 | stash rows | 3 | Every stash a row of the graph, drawn as a stash, whose details list its untracked files. |
+| S08 | stash rows and rounded lines | 3 | Every stash a row of the graph, drawn as a stash, whose details list its untracked files; every change of lane drawn as a smooth curve. |
 | S09 | the details panel | 4 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
 | S10 | the changed files | 5 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
 | S11 | keyboard navigation | 6 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
 | S12 | panel size, place and options | 7 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
+| S13 | unkept choice said without blocking | 3 | A choice that cannot be kept is said by a notice inside the window that blocks nothing, in place of a message box. |
 
 **Owner's rulings of 2026-11-02:** the stash rows of E01-M02 come into this milestone, because a stash's details
 need its row (S08); and every setting `docs/PLAN.md` §2 names for E04-M01 is built with its alternative values and
 a control in the view to choose them (S10, S12), which the settings UI of E02-M03 later takes over.
 
+**Added on 2026-11-04 from the owner's report:** the graph's lane changes are drawn as straight diagonals, which the
+owner found crooked (a screenshot of the `remotes` fixture); S08 draws them as curves. And the message box S03
+added for a choice that cannot be kept appeared during a test run and blocked the owner's screen until dismissed;
+S13 replaces it with a notice inside the window, and E04-M01-S04 finds the case that made a write fail.
+
 **The orchestrator's choices, for the owner to overrule:** the control is a settings button on the panel's own
-strip; a choice that cannot be kept is said in a message box on the window (S03); the Show Remote Branches
+strip; a choice that cannot be kept is said in the window (S03, then without blocking, S13); the Show Remote Branches
 checkbox shows neither state before the first page (S03); a branch name git refuses is refused before git runs
 (S02); and the end-to-end limits move only on a measurement under load (S04).
 
