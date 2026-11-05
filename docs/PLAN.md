@@ -304,6 +304,11 @@ the uncommitted changes row, or from the control bar.
 
 Standalone-only: the extension had the Marketplace for this.
 
+- Right-clicking a folder in the operating system's file manager offers to open it in the application, which
+  opens that folder's repository as if it had been named on the command line (E02-M01). → M01 on Windows, M02
+  elsewhere. Asked for by the owner on 2026-11-04; the editor host had no counterpart, so it has no reference
+  behaviour to observe.
+
 | ID | title | outcome |
 | --- | --- | --- |
 | E07-M01 | Windows build | An installer and a portable build with the application's own icon and version. |
