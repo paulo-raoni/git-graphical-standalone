@@ -34,6 +34,26 @@ export {
 } from './reference-records';
 export type { ReferenceParser } from './reference-records';
 
+export { createChangedFilesParser, finishChangedFiles, pushChangedFiles } from './changed-files';
+export type { ChangedFilesParser } from './changed-files';
+
+export {
+  COMMIT_DETAILS_FORMAT,
+  createCommitDetailsParser,
+  finishCommitDetails,
+  pushCommitDetails,
+} from './commit-details';
+export type { CommitDetailsParser } from './commit-details';
+
+export {
+  createUncommittedStatusParser,
+  EMPTY_TREE,
+  finishUncommittedStatus,
+  pushUncommittedStatus,
+  uncommittedDetailsOf,
+} from './uncommitted-files';
+export type { UncommittedStatusParser } from './uncommitted-files';
+
 export {
   buildWorkingTree,
   createStatusParser,

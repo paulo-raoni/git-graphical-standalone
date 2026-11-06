@@ -1,3 +1,4 @@
+import type { DetailsRequest, DetailsResponse } from './commit-details';
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
@@ -40,6 +41,11 @@ export interface GitGraphicalBridge {
    * or apply the selection the request carries and answer its first page.
    */
   readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>;
+  /**
+   * Read the details of one commit of the open repository, named by its full
+   * object name, or of its uncommitted changes, from git, at each call.
+   */
+  readonly commitDetails: (request: DetailsRequest) => Promise<DetailsResponse>;
   /** Report the application's own versions. */
   readonly applicationInfo: () => Promise<ApplicationInfoResponse>;
   /** Report the colour scheme in force. */

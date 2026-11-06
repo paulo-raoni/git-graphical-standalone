@@ -41,13 +41,17 @@ export interface FixtureSpecification {
   readonly stepSeconds: number;
   readonly zone: string;
   readonly repositories: readonly FixtureRepository[];
+  /** The steps a repository is built from in place of a shape's code, by its name. */
+  readonly scripts?: Readonly<Record<string, readonly FixtureStep[]>>;
 }
 
-interface Clock {
-  seconds: number;
-  readonly step: number;
-  readonly zone: string;
-}
+/**
+ * One step of a repository the specification spells out: git run with `args`,
+ * reading `input`'s lines on its standard input, each ended by a line feed.
+ */
+export type FixtureStep = { readonly args: readonly string[]; readonly input?: readonly string[] };
+
+type Clock = { seconds: number; readonly step: number; readonly zone: string };
 
 /** The only variables inherited: enough to start git, nothing that identifies. */
 const INHERITED = ['PATH', 'Path', 'SystemRoot', 'windir', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP'];
@@ -281,6 +285,29 @@ function remotes(workspace: Workspace, count: number): void {
   dirtyWorkingTree(workspace, 0);
 }
 
+/**
+ * A repository the specification spells out as git commands, one after another,
+ * rather than as code here: a repository whose name `specification.json`'s
+ * `scripts` holds steps for is built from them, whatever its shape says, and
+ * names the shape `script` to say so. The `details` repository is one: a
+ * `fast-import` stream that writes every name, identity, date and message exactly
+ * as they are spelt there, then its working tree's changes, restored from a commit
+ * of that stream whose reference is deleted once they are. The stream is run with
+ * `core.protectNTFS` off because the history holds `quote"mark.txt` and
+ * `question?.txt`, names Windows refuses: with it on, git 2.51.0 on Windows
+ * refused the first as an invalid path (measured by E04-M01-S06), and with it off
+ * it writes both into the history, and checking out a tree without them writes
+ * them into no working tree. No clock is read, so `firstSecond` moves none of its
+ * object names.
+ */
+function scripted(steps: readonly FixtureStep[]): (workspace: Workspace, count: number) => void {
+  return (workspace) => {
+    for (const step of steps) {
+      git(workspace, step.args, step.input?.map((line) => `${line}\n`).join(''));
+    }
+  };
+}
+
 const SHAPES = new Map<string, (workspace: Workspace, count: number) => void>([
   ['linear', linearCommits],
   ['branch-and-merge', branchAndMerge],
@@ -308,23 +335,25 @@ export function generateRepository(
   repository: FixtureRepository,
   specification: FixtureSpecification,
 ): void {
-  const build = SHAPES.get(repository.shape);
+  const steps = specification.scripts?.[repository.name];
+  const build = steps === undefined ? SHAPES.get(repository.shape) : scripted(steps);
   if (build === undefined) {
     throw new Error(`no fixture shape named "${repository.shape}"`);
   }
   rmSync(directory, { recursive: true, force: true });
   mkdirSync(directory, { recursive: true });
-  const workspace: Workspace = {
-    directory,
-    identity: specification.identity,
-    clock: {
-      seconds: specification.firstSecond,
-      step: specification.stepSeconds,
-      zone: specification.zone,
-    },
-  };
+  const workspace = workspaceOf(directory, specification, specification.stepSeconds);
   git(workspace, ['init', '--quiet']);
   build(workspace, repository.commits);
+}
+
+/** A workspace on `directory`, its clock at the specification's first second and moving by `step`. */
+function workspaceOf(directory: string, spec: FixtureSpecification, step: number): Workspace {
+  return {
+    directory,
+    identity: spec.identity,
+    clock: { seconds: spec.firstSecond, step, zone: spec.zone },
+  };
 }
 
 /** Build every repository of the specification under `root`, and report where. */
@@ -370,17 +399,10 @@ export function fingerprintOf(
   directory: string,
   specification: FixtureSpecification,
 ): RepositoryFingerprint {
-  const workspace: Workspace = {
-    directory,
-    identity: specification.identity,
-    clock: { seconds: specification.firstSecond, step: 0, zone: specification.zone },
-  };
-  const refs = git(workspace, ['show-ref', '--head', '--dereference'])
-    .split('\n')
-    .filter((line) => line.length > 0);
-  const commits = git(workspace, ['rev-list', '--all', '--reflog'])
-    .split('\n')
-    .filter((line) => line.length > 0);
+  const workspace = workspaceOf(directory, specification, 0);
+  const linesOf = (text: string): string[] => text.split('\n').filter((line) => line.length > 0);
+  const refs = linesOf(git(workspace, ['show-ref', '--head', '--dereference']));
+  const commits = linesOf(git(workspace, ['rev-list', '--all', '--reflog']));
   return {
     refs,
     commitCount: commits.length,

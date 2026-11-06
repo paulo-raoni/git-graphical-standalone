@@ -49,6 +49,7 @@ describe('the fixture repositories', () => {
     expect(Object.keys(generated).sort()).toEqual([
       'branch-and-merge',
       'detached-head',
+      'details',
       'dirty-working-tree',
       'large',
       'linear',

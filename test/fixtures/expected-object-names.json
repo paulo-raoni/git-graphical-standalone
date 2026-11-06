@@ -86,5 +86,14 @@
     ],
     "commitCount": 5008,
     "commitDigest": "3122b2f3d9bb909d85139951c4615283bcdd1c7b9361ed516d4e29c03d005ec2"
+  },
+  "details": {
+    "refs": [
+      "0867b54499c3ea89cbcecde236e1a892169c38d2 HEAD",
+      "0867b54499c3ea89cbcecde236e1a892169c38d2 refs/heads/main",
+      "331e42f973fa1d46d968a7f1609a1b551574b3ff refs/heads/side"
+    ],
+    "commitCount": 6,
+    "commitDigest": "316d9c99e04a2906ed0e07e880c01652ef6c27bb777ab8f839e8fd58e6ed8e66"
   }
 }

@@ -1,4 +1,13 @@
-import type { BranchSelection, CommitColumns, Refs, Result, WorkingTree } from '../contracts/index';
+import type {
+  BranchSelection,
+  CommitColumns,
+  CommitDetails,
+  DetailsTarget,
+  Refs,
+  Result,
+  UncommittedDetails,
+  WorkingTree,
+} from '../contracts/index';
 
 /**
  * What the application needs from a repository, said without naming git.
@@ -53,6 +62,17 @@ export interface RepositoryPage {
   readonly hasMore: boolean;
 }
 
+/** Which details to read, and where. */
+export interface DetailsQuery {
+  /** A path inside the repository, as a page was read from. */
+  readonly repositoryPath: string;
+  /**
+   * A commit by its full object name, or the uncommitted changes. The reader
+   * checks it before anything of it reaches git, because it came from the page.
+   */
+  readonly target: DetailsTarget;
+}
+
 /** Where the program that reads repositories was found, and which one it is. */
 export interface ReaderDescription {
   /** The absolute path the reader is running. */
@@ -74,4 +94,10 @@ export interface RepositoryReader {
   describe(): Promise<Result<ReaderDescription>>;
   /** One page of the repository, or why it could not be read. */
   readPage(request: PageRequest): Promise<Result<RepositoryPage>>;
+  /**
+   * One commit's details or the uncommitted changes', or why they could not be
+   * read: a target that is neither, or a hash that is not a commit of the
+   * repository, is a failure.
+   */
+  readDetails(query: DetailsQuery): Promise<Result<CommitDetails | UncommittedDetails>>;
 }

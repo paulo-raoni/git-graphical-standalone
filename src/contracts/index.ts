@@ -91,6 +91,23 @@ export type { BranchEntry, BranchMenu } from './branch-menu';
  */
 export { keptSelection, openingSelection, survivingSelection } from './kept-selection';
 
+/**
+ * The details of one commit or of the uncommitted changes, asked for on their
+ * own channel, and the check a request from the page passes before any of it
+ * reaches a command line.
+ */
+export { detailsTargetOf, isObjectName } from './commit-details';
+export type {
+  ChangedFile,
+  CommitDetails,
+  DetailsPerson,
+  DetailsRequest,
+  DetailsResponse,
+  DetailsTarget,
+  FileStatus,
+  UncommittedDetails,
+} from './commit-details';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';
