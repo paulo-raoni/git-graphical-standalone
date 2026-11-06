@@ -114,8 +114,8 @@ a script recording the checkbox's state every frame from the document's start: i
 disabled from 234 and 264 ms, then unchecked and enabled from 7239 and 4871 ms, with nothing between (the machine
 was saturated by other projects' runs, which is why the first page took seconds). The end-to-end case holds the
 state where it lasts: a window started on no repository, which stays before its first page. The state after the
-first page is held by the cases that read the checkbox there, each requiring it not indeterminate as well as checked
-or unchecked as kept, since `toBeChecked` alone reads only the `checked` property: with
+first page is held by the cases that read the checkbox there, each requiring its accessibility snapshot to say
+checked or unchecked as kept, where an indeterminate box says `mixed` (`toBeChecked` reads only `checked`): with
 `shell.branches.remotes.indeterminate = false;` removed from `open`, two cases of `test/e2e/branches-dropdown.spec.ts`
 and five of `test/e2e/selection-kept.spec.ts` went red (E04-M01-FIX-01, 2026-11-06), where review round 01 had
 measured all 13 cases of the two files green without that line.
