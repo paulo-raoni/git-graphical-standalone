@@ -68,6 +68,18 @@ const remotes = (page: Page): Locator =>
 const entry = (page: Page, label: string): Locator =>
   list(page).getByRole('option', { name: label, exact: true });
 
+/**
+ * Require the checkbox to say `shown` after a first page, and not its third state.
+ * `toBeChecked` without options reads the `checked` property alone, which a box
+ * left indeterminate also carries; `{ indeterminate: true }` reads the third state
+ * itself, so its negation waits for the first page to clear it and fails while
+ * nothing does.
+ */
+async function expectRemotes(page: Page, shown: boolean): Promise<void> {
+  await expect(remotes(page)).not.toBeChecked({ indeterminate: true });
+  await expect(remotes(page)).toBeChecked({ checked: shown });
+}
+
 /** What {@link recordDrawn} touches in the page. `tsconfig.node.json` has no DOM library. */
 interface PageScope {
   readonly document: {
@@ -185,7 +197,7 @@ interface Shown {
 
 async function expectShown(page: Page, repository: string, shown: Shown): Promise<void> {
   await expect(text(page)).toHaveText(shown.box);
-  await expect(remotes(page)).toBeChecked({ checked: shown.remotes });
+  await expectRemotes(page, shown.remotes);
   await expectGraph(page, repository, { labels: shown.remotes, ...shown });
   await box(page).click();
   await expect.poll(() => list(page).getByRole('option').allTextContents()).toEqual(shown.listed);
@@ -267,7 +279,7 @@ test('each repository keeps its own selection', async () => {
   });
   await withWindow(other, home, async (page) => {
     await expect(text(page)).toHaveText('Show All');
-    await expect(remotes(page)).toBeChecked();
+    await expectRemotes(page, true);
     await expectGraph(page, other, { revisions: EVERY });
     await apply(page, 'uncheck');
     // This repository has no remote branch, so its graph does not change: what is
@@ -289,7 +301,7 @@ test('each repository keeps its own selection', async () => {
   await withWindow(remotesRepository, home, (page) =>
     expectShown(page, remotesRepository, { ...SHOW_ALL, ...feature }),
   );
-  await withWindow(other, home, (page) => expect(remotes(page)).not.toBeChecked());
+  await withWindow(other, home, (page) => expectRemotes(page, false));
 });
 
 test('a second instance open at once opens on what the first applied, without a stall', async () => {
