@@ -115,6 +115,36 @@ which are the rows of the two curves (counted by comparing the two inflated buff
 `renderer.js` measured 18 610 production bytes at Base and 18 696 at this lane's head, by `npm run gates:size`
 on 2026-11-07, against its budget of 19 456, which this lane did not change.
 
+## The frame budget
+
+The scrolled case of `test/e2e/budgets-frames.spec.ts` was read on 2026-11-07, at this lane's head (`11718fe`)
+and at Base's painter: the same tree with `src/ui/graph-canvas.ts`, `src/ui/geometry.ts` and
+`src/contracts/layout.ts` checked out from Base and built, the three source files this lane changed. The
+readings were interleaved, head then Base, three rounds, then a whole `npm run gates:budgets` at head. Each was
+started only after a minute whose other load averaged under 40 per cent with no sample over 75, and with no other
+gate run of this project listed. Load was sampled every 2 seconds from the operating system's process table: the
+idle process's processor time gave the machine's load, and the processor time of the reading's own processes,
+each known by its id and its creation time, was taken out of it.
+
+| reading | other load, minute before / during / highest | reference 95th percentile | mean per reference | fifth-slowest per reference | longest as timed |
+| --- | --- | --- | --- | --- | --- |
+| head, round 1 | 24.8 / 24.9 / 72.0 % | 4.7 ms, **discarded** | 4.649 | 6 | 7.4 |
+| Base, round 1 | 37.6 / 16.6 / 40.8 % | 3.8 ms, kept | 4.711 | 5.959 | 7.7 |
+| head, round 2 | 22.2 / 9.0 / 40.7 % | 3.2 ms, kept | 4.895 | 6.168 | 7.2 |
+| Base, round 2 | 13.8 / 9.8 / 33.3 % | 3.5 ms, kept | 4.994 | 6.038 | 7.3 |
+| head, round 3 | 15.3 / 8.4 / 27.9 % | 3.2 ms, kept | 4.947 | 6.072 | 6.8 |
+| Base, round 3 | 13.7 / 8.4 / 30.1 % | 3.2 ms, kept | 4.942 | 5.942 | 6.8 |
+| head, whole `gates:budgets` | 13.6 / 11.7 / 48.8 % | 3.7 ms, kept | 4.628 | 6 | 7.1 |
+
+All in milliseconds; the limits are 7.41 for the mean (baseline 4.94 times 1.5), 10.0365 for the fifth-slowest
+(6.691 times 1.5) and 16.7 for the longest frame as timed, the literal verdict. Every kept reading is green on all
+three verdicts, at head and at Base. Kept head readings read 4.628 to 4.947, 6 to 6.168 and 6.8 to 7.2; kept
+Base readings 4.711 to 4.994, 5.942 to 6.038 and 6.8 to 7.7. The two ranges overlap on every verdict, so these
+six kept readings show no cost of the curve that this case can tell from its own spread; they do not show that
+there is none. An earlier whole `gates:budgets` at head, at 08:24 UTC, read the scrolled case at 33.2 per cent
+other load before it and 42.4 during it, highest 86.0, with a reference percentile of 5.5 ms: not free and
+discarded on both counts.
+
 ## Sentences corrected
 
 - `src/contracts/layout.ts`: the vocabulary still holds no curves, because the buffer is unchanged; the comment
