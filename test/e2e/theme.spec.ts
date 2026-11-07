@@ -97,10 +97,14 @@ function freshHome(): string {
 }
 
 /**
- * A profile is removed only once every process that could write into it has
- * exited. A case that ran out leaves its application running while this hook
- * runs, and removing a profile under it met `EPERM` (E04-M01-S04, review round
- * 01). The line the order hinges on is the wait on {@link ended}.
+ * A profile is removed only once the main process, which writes the choices into
+ * it, has exited. A case that ran out leaves its application running while this
+ * hook runs (measured by E04-M01-S13 in every run of a case left to run out), and
+ * removing a profile under it met `EPERM` (E04-M01-S04, review round 01). The line
+ * the order hinges on is the wait on {@link ended}. What it does not hold: after a
+ * main process stopped by force, the application's other processes held the
+ * profile for over thirty seconds on a loaded machine in E04-M01-S13's runs, so the
+ * removal of such a case's profile can still fail.
  */
 test.afterEach(async () => {
   for (const child of children.splice(0)) await ended(child);

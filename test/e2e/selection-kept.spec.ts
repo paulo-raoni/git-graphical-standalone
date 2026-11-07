@@ -244,10 +244,11 @@ test.beforeAll(() => {
 });
 
 /**
- * The directories are removed only once every process that could write into them
- * has exited: a case that ran out can leave its applications running, and
- * removing a profile under one met `EPERM` (E04-M01-S04, review round 01). The
- * line the order hinges on is the wait on {@link ended}.
+ * The directories are removed only once the main processes, which write the
+ * selections into them, have exited: a case that ran out can leave its
+ * applications running, and removing a profile under one met `EPERM` (E04-M01-S04,
+ * review round 01). The line the order hinges on is the wait on {@link ended};
+ * what it does not hold is said beside the same wait in `theme.spec.ts`.
  */
 test.afterAll(async () => {
   for (const child of children.splice(0)) await ended(child);
