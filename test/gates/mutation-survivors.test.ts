@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Files, Mutant, ReportFile } from './report';
+import type { Files, Mutant, Position, ReportFile } from './report';
 import { fixture, gateModule } from './report';
 
 /**
@@ -14,7 +14,9 @@ import { fixture, gateModule } from './report';
  * added above a listed mutant turned the gate red on an unchanged guarantee.
  * These cases hold both halves: a listed survivor stays matched wherever its line
  * moves, and a survivor the list does not name, including a second copy of a
- * listed one, is refused.
+ * listed one, is refused. The text is read with every run of white space as one
+ * space (`originalOf`), so that a survivor whose text is reflowed keeps its key,
+ * and E04-M01-S07 added the case that holds it.
  *
  * `fixtures/survivor-run.json` holds the two files of S01's full run that carry
  * its two survivors, `src/contracts/bridge.ts` and `src/core/parse/bytes.ts`,
@@ -65,6 +67,32 @@ function withLineAbove(files: Files, key: string, line: number, text: string): F
   return { ...files, [key]: { source: lines.join('\n'), mutants } };
 }
 
+/**
+ * The run with a line break and `indent` spaces put into one file before `at`,
+ * every position at or after it moved as the source moved.
+ */
+function withBreakBefore(files: Files, key: string, at: Position, indent: number): Files {
+  const file = fileOf(files, key);
+  const lines = file.source.split('\n');
+  const line = lines[at.line - 1] ?? '';
+  lines.splice(
+    at.line - 1,
+    1,
+    line.slice(0, at.column - 1),
+    ' '.repeat(indent) + line.slice(at.column - 1),
+  );
+  const moved = (from: Position): Position => {
+    if (from.line > at.line) return { ...from, line: from.line + 1 };
+    if (from.line < at.line || from.column < at.column) return from;
+    return { line: from.line + 1, column: from.column - at.column + 1 + indent };
+  };
+  const mutants = file.mutants.map((mutant) => ({
+    ...mutant,
+    location: { start: moved(mutant.location.start), end: moved(mutant.location.end) },
+  }));
+  return { ...files, [key]: { source: lines.join('\n'), mutants } };
+}
+
 /** The run with one file's mutants changed by `change`. */
 function withMutants(
   files: Files,
@@ -105,6 +133,26 @@ describe('a listed survivor stays matched wherever its line moves', () => {
     const line = survivorOf(run, BRIDGE).location.start.line;
     const moved = withLineAbove(run, BRIDGE, line, "import type { RefreshRequest } from './ipc';");
     expect(against(moved).found).toEqual([]);
+  });
+
+  // The line this hinges on is `originalOf`'s `.replace(/\s+/g, ' ')` in
+  // `mutation-remeasure.js`: without it the reflowed text is a key the list does not hold.
+  it('matches the bytes loop condition with the text it replaces reflowed over two lines', () => {
+    const listed = survivorOf(run, BYTES);
+    const { end } = listed.location;
+    const operand = 'units.length';
+    const at = { line: end.line, column: end.column - operand.length };
+    const reflowed = withBreakBefore(run, BYTES, at, 6);
+    const lines = fileOf(reflowed, BYTES).source.split('\n');
+    expect([lines[at.line - 1]?.trimEnd(), lines[at.line]?.trim()]).toEqual([
+      '  for (let at = 0; at <',
+      'units.length; at += BATCH) {',
+    ]);
+    expect(survivorOf(reflowed, BYTES).location.end).toEqual({
+      line: end.line + 1,
+      column: 7 + operand.length,
+    });
+    expect(against(reflowed).found).toEqual([]);
   });
 });
 
