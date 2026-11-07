@@ -35,7 +35,8 @@ literal 16.7 ms frame check and the bound on a reading's reference time the owne
 | S14 | stash rows | 4 | Every stash a row of the graph, drawn as a stash, whose details list its untracked files; the details read on the git the setup states. |
 
 **Owner's rulings of 2026-11-02:** the stash rows of E01-M02 come into this milestone, because a stash's details
-need its row (S08); and every setting `docs/PLAN.md` §2 names for E04-M01 is built with its alternative values and
+need its row (S08 when ruled; S14 since the split of 2026-11-07); and every setting `docs/PLAN.md` §2 names
+for E04-M01 is built with its alternative values and
 a control in the view to choose them (S10, S12), which the settings UI of E02-M03 later takes over.
 
 **Added on 2026-11-04 from the owner's report:** the graph's lane changes are drawn as straight diagonals, which the
@@ -56,7 +57,7 @@ checkbox shows neither state before the first page (S03); a branch name git refu
 (S02); and the end-to-end limits move only on a measurement under load (S04).
 
 The reference behaviour of S09 and S10 was observed on 2026-10-25 (`.omc/observations`, not committed); the
-behaviour of S08, S11 and S12 and the alternative values of the settings need an observation of the reference
+behaviour of S14, S11 and S12 and the alternative values of the settings need an observation of the reference
 extension, or its Marketplace page where an observation cannot reach (keys, drags, the context menu), before
 their tasks are written (`AGENTS.md` §1, §7).
 
