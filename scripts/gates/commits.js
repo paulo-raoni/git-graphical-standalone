@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { repositoryRoot, report } from './tree.js';
 
@@ -46,8 +47,8 @@ const ATTRIBUTION = [
   { what: 'an emoji', pattern: /\p{Extended_Pictographic}/u },
 ];
 
-function git(args) {
-  return execFileSync('git', args, { cwd: repositoryRoot, encoding: 'utf8' });
+function git(args, repository = repositoryRoot) {
+  return execFileSync('git', args, { cwd: repository, encoding: 'utf8' });
 }
 
 /**
@@ -57,14 +58,17 @@ function git(args) {
  * which among those is only a tag on `HEAD` itself. `%(objecttype)` is `tag`
  * for an annotated tag only. `rev-parse` peels each to its commit.
  */
-function promotionTagsBehindHead() {
-  const names = git([
-    'for-each-ref',
-    '--merged=HEAD',
-    '--no-contains=HEAD',
-    '--format=%(objecttype) %(refname:strip=2)',
-    'refs/tags',
-  ])
+function promotionTagsBehindHead(repository) {
+  const names = git(
+    [
+      'for-each-ref',
+      '--merged=HEAD',
+      '--no-contains=HEAD',
+      '--format=%(objecttype) %(refname:strip=2)',
+      'refs/tags',
+    ],
+    repository,
+  )
     .split('\n')
     .map((line) => line.trim().split(' '))
     .filter(([type, name]) => type === 'tag' && PROMOTION_TAG.test(name ?? ''))
@@ -72,7 +76,10 @@ function promotionTagsBehindHead() {
   if (names.length === 0) {
     return [];
   }
-  const commits = git(['rev-parse', ...names.map((name) => `refs/tags/${name}^{commit}`)])
+  const commits = git(
+    ['rev-parse', ...names.map((name) => `refs/tags/${name}^{commit}`)],
+    repository,
+  )
     .split('\n')
     .map((line) => line.trim());
   return names.map((name, index) => ({ name, commit: commits[index] ?? '' }));
@@ -85,12 +92,15 @@ function promotionTagsBehindHead() {
  * than one means no tag is the latest by ancestry, and guessing could start the
  * range after commits it has to read, so the gate refuses instead.
  */
-function previousPromotion() {
-  const tags = promotionTagsBehindHead();
+function previousPromotion(repository) {
+  const tags = promotionTagsBehindHead(repository);
   if (tags.length === 0) {
     return { tag: undefined };
   }
-  const latest = git(['merge-base', '--independent', ...tags.map(({ commit }) => commit)])
+  const latest = git(
+    ['merge-base', '--independent', ...tags.map(({ commit }) => commit)],
+    repository,
+  )
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
@@ -102,13 +112,13 @@ function previousPromotion() {
   return { tag: named[0] };
 }
 
-function range() {
-  const given = process.argv[2] ?? process.env['GATE_COMMIT_RANGE'];
-  if (given !== undefined && given !== '') {
-    const source = process.argv[2] === undefined ? 'GATE_COMMIT_RANGE' : 'the argument';
-    return { selected: given, why: `${source} names it` };
-  }
-  const { tag, refusal } = previousPromotion();
+/**
+ * The range read when none is given, in `repository`: from the previous
+ * promotion's tag to `HEAD`, as the header says. Exported so that
+ * `test/gates/commits.test.ts` reads it in a repository of its own.
+ */
+export function defaultRange(repository = repositoryRoot) {
+  const { tag, refusal } = previousPromotion(repository);
   if (refusal !== undefined) {
     return { refusal: `${refusal}; pass a range as an argument or in GATE_COMMIT_RANGE` };
   }
@@ -116,6 +126,15 @@ function range() {
     return { selected: 'HEAD', why: 'no promotion tag is on an ancestor of HEAD' };
   }
   return { selected: `${tag}..HEAD`, why: `${tag} is the latest promotion tag behind HEAD` };
+}
+
+function range() {
+  const given = process.argv[2] ?? process.env['GATE_COMMIT_RANGE'];
+  if (given !== undefined && given !== '') {
+    const source = process.argv[2] === undefined ? 'GATE_COMMIT_RANGE' : 'the argument';
+    return { selected: given, why: `${source} names it` };
+  }
+  return defaultRange();
 }
 
 /**
@@ -164,10 +183,16 @@ function conventionalFindings(selected) {
   }
 }
 
-const { selected, why, refusal } = range();
-if (refusal === undefined) {
-  process.stdout.write(`commits: checking ${selected}, because ${why}\n`);
-  report('commits', [...conventionalFindings(selected), ...attributionFindings(selected)]);
-} else {
-  report('commits', [refusal]);
+/** The gate: the range, then every message in it. */
+function main() {
+  const { selected, why, refusal } = range();
+  if (refusal === undefined) {
+    process.stdout.write(`commits: checking ${selected}, because ${why}\n`);
+    report('commits', [...conventionalFindings(selected), ...attributionFindings(selected)]);
+  } else {
+    report('commits', [refusal]);
+  }
 }
+
+/** Run as a program, the gate; imported, as `test/gates/` does to hold its range, nothing runs. */
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) main();
