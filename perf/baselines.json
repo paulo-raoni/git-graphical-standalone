@@ -102,6 +102,13 @@
     "ciTolerance": 4,
     "unit": "milliseconds of main-thread work in the worst of the same 240 frames once the four slowest are set aside, their fifth-slowest, read per the same reference since E03-M01-FIX-04: each frame's work over the reference timed after it, times 2.3, and the lowest of the ten runs' fifth-slowest such figures is held. The baseline is 6.691 since E03-M01-FIX-05, the median of FIX-04's twenty readings of this reading kept on 2026-10-30, 5.8 to 9.834 (FIX-04's measurement), so the limit is 10.0365; FIX-05 kept sixteen more on 2026-10-31 and 2026-11-01 at other load of 7.7 to 37.7 per cent, 6.037 to 7.541, none red. E03-M01-FIX-03's 6.9 was the median of the raw fifth-slowest frame. It cannot see a regression that slows the reference as much as the frames, nor one that slows four or fewer frames of every run, and under a load that slows layout more than script it reads a regression of script smaller: FIX-05's busy-wait of 5 ms in every frame read 9.237 and 9.246, green, at 32.7 and 34.0 per cent other load from a game. The tolerance and the ceiling are unchanged"
   },
+  "scrollFrameLongestMilliseconds": {
+    "baseline": 16.7,
+    "ceiling": 16.7,
+    "tolerance": 1,
+    "ciTolerance": 4,
+    "unit": "milliseconds of main-thread work in one frame as timed, not per reference: the longest of the 240 frames of a run scrolled 1200 pixels each, every row element rewritten, 10000-commit fixture, test/e2e/budgets-frames.spec.ts, and the lowest of the ten runs' longest is held, since E04-M01-S05. The baseline and the ceiling are docs/ADR-0002-architecture-and-performance.md decision 6's 16.7, one frame at 60 Hz, with no tolerance on the development machine (the CI regime widens them by ciTolerance, as it does every timed entry); they are the ADR's number and not a measurement, so AGENTS.md section 11's relaxation path does not apply and only a change of the ADR moves them. Read on a quiet machine on 2026-11-06 at 6.8 to 8.0. A reading whose reference timings have a 95th percentile over 4 ms is discarded and this verdict is not asserted (the spec's REFERENCE_BOUND_MILLISECONDS)"
+  },
   "liveRowElements": {
     "baseline": 37,
     "ceiling": 37,
