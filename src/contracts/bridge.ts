@@ -11,6 +11,7 @@ import type {
   StartupRepositoryResponse,
 } from './ipc';
 import type { ChooseThemeRequest, ChooseThemeResponse, ThemeChoiceResponse } from './ipc';
+import type { UnkeptChoice } from './ipc';
 
 /** The property the preload attaches the bridge to on the renderer's global. */
 export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
@@ -24,8 +25,10 @@ export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
  * reason the bridge exists. Adding a capability here is a change to this file
  * and to the preload, and therefore visible in review.
  *
- * Every method resolves to a `Result`. None of them rejects on a failure the
- * user could be told about; a rejection here means the bridge itself is broken.
+ * Every method that asks resolves to a `Result`. None of them rejects on a
+ * failure the user could be told about; a rejection here means the bridge itself
+ * is broken. One method does not ask: {@link GitGraphicalBridge.unkeptChoice}
+ * subscribes to the one message the main process sends unasked.
  */
 export interface GitGraphicalBridge {
   /** Report the folder the application was started with, if it was given one. */
@@ -52,6 +55,12 @@ export interface GitGraphicalBridge {
   readonly themeChoice: () => Promise<ThemeChoiceResponse>;
   /** Apply a colour scheme to the whole application and keep it for the next start. */
   readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>;
+  /**
+   * Call `listener` each time the main process says a choice could not be kept
+   * for the next start. It is handed the two strings of the message, checked,
+   * and never the message itself; a message that is not one is dropped.
+   */
+  readonly unkeptChoice: (listener: (unkept: UnkeptChoice) => void) => void;
 }
 
 declare global {

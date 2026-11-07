@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { BRIDGE_GLOBAL_NAME, CHANNELS } from '../contracts/index';
+import { BRIDGE_GLOBAL_NAME, CHANNELS, unkeptChoiceOf } from '../contracts/index';
 import type {
   ApplicationInfoResponse,
   ChannelName,
@@ -18,6 +18,7 @@ import type {
   RefreshResponse,
   StartupRepositoryResponse,
   ThemeChoiceResponse,
+  UnkeptChoice,
 } from '../contracts/index';
 
 /**
@@ -52,6 +53,16 @@ const bridge: GitGraphicalBridge = {
     request<ThemeChoiceResponse>(CHANNELS.themeChoice),
   chooseTheme: (themeRequest: ChooseThemeRequest): Promise<ChooseThemeResponse> =>
     request<ChooseThemeResponse>(CHANNELS.chooseTheme, themeRequest),
+  // The page is handed the checked payload and never the event, whose `sender`
+  // is this preload's `ipcRenderer`.
+  unkeptChoice: (listener: (unkept: UnkeptChoice) => void): void => {
+    ipcRenderer.on(CHANNELS.unkeptChoice, (_event: unknown, payload: unknown) => {
+      const unkept = unkeptChoiceOf(payload);
+      if (unkept !== null) {
+        listener(unkept);
+      }
+    });
+  },
 };
 
 contextBridge.exposeInMainWorld(BRIDGE_GLOBAL_NAME, bridge);

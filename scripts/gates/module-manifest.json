@@ -45,7 +45,12 @@
       "src/contracts/kept-selection.ts",
       "src/contracts/result.ts"
     ],
-    "preload.cjs": ["src/contracts/bridge.ts", "src/contracts/ipc.ts", "src/preload/bridge.ts"],
+    "preload.cjs": [
+      "src/contracts/bridge.ts",
+      "src/contracts/ipc.ts",
+      "src/contracts/unkept-choice.ts",
+      "src/preload/bridge.ts"
+    ],
     "repository.cjs": [
       "src/adapters/git-commands.ts",
       "src/adapters/git-details.ts",

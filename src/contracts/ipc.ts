@@ -29,6 +29,11 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   themeChoice: 'theme:choice',
   /** Apply a colour scheme to the application and keep it for the next start. */
   chooseTheme: 'theme:choose',
+  /**
+   * The one message the main process sends the window unasked: a choice that
+   * could not be kept for the next start ({@link UnkeptChoice}).
+   */
+  unkeptChoice: 'application:unkept-choice',
 } as const);
 
 /** One of the channel names in {@link CHANNELS}. */
@@ -230,3 +235,18 @@ export interface ChooseThemeRequest {
  * that stayed when the request named none of the three.
  */
 export type ChooseThemeResponse = Result<ThemeSetting>;
+
+/**
+ * A choice the main process could not write for the next start, sent to the
+ * window on {@link CHANNELS}`.unkeptChoice` so that it can say so: the choice
+ * still applies until the application closes. It is a push, the only one, because
+ * the failure happens after the reply that applied the choice may already have
+ * been drawn. Each kind is sent at most once per run (`sayUnkept`,
+ * `src/app/window.ts`).
+ */
+export interface UnkeptChoice {
+  /** The choice in plain words, such as `theme choice` or `branch selection`. */
+  readonly what: string;
+  /** The absolute path of the file that could not be written. */
+  readonly file: string;
+}

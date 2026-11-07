@@ -114,8 +114,8 @@ export function openThemeStore(directory: string): ThemeStore {
         .catch((error: unknown) => {
           // The scheme is applied for this session whatever happens here; what
           // is lost is only that the next start will not remember it. Said on
-          // the process's own error stream, and in a message box over the
-          // window, once per run (`sayUnkept` in `./window.ts`).
+          // the process's own error stream, and in a notice inside the window,
+          // once per run (`sayUnkept` in `./window.ts`).
           process.stderr.write(`The theme could not be kept: ${String(error)}\n`);
           sayUnkept('theme choice', file);
         });

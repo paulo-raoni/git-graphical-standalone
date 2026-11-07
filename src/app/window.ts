@@ -1,5 +1,8 @@
-import { BrowserWindow, dialog, nativeTheme, shell } from 'electron';
+import { BrowserWindow, nativeTheme, shell } from 'electron';
 import { join } from 'node:path';
+
+import { CHANNELS } from '../contracts/index';
+import type { UnkeptChoice } from '../contracts/index';
 
 /** Initial window size, chosen to show a graph column and four text columns. */
 const INITIAL_WIDTH = 1280;
@@ -45,32 +48,25 @@ const unkeptSaid = new Set<string>();
  * Say in the window that a choice could not be kept for the next start: `what`
  * names the choice ("theme choice"), `file` the file that could not be written.
  *
- * A warning message box attached to the window, because a person who did not
+ * Sent to the window as the one message the main process pushes
+ * (`CHANNELS.unkeptChoice`), and shown there as a notice inside the window that
+ * blocks nothing (`showUnkept`, `src/ui/shell.ts`), because a person who did not
  * start the application from a terminal never reads the standard error the
- * caller also writes to; and not the window's failure view, which replaces the
- * graph, out of proportion to a choice that still applies until the application
- * closes. **Each kind is said once per run**: a disk that refuses one write
- * refuses the next, and a box at every choice would make the application
- * unusable for the rest of the run. The box is not awaited; nothing waits on its
- * answer, and the main process goes on serving the window while it is open.
+ * caller also writes to. Not a message box: S03's box was modal and blocked the
+ * owner's screen until dismissed (the owner's report of 2026-11-04). **Each kind
+ * is said once per run**: a disk that refuses one write refuses the next. With
+ * no window to send to, it is said on the standard error alone, and the kind is
+ * not counted as said.
  */
 export function sayUnkept(what: string, file: string): void {
-  if (unkeptSaid.has(what)) {
+  const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+  // The line "once per run" hinges on.
+  if (unkeptSaid.has(what) || window === undefined) {
     return;
   }
   unkeptSaid.add(what);
-  const options = {
-    type: 'warning' as const,
-    title: 'Not kept',
-    message: `The ${what} could not be kept.`,
-    detail:
-      'It still applies until the application closes, but the next start will not have it. ' +
-      `This file could not be written:\n${file}`,
-  };
-  const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-  void (window === undefined
-    ? dialog.showMessageBox(options)
-    : dialog.showMessageBox(window, options));
+  const unkept: UnkeptChoice = { what, file };
+  window.webContents.send(CHANNELS.unkeptChoice, unkept);
 }
 
 /**
