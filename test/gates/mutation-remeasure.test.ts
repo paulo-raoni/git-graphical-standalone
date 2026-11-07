@@ -153,6 +153,13 @@ describe('a kill re-measured is counted by what its second run says', () => {
     expect(statusOf(reportOf('clock alone').id)).toBe('Killed');
   });
 
+  it('a kill whose second run fails a test on a buffer refused to the mutated file stays a kill', async () => {
+    const { findings, statusOf, verdict } = await replay('clock and starved', 'own allocation');
+    expect(verdict).toBe("assertion, a test failed on the mutant's own allocation");
+    expect(findings).toEqual([]);
+    expect(statusOf(reportOf('clock and starved').id)).toBe('Killed');
+  });
+
   it('a kill whose second run passes every test is handed on as a survivor', async () => {
     const { findings, statusOf, verdict } = await replay('no failing test', 'passing');
     expect(verdict).toBe('survived, every test passed');
@@ -177,6 +184,20 @@ describe('a kill neither run says anything about refuses the build', () => {
 
   it('a kill whose second run starves again', async () => {
     const { findings, verdict } = await replay('starved', 'starved');
+    expect(verdict).toBe('unmeasured, could not get memory again');
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('could not get memory again');
+  });
+
+  it('a kill whose second run fails a test on a buffer refused to a file it did not mutate', async () => {
+    const { findings, verdict } = await replay('no failing test', 'own allocation');
+    expect(verdict).toBe('unmeasured, could not get memory again');
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('could not get memory again');
+  });
+
+  it('a kill whose second run fails a test on a refused buffer and also lost its worker', async () => {
+    const { findings, verdict } = await replay('clock and starved', 'own allocation, worker lost');
     expect(verdict).toBe('unmeasured, could not get memory again');
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('could not get memory again');
