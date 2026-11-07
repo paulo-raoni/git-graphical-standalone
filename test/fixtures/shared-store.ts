@@ -53,10 +53,16 @@ import { basename, dirname, join } from 'node:path';
  * is the published name itself, copy 2 is that name with `.2` appended, and so
  * on. Every copy that exists is checked, lowest number first, and the first that
  * matches its record is handed out; when none does, the copy numbered one past the
- * highest that exists is built and published under the rule below. No number is
- * used twice, so a copy removed leaves a gap that nothing builds into again. A
- * changed copy is reported on standard error, with the first difference found,
- * the first time a process passes over it. A copy that differs from its record
+ * highest that exists is built and published under the rule below. So a number
+ * below a copy that exists when a process lists them is never built again, and a
+ * copy removed below the highest leaves a gap that nothing builds into
+ * (`shared-store-copies.test.ts` holds both). A number is not reserved for good:
+ * one is built again when a process lists the copies at a moment when no copy at
+ * or above it exists. Review round 02 of E03-M01 read one such moment in this
+ * code, and E04-M01-S07 did not measure it: a process lists the copies after
+ * another has removed the only copy and before that one has published the next,
+ * so it builds copy 1 again. A changed copy is reported on standard error, with
+ * the first difference found, the first time a process passes over it. A copy that differs from its record
  * the moment it has been published is a defect of this check, not damage, and the
  * run fails at once rather than build another.
  *

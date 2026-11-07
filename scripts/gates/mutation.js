@@ -297,13 +297,19 @@ import { repositoryRoot, report } from './tree.js';
  *
  * ## Beside the five shape clauses: a committed survivor baseline
  *
- * Stryker's own `break` threshold compares **one global score**, and at this
- * project's size that number cannot fail for anything smaller than a collapse.
- * The arithmetic, over the 1195 mutants this scope produced when the clause was
- * written: a score under 85 needs `(1195 − S) / 1195 < 0.85`, so **180
- * survivors**, and the largest single file in scope carries **140 mutants**.
- * Deleting the tests of the largest file in the project therefore reads 88.28 and
- * **passes**. Measured rather than argued, in the lane that wrote this clause:
+ * Stryker's own `break` threshold compares **one global score**, and that number
+ * cannot see the loss of one file's tests, whatever the size of the scope: a
+ * score under 85 needs more than 15 per cent of every mutant in scope to survive,
+ * and deleting every test of one file leaves at most that file's mutants alive,
+ * so `break` passes it while no single file carries 15 per cent of the scope.
+ * The numbers this clause was argued with are those of the day it was written
+ * (E01-M01-FIX-07, `9ab3a17`, 2026-09-13), not a description of today's scope:
+ * over the 1195 mutants the scope produced then, `(1195 − S) / 1195 < 0.85`
+ * needed **180 survivors**, the largest single file carried **140 mutants**, and
+ * deleting its tests would by that arithmetic have read 88.28 and **passed**.
+ * The scope has grown since: Stryker instrumented 1896 mutants for
+ * E04-M01-S07's dry run on 2026-11-07, which counted no file's share of them.
+ * Measured rather than argued, in the lane that wrote this clause:
  * reducing one module's tests to a single assertion-free test took that module's
  * own line to 66.20 with 24 survivors and left the whole run at 97.32, which
  * `break` passes. `break` is kept, because it is Stryker's own message and

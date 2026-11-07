@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { repositoryRoot, report } from './tree.js';
@@ -48,23 +48,40 @@ function licencesOf(entry) {
   return Array.isArray(licences) ? licences : [licences];
 }
 
-function findingsFor(identifier, entry) {
+/**
+ * **The line this gate's message hinges on.** Why a licence is refused for the
+ * package `name`: it is not on the allow-list, and either no exception names the
+ * package or the package's exception is for another licence.
+ */
+function whyRefused(name, exception) {
+  return exception === undefined
+    ? `which is not on the allow-list, and no exception names ${name}`
+    : `which is not on the allow-list, and the exception for ${name} allows "${exception.licence}" only`;
+}
+
+/** The findings for one installed package: one per licence it is under that is refused. */
+export function findingsFor(identifier, entry) {
   const name = packageNameOf(identifier);
   const exception = configuration.exceptions[name];
   return licencesOf(entry)
     .filter((licence) => !allowed.has(licence) && exception?.licence !== licence)
-    .map((licence) => `${identifier} is under "${licence}", which is not on the allow-list`);
+    .map((licence) => `${identifier} is under "${licence}", ${whyRefused(name, exception)}`);
 }
 
-const output = execFileSync(
-  process.execPath,
-  [checker, '--json', '--excludePrivatePackages', '--start', repositoryRoot],
-  { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-);
-const installed = JSON.parse(output);
-const findings = Object.entries(installed).flatMap(([identifier, entry]) =>
-  findingsFor(identifier, entry),
-);
+/** The gate: the checker over every installed package, then the findings. */
+function main() {
+  const output = execFileSync(
+    process.execPath,
+    [checker, '--json', '--excludePrivatePackages', '--start', repositoryRoot],
+    { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  const installed = JSON.parse(output);
+  const findings = Object.entries(installed).flatMap(([identifier, entry]) =>
+    findingsFor(identifier, entry),
+  );
+  process.stdout.write(`licences: ${String(Object.keys(installed).length)} packages checked\n`);
+  report('licences', findings);
+}
 
-process.stdout.write(`licences: ${String(Object.keys(installed).length)} packages checked\n`);
-report('licences', findings);
+/** Run as a program, the gate; imported, as `test/gates/` does to hold its message, nothing runs. */
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) main();
