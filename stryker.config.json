@@ -13,6 +13,7 @@
   "incrementalFile": ".stryker-tmp/incremental.json",
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
+  "ignorePatterns": ["/reports/mutation/events"],
   "thresholds": {
     "high": 100,
     "low": 95,
