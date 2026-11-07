@@ -50,7 +50,8 @@ read passes options newer than the git 2.25 that docs/ADR-0001-stack.md states, 
 before S09 draws the details.
 
 **The orchestrator's choices, for the owner to overrule:** the control is a settings button on the panel's own
-strip; a choice that cannot be kept is said in the window (S03, then without blocking, S13); the Show Remote Branches
+strip; a choice that cannot be kept is said in the window (S03), then without blocking (S13): by a strip inside the
+window that stays until the person closes it, reached by a message from the main process; the Show Remote Branches
 checkbox shows neither state before the first page (S03); a branch name git refuses is refused before git runs
 (S02); and the end-to-end limits move only on a measurement under load (S04).
 
