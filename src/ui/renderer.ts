@@ -392,6 +392,8 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
 
   connectBranches(shell, view, session);
 
+  window.gitGraphical.unkeptChoice(shell.showUnkept);
+
   view.onLoadMore(() => {
     view.setLoadingMore(true);
     run(

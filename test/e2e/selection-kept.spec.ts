@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
-import { fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
+import { removeDirectory } from '../fixtures/shared-store';
+import { ended, fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
 
 /**
  * The branch selection and Show Remote Branches are kept per repository by the
@@ -50,6 +52,8 @@ const REMOTES = ['origin/HEAD', 'origin/feature', 'origin/main', 'origin/only-re
 
 let remotesRepository = '';
 const temporary: string[] = [];
+/** Every application process a case launched, waited for before the directories go. */
+const children: ChildProcess[] = [];
 
 /** One launched instance, and what its renderer drew. */
 interface Instance {
@@ -112,6 +116,7 @@ async function launch(repository: string, home: string): Promise<Instance> {
   const started = Date.now();
   const args = ['.', repository, `--user-data-dir=${home}`];
   const application = await electron.launch({ args, cwd: repositoryRoot });
+  children.push(application.process());
   await application.context().addInitScript(recordDrawn);
   const page = await application.firstWindow();
   await expect(box(page)).toBeEnabled();
@@ -238,8 +243,16 @@ test.beforeAll(() => {
   remotesRepository = fixture('remotes', 'remotes', 5000);
 });
 
-test.afterAll(() => {
-  for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true });
+/**
+ * The directories are removed only once the main processes, which write the
+ * selections into them, have exited: a case that ran out can leave its
+ * applications running, and removing a profile under one met `EPERM` (E04-M01-S04,
+ * review round 01). The line the order hinges on is the wait on {@link ended};
+ * what it does not hold is said beside the same wait in `theme.spec.ts`.
+ */
+test.afterAll(async () => {
+  for (const child of children.splice(0)) await ended(child);
+  for (const directory of temporary.splice(0)) removeDirectory(directory);
   removeOwnFixtures();
 });
 
@@ -376,26 +389,4 @@ test('a record that is not one this application wrote opens as nothing kept', as
       expectShown(page, remotesRepository, SHOW_ALL),
     );
   }
-});
-
-test('a selection that cannot be kept is said once in the window, and still applies', async () => {
-  const home = freshHome();
-  // A file where the records' folder goes: every write is refused, as a disk would refuse it.
-  writeFileSync(join(home, RECORDS), '');
-  await withWindow(remotesRepository, home, async (page, application) => {
-    // Every message box answered at once, as a click would, and recorded.
-    await application.evaluate(({ BrowserWindow, dialog }) => {
-      const asked: unknown[] = ((globalThis as { asked?: unknown[] }).asked = []);
-      dialog.showMessageBox = ((window: unknown, { type, message }: Record<string, unknown>) =>
-        asked.push([window === BrowserWindow.getAllWindows()[0], type, message])) as never;
-    });
-    // Two writes refused, each page drawn only once its write has given up. Waited on one by
-    // one, because a refresh that a later one supersedes writes nothing.
-    await apply(page, 'feature');
-    await expectGraph(page, remotesRepository, { revisions: [FEATURE], uncommitted: false });
-    await apply(page, 'topic');
-    await expectGraph(page, remotesRepository, { revisions: [FEATURE, TOPIC], uncommitted: false });
-    const asked = await application.evaluate(() => (globalThis as { asked?: unknown }).asked);
-    expect(asked).toEqual([[true, 'warning', 'The branch selection could not be kept.']]);
-  });
 });

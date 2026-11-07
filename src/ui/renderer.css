@@ -191,6 +191,26 @@ body {
   content: '✓ ' / '';
 }
 
+/* A choice not kept: in the column's flow, so it covers nothing. */
+.notices {
+  flex: none;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: light-dark(#fff4ce, #3d3418);
+  gap: 8px;
+}
+
+.notice__text {
+  flex: 1 1 auto;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .stage {
   display: flex;
   flex: 1 1 auto;

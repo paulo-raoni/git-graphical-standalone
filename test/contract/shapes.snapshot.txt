@@ -29,7 +29,7 @@ interface BranchSelection {
     readonly showRemoteBranches: boolean
 }
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; readonly unkeptChoice: "application:unkept-choice"; }
 
 interface ChangedFile {
     readonly additions: number | null
@@ -39,7 +39,7 @@ interface ChangedFile {
     readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
 }
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "application:info" | "theme:choice" | "theme:choose"
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "application:info" | "theme:choice" | "theme:choose" | "application:unkept-choice"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
 
@@ -115,6 +115,7 @@ interface GitGraphicalBridge {
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
     readonly startupRepository: () => Promise<StartupRepositoryResponse>
     readonly themeChoice: () => Promise<ThemeChoiceResponse>
+    readonly unkeptChoice: (listener: (unkept: UnkeptChoice) => void) => void
 }
 
 interface GraphPage {
@@ -227,6 +228,11 @@ interface UncommittedDetails {
     readonly files: readonly ChangedFile[]
 }
 
+interface UnkeptChoice {
+    readonly file: string
+    readonly what: string
+}
+
 interface WorkingTree {
     readonly changedFileCount: number
     readonly hasChanges: boolean
@@ -289,3 +295,5 @@ value subjectOf: (columns: CommitColumns, row: number) => string
 value survivingSelection: (selection: BranchSelection, refs: Refs) => BranchSelection
 
 value toggleBranch: (menu: BranchMenu, name: string) => BranchMenu
+
+value unkeptChoiceOf: (value: unknown) => UnkeptChoice | null

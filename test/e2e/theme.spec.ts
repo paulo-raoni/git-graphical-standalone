@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +10,8 @@ import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
 import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
-import { fixture } from './support/fixtures';
+import { removeDirectory } from '../fixtures/shared-store';
+import { ended, fixture } from './support/fixtures';
 
 /**
  * The colour-scheme control in the bar, driven through the built application.
@@ -84,6 +86,8 @@ interface PageScope {
 }
 
 const homes: string[] = [];
+/** Every application process a case launched, waited for before its profile goes. */
+const children: ChildProcess[] = [];
 
 /** A user-data directory nobody has used: the application's first start. */
 function freshHome(): string {
@@ -92,8 +96,19 @@ function freshHome(): string {
   return home;
 }
 
-test.afterEach(() => {
-  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+/**
+ * A profile is removed only once the main process, which writes the choices into
+ * it, has exited. A case that ran out leaves its application running while this
+ * hook runs (measured by E04-M01-S13 in every run of a case left to run out), and
+ * removing a profile under it met `EPERM` (E04-M01-S04, review round 01). The line
+ * the order hinges on is the wait on {@link ended}. What it does not hold: after a
+ * main process stopped by force, the application's other processes held the
+ * profile for over thirty seconds on a loaded machine in E04-M01-S13's runs, so the
+ * removal of such a case's profile can still fail.
+ */
+test.afterEach(async () => {
+  for (const child of children.splice(0)) await ended(child);
+  for (const home of homes.splice(0)) removeDirectory(home);
 });
 
 /** Launch the built application on `home`. */
@@ -104,6 +119,7 @@ async function launch(home: string, options: LaunchOptions): Promise<Launched> {
     cwd: repositoryRoot,
     colorScheme: options.emulated === undefined ? 'light' : options.emulated,
   });
+  children.push(application.process());
   if (options.initScript !== undefined) {
     // Not always in place before the first document: the launch releases the
     // application's `ready` before it returns, so the window can already be
@@ -391,41 +407,5 @@ test("the window's own background follows Light, Dark and System", async () => {
       const dark = (await native(launched)).dark;
       await expect.poll(background).toBe(dark ? '#1F1F1F' : '#FFFFFF');
     }
-  });
-});
-
-/**
- * Runs in the main process: answer every message box at once, as a click on its
- * button would, recording whether it was attached to the window and what it said.
- */
-function answerMessageBoxes(electronModule: { BrowserWindow: unknown; dialog: object }): void {
-  const windows = electronModule.BrowserWindow as { getAllWindows(): unknown[] };
-  const asked: unknown[][] = [];
-  Object.assign(globalThis, { asked });
-  Object.assign(electronModule.dialog, {
-    showMessageBox: (window: unknown, { type, message, detail }: Record<string, unknown>) => {
-      asked.push([windows.getAllWindows().includes(window), type, message, detail]);
-      return Promise.resolve({ response: 0, checkboxChecked: false });
-    },
-  });
-}
-
-test('a theme choice that cannot be kept is said once in the window, and still applies', async () => {
-  const home = freshHome();
-  // A directory where the file goes: every write of it is refused, as a disk would refuse it.
-  mkdirSync(join(home, 'theme'));
-  await withApplication(home, {}, async (launched) => {
-    const { application } = launched;
-    let errors = '';
-    application.process().stderr?.on('data', (chunk: Buffer) => (errors += chunk.toString()));
-    const said = (): number => errors.split('The theme could not be kept').length - 1;
-    await application.evaluate(answerMessageBoxes);
-    await choose(launched, 'dark', DARK_SURFACE);
-    await expect.poll(said).toBe(1);
-    await choose(launched, 'light', LIGHT_SURFACE);
-    await expect.poll(said).toBe(2);
-    const asked = await application.evaluate(() => (globalThis as { asked?: unknown }).asked);
-    const detail = expect.stringMatching(/^It still applies until the application closes.*theme$/s);
-    expect(asked).toEqual([[true, 'warning', 'The theme choice could not be kept.', detail]]);
   });
 });

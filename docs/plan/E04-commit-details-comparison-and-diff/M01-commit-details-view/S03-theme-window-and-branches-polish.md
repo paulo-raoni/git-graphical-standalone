@@ -40,6 +40,12 @@ choice the application's window owned one visible window of class `#32770` title
 and the application's window was disabled while it was open (`EnumWindows`, `GetWindow(GW_OWNER)` and
 `IsWindowEnabled`); after the second choice there was still exactly one, and standard error held both lines.
 
+*Note of E04-M01-S13, 2026-11-07:* the message box above is gone. It was modal, as the paragraph above measured,
+and on 2026-11-04 it blocked the owner's screen during a test run until dismissed (the owner's report in
+`MILESTONE.md`). The same news is now given by a notice inside the window that blocks nothing, sent from the main
+process on a channel of its own; `S13-unkept-choice-without-blocking.md` describes it. What this section says of
+the box is kept as the record of what S03 built.
+
 ## The window's own background, held by a check
 
 `src/app/window.ts` gives the window the background of the scheme in force and moves it on every `updated`

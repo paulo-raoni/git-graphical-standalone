@@ -108,6 +108,12 @@ export type {
   UncommittedDetails,
 } from './commit-details';
 
+/**
+ * The check a choice the main process could not keep passes before the page is
+ * told of it: the preload calls it, and that bundle may import this ring alone.
+ */
+export { unkeptChoiceOf } from './unkept-choice';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';
@@ -133,6 +139,7 @@ export type {
   StartupRepositoryResponse,
   ThemeChoiceResponse,
   ThemeSetting,
+  UnkeptChoice,
 } from './ipc';
 
 export { RowFlag } from './layout';

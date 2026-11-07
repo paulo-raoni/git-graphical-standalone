@@ -121,8 +121,8 @@ export function openSelectionStore(directory: string): SelectionStore {
         .catch((error: unknown) => {
           // The selection holds in this window whatever happens here; what is
           // lost is that the next open will not find it. Said on the process's
-          // own error stream, and in a message box over the window once per
-          // run, as a theme that cannot be kept is (`./theme.ts`).
+          // own error stream, and in a notice inside the window once per run,
+          // as a theme that cannot be kept is (`./theme.ts`).
           process.stderr.write(`The branch selection could not be kept: ${String(error)}\n`);
           sayUnkept('branch selection', file);
         });
