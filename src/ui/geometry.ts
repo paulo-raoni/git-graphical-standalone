@@ -188,6 +188,13 @@ export function graphColumnWidth(maxLane: number): number {
  * does not emit, its every lane change having one end at the vertex — is drawn
  * corner to corner, so that a future layout cannot make this function silently
  * paint nothing.
+ *
+ * What it writes is a line's two **ends**, never its shape. A line whose ends
+ * are in one lane is stroked straight; a line whose ends are in two lanes — the
+ * three leaning cases above — is stroked by `paintRow` in `./graph-canvas` as a
+ * curve between the same two ends that leaves and arrives vertically, so
+ * "leans" above means the curve's course from one lane to the other, not a
+ * straight diagonal (E04-M01-S08).
  */
 export function segmentLines(
   into: number[],

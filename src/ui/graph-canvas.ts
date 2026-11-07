@@ -77,7 +77,22 @@ export function resizeCanvas(canvas: HTMLCanvasElement, width: number, height: n
   }
 }
 
-/** Every line of one row, in its lanes' colours. */
+/**
+ * Every line of one row, in its lanes' colours.
+ *
+ * A line whose two ends are in one lane is stroked straight. A line whose ends
+ * are in two lanes — a lane change, from `segmentLines`'s first branch — is
+ * stroked as a cubic Bézier curve between the same two ends, with both control
+ * points at the height halfway between them and each directly above or below
+ * its own end: `(x0, bend)` and `(x1, bend)`. A control point straight above or
+ * below an end makes the curve's direction at that end vertical, so it meets the
+ * vertical line of the next row, or the vertex it leaves or reaches, with no
+ * corner; putting both at the same height makes the curve symmetric about its
+ * middle, so a line leaving a vertex and a line arriving at one are the same
+ * shape turned over. The ends are `segmentLines`'s four numbers and nothing
+ * else: the curve adds no number to the geometry, and the reasons are in
+ * `docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S08-rounded-lines.md`.
+ */
 function paintRow(
   context: CanvasRenderingContext2D,
   rows: LayoutRows,
@@ -99,8 +114,17 @@ function paintRow(
     context.strokeStyle = laneColour(entryAt(rows.segmentColour, segment));
     context.beginPath();
     for (let line = 0; line < lines; line += 1) {
-      context.moveTo(entryAt(scratch, line * 4), entryAt(scratch, line * 4 + 1));
-      context.lineTo(entryAt(scratch, line * 4 + 2), entryAt(scratch, line * 4 + 3));
+      const x0 = entryAt(scratch, line * 4);
+      const y0 = entryAt(scratch, line * 4 + 1);
+      const x1 = entryAt(scratch, line * 4 + 2);
+      const y1 = entryAt(scratch, line * 4 + 3);
+      context.moveTo(x0, y0);
+      if (x0 === x1) {
+        context.lineTo(x1, y1);
+      } else {
+        const bend = (y0 + y1) / 2;
+        context.bezierCurveTo(x0, bend, x1, bend, x1, y1);
+      }
     }
     context.stroke();
   }

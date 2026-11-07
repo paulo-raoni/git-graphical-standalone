@@ -61,8 +61,11 @@ export type RowFlag = (typeof RowFlag)[keyof typeof RowFlag];
  * that passes straight through a row it does not touch is a segment whose
  * `segmentFromLane` and `segmentToLane` are equal. A line that moves to another
  * lane over the height of one row is a segment whose two lanes differ. That is
- * the whole vocabulary: there are no curves, no multi-row edges and no scene
- * graph, so painting a viewport is a walk over a slice of these arrays.
+ * the whole vocabulary: it holds no curves, no multi-row edges and no scene
+ * graph, so painting a viewport is a walk over a slice of these arrays. A curve
+ * is the painter's way of drawing a segment whose two lanes differ, between the
+ * two ends the segment names (`src/ui/graph-canvas.ts`, since E04-M01-S08); it
+ * adds nothing to this vocabulary.
  *
  * A segment spans the **whole** band unless the row says otherwise. A branch tip
  * has no line above its dot and a root has none below, so each occupies half of
