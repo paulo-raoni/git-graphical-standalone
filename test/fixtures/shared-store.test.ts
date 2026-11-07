@@ -11,15 +11,14 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type * as UnitStore from '../../src/adapters/fixtures.spec-support';
 import type * as EndToEndStore from '../e2e/support/fixtures';
-import { generateRepository, readSpecification } from './generate';
-import { differenceFrom, verifiedCopy } from './shared-store';
+import { readSpecification } from './generate';
+import { differenceFrom } from './shared-store';
 
 /**
  * The check both stores of shared fixture repositories make before they hand a
@@ -36,7 +35,8 @@ import { differenceFrom, verifiedCopy } from './shared-store';
  * leave the damaged one where it is, as damaged as it was, and say on standard
  * error which directory it passed over and why. The damaged one stays because
  * this process was handed it and still runs; what happens once no such process
- * runs is the last case's. Every damage case asks for a repository no other case
+ * runs is held in `shared-store-copies.test.ts`, which E04-M01-S07 split out of
+ * this file with the cases that call `verifiedCopy` directly. Every damage case asks for a repository no other case
  * names — the end-to-end store's by name, the adapter suite's by a set of its own
  * — so that no case is handed what an earlier one damaged, and the cases pass in
  * any order (E03-M01-S05 ran them shuffled; its slice document says how).
@@ -290,75 +290,11 @@ describe('the adapter suite’s store, asked for a repository that has changed',
   });
 });
 
-describe('a copy that differs from its record the moment it is published', () => {
-  it('fails the run at once rather than build another', () => {
-    const published = join(privateRoot, 'raced', 'linear');
-    const specification = readSpecification();
-    const build = (directory: string): void => {
-      generateRepository(directory, { name: 'linear', shape: 'linear', commits: 2 }, specification);
-      mkdirSync(join(published, '.git'), { recursive: true });
-    };
-    expect(() => verifiedCopy(published, join(privateRoot, 'raced', 'staging'), build)).toThrow(
-      `fixture ${published} differs from its record as soon as published: it has no readable record`,
-    );
-    expect(existsSync(`${published}.2`)).toBe(false);
-  });
-});
-
-const here = dirname(fileURLToPath(import.meta.url));
-
-/** A process of its own: asks the store for `published`, prints the path it is handed, and exits. */
-const READER = [
-  'const [store, generator, published, staging] = process.argv.slice(1);',
-  'const { verifiedCopy } = await import(store);',
-  'const { generateRepository, readSpecification } = await import(generator);',
-  "const linear = { name: 'linear', shape: 'linear', commits: 2 };",
-  'const build = (at) => generateRepository(at, linear, readSpecification());',
-  'process.stdout.write(verifiedCopy(published, staging, build));',
-].join('\n');
-
 describe('what the stores leave behind', () => {
   it('removes the stores before E01-M01-FIX-33 when they load, and nothing else', () => {
     const left = (names: readonly string[]): string[] =>
       names.filter((name) => existsSync(join(privateRoot, name, 'repositories', 'linear')));
     expect(left(OLD_STORES)).toEqual([]);
     expect(left(LOOK_ALIKES)).toEqual(LOOK_ALIKES);
-  });
-
-  // The other half, a changed copy kept while a process it was handed to runs, is
-  // `holdsTo`'s: this process was handed what it damages, and finds it still there.
-  it('removes a changed copy once every process it was handed to has exited', () => {
-    const published = join(privateRoot, 'handed', 'linear');
-    const staging = join(privateRoot, 'handed', 'staging');
-    const modules = ['shared-store.ts', 'generate.ts'].map((name) =>
-      pathToFileURL(join(here, name)),
-    );
-    const reader = [
-      '--input-type=module',
-      '-e',
-      READER,
-      ...modules.map(String),
-      published,
-      staging,
-    ];
-    expect(execFileSync(process.execPath, reader, { encoding: 'utf8' })).toBe(published);
-    unlinkSync(join(published, 'file.txt'));
-    catchStandardError();
-    const ask = (): string =>
-      verifiedCopy(published, staging, (directory) => {
-        generateRepository(
-          directory,
-          { name: 'linear', shape: 'linear', commits: 2 },
-          readSpecification(),
-        );
-      });
-    expect(ask()).toBe(`${published}.2`);
-    expect([existsSync(published), existsSync(`${published}.handed`)]).toEqual([false, false]);
-    expect(written.join('')).toContain(
-      `fixture ${published} is not what was published: file.txt has gone. No process it was handed to runs, so it is removed.`,
-    );
-    // No number is used twice: copy 1 is not built again while copy 2 matches its record.
-    expect(ask()).toBe(`${published}.2`);
-    expect(existsSync(published)).toBe(false);
   });
 });
