@@ -25,8 +25,10 @@ application from a terminal never sees.
   (`RENAME_ATTEMPTS`), or at once when the folder cannot be made. The box is attached to the focused window, or
   the first window when none has the focus, and is shown without a parent only when there is no window.
 - **Why a message box and not the window's failure view.** The failure view replaces the graph, which is out of
-  proportion to a choice that still applies; this is the owner's ruling of 2026-11-02, recorded in
-  `MILESTONE.md`. The box is not awaited: nothing waits on its answer.
+  proportion to a choice that still applies; this is the orchestrator's choice of 2026-11-02, open to the owner's
+  overruling, as `MILESTONE.md` records it under *The orchestrator's choices, for the owner to overrule* (that
+  paragraph gives no date; the date is the one this slice's task gave). *Corrected by E04-M01-FIX-02, 2026-11-06:*
+  this sentence called it the owner's ruling. The box is not awaited: nothing waits on its answer.
 - **What it costs.** Nothing on start and nothing on a write that succeeds: `sayUnkept` runs only from the
   failure path, and the only work added elsewhere is the import of `dialog`, a property read when it is called.
   The production `main.cjs` measured 7111 bytes with `npm run gates:size` on 2026-11-03 at this lane's head; the
@@ -65,13 +67,32 @@ read from the window rendered by `PrintWindow` with `PW_RENDERFULLCONTENT`, fram
 of its 1280 by 800 pixels: the title bar is rows 0 to 30. The window's background is the client area with the
 document's root element set to `display: none`, so that no page paints over it; there it was one colour from the
 top of the client area to its bottom border. The title bar's two colours are not neutral greys, which suggests a
-tint the system adds to the frame (an inference). `DWMWA_USE_IMMERSIVE_DARK_MODE` was read with
-`DwmGetWindowAttribute` after each choice. Electron's `desktopCapturer` window source, which did work, captures
-the client area only, so it showed no title bar. No screenshot is committed.
+tint the system adds to the frame (an inference). *Corrected by E04-M01-FIX-02, 2026-11-06:* from the screen
+(below) the Light title bar is `#F3F3F3`, a neutral grey, so that sentence holds for Dark only.
+`DWMWA_USE_IMMERSIVE_DARK_MODE` was read with `DwmGetWindowAttribute` after each choice. Electron's
+`desktopCapturer` window source, which did work, captures the client area only, so it showed no title bar. No
+screenshot is committed.
 
-**Owed to the owner:** the colours as sampled from the unlocked screen, and a live change of the operating
-system's preference with System chosen, which needs a change to the system's settings that this slice does not
-make.
+**From the screen, measured by E04-M01's review round 01**, not by this slice, and not reproduced by
+E04-M01-FIX-02, which records it here: on 2026-11-04 between 22:58 and 22:59, Windows 11 preferring dark, display
+scale 1, the built application at `4a6a949` on a fresh user-data directory, its window brought to the front and
+focused. `Graphics.CopyFromScreen` read one pixel row 12 px below the window's top edge, across the middle 30 % of
+its width (384 pixels), and one row across the middle of the client area with the document's root at
+`display: none`.
+
+| choice | title bar (the three most frequent colours, of 384 pixels) | window's background (of 384 pixels) |
+| --- | --- | --- |
+| Light | `#F3F3F3` 384 | `#FFFFFF` 384 |
+| Dark | `#251E1B` 135, `#261E1A` 134, `#251E1C` 95 | `#1F1F1F` 384 |
+| System | the same as Dark | `#1F1F1F` 384 |
+
+So the Light title bar on the screen is `#F3F3F3` where `PrintWindow` read `#F9F1ED`. Under Dark and System the
+screen's most frequent title-bar colour is the `#251E1B` `PrintWindow` read, beside two within one step of it in
+each channel, and every window's background is the one in the table above.
+
+**Owed to the owner:** a live change of the operating system's preference with System chosen, which needs a change
+to the system's settings that this slice does not make. *Corrected by E04-M01-FIX-02, 2026-11-06:* the colours as
+sampled from the screen were also listed here as owed; review round 01 has sampled them, above.
 
 ## The order of the branch list, said truly
 
