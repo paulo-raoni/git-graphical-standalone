@@ -68,6 +68,13 @@ const remotes = (page: Page): Locator =>
 const entry = (page: Page, label: string): Locator =>
   list(page).getByRole('option', { name: label, exact: true });
 
+/**
+ * The checkbox after a first page, as assistive technology reads it: checked or not,
+ * where an indeterminate box reads `mixed` and matches neither. `toBeChecked` reads
+ * the `checked` property alone, which a box left indeterminate also carries.
+ */
+const [SHOWN, HIDDEN] = ['- checkbox [checked=true]', '- checkbox [checked=false]'];
+
 /** What {@link recordDrawn} touches in the page. `tsconfig.node.json` has no DOM library. */
 interface PageScope {
   readonly document: {
@@ -185,7 +192,7 @@ interface Shown {
 
 async function expectShown(page: Page, repository: string, shown: Shown): Promise<void> {
   await expect(text(page)).toHaveText(shown.box);
-  await expect(remotes(page)).toBeChecked({ checked: shown.remotes });
+  await expect(remotes(page)).toMatchAriaSnapshot(shown.remotes ? SHOWN : HIDDEN);
   await expectGraph(page, repository, { labels: shown.remotes, ...shown });
   await box(page).click();
   await expect.poll(() => list(page).getByRole('option').allTextContents()).toEqual(shown.listed);
@@ -267,7 +274,7 @@ test('each repository keeps its own selection', async () => {
   });
   await withWindow(other, home, async (page) => {
     await expect(text(page)).toHaveText('Show All');
-    await expect(remotes(page)).toBeChecked();
+    await expect(remotes(page)).toMatchAriaSnapshot(SHOWN);
     await expectGraph(page, other, { revisions: EVERY });
     await apply(page, 'uncheck');
     // This repository has no remote branch, so its graph does not change: what is
@@ -280,16 +287,11 @@ test('each repository keeps its own selection', async () => {
         .some((name) => readFileSync(join(home, RECORDS, name), 'utf8').includes(':false'));
     await expect.poll(hidden).toBe(true);
   });
-  const feature = {
-    box: 'feature',
-    checked: ['feature'],
-    revisions: [FEATURE],
-    uncommitted: false,
-  };
+  const feature = { box: 'feature', checked: ['feature'], revisions: [FEATURE] };
   await withWindow(remotesRepository, home, (page) =>
-    expectShown(page, remotesRepository, { ...SHOW_ALL, ...feature }),
+    expectShown(page, remotesRepository, { ...SHOW_ALL, ...feature, uncommitted: false }),
   );
-  await withWindow(other, home, (page) => expect(remotes(page)).not.toBeChecked());
+  await withWindow(other, home, (page) => expect(remotes(page)).toMatchAriaSnapshot(HIDDEN));
 });
 
 test('a second instance open at once opens on what the first applied, without a stall', async () => {
