@@ -15,6 +15,7 @@ import {
   processTree,
   withBudgeted,
 } from './support/budgets';
+import type { Budgeted } from './support/budgets';
 import type { PaintState } from './support/budgets-page';
 import { pressRefresh, readProbe, setMarking } from './support/budgets-page';
 import { fixture } from './support/fixtures';
@@ -123,14 +124,38 @@ async function checkedAgainstChromium(page: Page): Promise<{ late: number; prese
   };
 }
 
+/** Launches a cold start may make to get one whose first window was not reloaded. */
+const LAUNCH_ATTEMPTS = 3;
+
 /**
  * Launch with `open` on the command line and time the window to the first mark
  * showing `wanted`: from the main process's creation, which is when a person's
  * start begins, and from the call to `electron.launch`, which also pays for
  * Playwright's own connection and is printed for comparison.
+ *
+ * A launch whose first window `launchBudgeted` reloaded, because an init script
+ * reached its first document late, is closed untimed and launched again: its
+ * first painted state came after a reload no person's start makes.
  */
 async function coldStart(open: string, wanted: (state: PaintState) => boolean): Promise<ColdStart> {
+  for (let attempt = 1; attempt < LAUNCH_ATTEMPTS; attempt += 1) {
+    const budgeted = await launchBudgeted({ open });
+    if (!budgeted.reloaded) {
+      return timedColdStart(budgeted, wanted);
+    }
+    await closeBudgeted(budgeted);
+    process.stdout.write('    that launch was reloaded, so it is not timed: launched again\n');
+  }
   const budgeted = await launchBudgeted({ open });
+  expect(budgeted.reloaded).toBe(false);
+  return timedColdStart(budgeted, wanted);
+}
+
+/** Time a launched window to the first mark showing `wanted`, and close it. */
+async function timedColdStart(
+  budgeted: Budgeted,
+  wanted: (state: PaintState) => boolean,
+): Promise<ColdStart> {
   try {
     const mark = await paintedState(budgeted.page, wanted);
     const main = await budgeted.application.evaluate(() => process.pid);
