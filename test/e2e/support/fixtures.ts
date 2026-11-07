@@ -138,6 +138,8 @@ export interface Launch {
   readonly open?: string;
   /** The whole environment of the application, or this process's when absent. */
   readonly env?: Record<string, string>;
+  /** Runs on the fresh user-data directory before the launch, to put something in it. */
+  readonly prepare?: (home: string) => void;
 }
 
 /**
@@ -166,12 +168,13 @@ export interface Launch {
  * function, and only that digest would show it.
  *
  * **Nothing is removed under a running application.** A profile removed while
- * the application still runs makes its next write fail, and a failed write
- * raises a *Not kept* message box (`sayUnkept`, `src/app/window.ts`). So the
- * directory goes only after the process has exited ({@link ended}), never from a
- * hook that runs beside a case Playwright stopped waiting for; and every
- * message box the application asks for while the case runs is held and recorded
- * instead of shown ({@link holdMessageBoxes}), and fails the case.
+ * the application still runs makes its next write fail, and a failed write is
+ * said in a *not kept* notice in the window (`sayUnkept`, `src/app/window.ts`;
+ * until E04-M01-S13 it was a message box). So the directory goes only after the
+ * process has exited ({@link ended}), never from a hook that runs beside a case
+ * Playwright stopped waiting for; and every message box the application asks for
+ * while the case runs is held and recorded instead of shown
+ * ({@link holdMessageBoxes}), and fails the case.
  *
  * The directory is made fresh for each launch under the system's temporary
  * directory and removed once the process has exited, whatever `body` did; a case
@@ -189,6 +192,7 @@ export async function withOwnProfile<T>(
   const home = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-profile-'));
   let child: ChildProcess | undefined;
   try {
+    launch.prepare?.(home);
     const args = ['.', ...(launch.open === undefined ? [] : [launch.open])];
     const application = await electron.launch({
       args: [...args, `--user-data-dir=${home}`],
@@ -221,9 +225,10 @@ const EXIT_WAIT_MS = 10_000;
 /**
  * Settle once `child` has exited, stopping it if it has not within
  * {@link EXIT_WAIT_MS}: it is this run's own process, launched by
- * {@link withOwnProfile}, and its profile is about to be removed.
+ * {@link withOwnProfile} or by a suite that launches for itself, and its profile
+ * is about to be removed.
  */
-async function ended(child: ChildProcess): Promise<void> {
+export async function ended(child: ChildProcess): Promise<void> {
   const gone = (): boolean => child.exitCode !== null || child.signalCode !== null;
   const exit = (within: number): Promise<void> =>
     new Promise((resolve) => {
@@ -253,15 +258,15 @@ interface MessageBoxScope {
  * Runs in the main process: replace the message boxes of Electron's `dialog`
  * with a recorder that shows nothing and answers as if OK were pressed.
  *
- * A box the application raises while a case runs — the *Not kept* warning of
- * `sayUnkept` (`src/app/window.ts`), when a write into the profile fails — would
- * otherwise appear on the screen of whoever runs the suite and stay there until
- * they press OK; one did, during a test run on 2026-11-04. Recorded instead, it
- * is a failure of the case ({@link requireNoMessageBox}), since no case launched
- * here expects one; a case that does replaces `dialog.showMessageBox` itself, as
- * `theme.spec.ts` does. Installed once the application has started, so a box
- * raised before that is not caught: the application raises none before a choice
- * is written (`src/app/theme.ts`, `src/app/selections.ts`).
+ * A box the application raised while a case ran — the *Not kept* warning
+ * `sayUnkept` (`src/app/window.ts`) showed until E04-M01-S13, when a write into
+ * the profile failed — appeared on the screen of whoever ran the suite and stayed
+ * there until they pressed OK, during a test run on 2026-11-04. Recorded instead,
+ * a box is a failure of the case ({@link requireNoMessageBox}): the application
+ * asks for none, and `unkept-notice.spec.ts` relies on this to show that a
+ * choice not kept asks for none either. Installed once the application has
+ * started, so a box raised before that is not caught: no write fails before a
+ * choice is made (`src/app/theme.ts`, `src/app/selections.ts`).
  */
 function holdMessageBoxes(electronModule: { dialog: object }): void {
   const asked: string[] = [];
