@@ -102,6 +102,15 @@ later layout cannot make this function silently paint nothing.
 Lines are painted per segment in the segment's own colour, with round caps at 1.6 pixels. The vertex is a
 filled dot of the row's colour, 3.5 pixels, or an outline on the uncommitted row.
 
+*Corrected by E04-M01-S08, 2026-11-07:* the ends in the table above still hold, and `segmentLines` still
+writes them, four numbers a line. What is drawn between them is no longer always a straight line. The last two
+rows of the table, and the corner-to-corner case, have their two ends in different lanes, and since E04-M01-S08
+`paintRow` strokes each of them as a curve between the same two ends that leaves and arrives vertically, so
+"leaning" above names the line's course from one lane to the other and not a straight diagonal. The first two
+rows, whose ends share a lane, are still straight. That slice's document,
+`docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S08-rounded-lines.md`, has the curve
+and what was seen of it.
+
 ## The recycling scheme, and its invariants
 
 A fixed pool of row elements over a spacer. The three invariants:
