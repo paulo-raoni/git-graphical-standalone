@@ -7,7 +7,8 @@ import { inflateSync } from 'node:zlib';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
-import { readCanvas, scrollListTo } from './support/budgets-page';
+import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
+import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
 import { fixture } from './support/fixtures';
 
 /**
@@ -46,10 +47,7 @@ type Choice = Scheme | 'system';
 /** What `surface` is for a scheme. */
 const surfaceOf = (scheme: Scheme): string => (scheme === 'dark' ? DARK_SURFACE : LIGHT_SURFACE);
 
-interface Launched {
-  readonly application: ElectronApplication;
-  readonly page: Page;
-}
+type Launched = { readonly application: ElectronApplication; readonly page: Page };
 
 interface LaunchOptions {
   /** The emulated preference, or `null` for the operating system's own. Light when absent. */
@@ -107,8 +105,11 @@ async function launch(home: string, options: LaunchOptions): Promise<Launched> {
     colorScheme: options.emulated === undefined ? 'light' : options.emulated,
   });
   if (options.initScript !== undefined) {
-    // In place before the first document, because the launch holds the
-    // application's `ready` until Playwright has connected (`support/budgets.ts`).
+    // Not always in place before the first document: the launch releases the
+    // application's `ready` before it returns, so the window can already be
+    // loading (E04-M01-S05 read where Playwright does it; `launchBudgeted` in
+    // `support/budgets.ts`). It is in place for every document created after
+    // this call has resolved, which is what a reload relies on.
     await application.context().addInitScript(options.initScript);
   }
   return { application, page: await application.firstWindow() };
@@ -145,9 +146,7 @@ function readShown(): { surface: string; scheme: string; pinned: string } {
 }
 
 /** What the page shows. */
-async function shown(page: Page): Promise<{ surface: string; scheme: string; pinned: string }> {
-  return page.evaluate(readShown);
-}
+const shown = (page: Page): Promise<ReturnType<typeof readShown>> => page.evaluate(readShown);
 
 /** The main process's half of the scheme. */
 async function native({ application }: Launched): Promise<{ source: string; dark: boolean }> {
@@ -207,10 +206,19 @@ test('Dark and Light override the preference at once, keeping the scroll and the
     const { page } = launched;
     await expect(page.locator('.bar__path')).toHaveText(large);
     await expect(control(page)).toBeEnabled();
-    await page.evaluate(markDocument);
+    // The mark, then the budget probe's counters (`support/budgets-page.ts`), put
+    // into the running document rather than as init scripts: what the waits below
+    // wait for is asked for after this, through the globals they wrap.
+    for (const script of [markDocument, installProbe, installTimerCounters, installRedrawCounter])
+      await page.evaluate(script);
+    const unscrolled = await page.evaluate(wakeupsSettled, 30_000);
     expect(await page.evaluate(scrollListTo, 3600)).toBe(3600);
     const before = await page.evaluate(readUntouched);
     expect(before).toMatchObject({ loads: 1, marker: 1, offset: 3600, scroller: 'light dark' });
+    // The canvas keeps its old picture until the renderer repaints after the
+    // scroll (measured by E04-M01's review round 02): read once all the page asked
+    // for has run, and once the canvas has been redrawn since the scroll.
+    expect(await page.evaluate(wakeupsSettled, 30_000)).toBeGreaterThan(unscrolled);
     const canvas = (await page.evaluate(readCanvas)).rgba;
 
     await page.emulateMedia({ colorScheme: 'light' });
@@ -218,7 +226,10 @@ test('Dark and Light override the preference at once, keeping the scroll and the
     expect(await shown(page)).toEqual({ surface: DARK_SURFACE, scheme: 'dark', pinned: 'dark' });
     expect((await native(launched)).dark).toBe(true);
     expect(await page.evaluate(readUntouched)).toEqual({ ...before, scroller: 'dark' });
-    await page.waitForTimeout(300);
+    // What the switch left on the canvas, once everything it asked for has run.
+    // The switch asked for no redraw in E04-M01-FIX-03's three counted runs; a
+    // change that repaints the canvas differently in Dark is waited for and read.
+    await page.evaluate(wakeupsSettled, 30_000);
     expect((await page.evaluate(readCanvas)).rgba).toBe(canvas);
 
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -279,6 +290,16 @@ test('the choice survives a relaunch and is the scheme of the first paint', asyn
   const options = { emulated: null, initScript: recordFirstFrame };
   await withApplication(home, options, async (launched) => {
     const { page } = launched;
+    // The script can miss the first document (`launch` says why). Once the
+    // renderer's view is in the window's document, one the script did not run
+    // in first is reloaded, once: the script is in the context by then, so the
+    // reloaded document runs it before its own scripts. `beforeRenderer: true`
+    // below is what refuses a document it still did not run in first. A reloaded
+    // document starts in the scheme the main process holds at the reload, so a
+    // stored choice applied after the window was made, and before the reload,
+    // is seen only on a launch that does not reload.
+    await page.waitForFunction(() => 'gitGraphicalView' in globalThis);
+    if ((await page.evaluate(readFirstFrame))?.['beforeRenderer'] !== true) await page.reload();
     await expect(control(page)).toHaveValue(against);
     // The control shows the choice from an IPC reply that does not wait for a
     // frame, so the first frame's callback may not have run yet: in 6 of 20
