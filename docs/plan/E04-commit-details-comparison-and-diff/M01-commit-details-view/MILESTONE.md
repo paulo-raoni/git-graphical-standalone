@@ -26,12 +26,13 @@ literal 16.7 ms frame check and the bound on a reading's reference time the owne
 | S05 | budgets and the reference bound | 2 | The literal 16.7 ms frame check, a reading whose reference time is out of bound discarded, the launch race closed and the fixed waits replaced. |
 | S06 | commit details read | 2 | The details of a commit and of the uncommitted changes, with every changed file, its status and its line counts, read from git on request and handed to the window. |
 | S07 | fixture store and gate messages | 3 | The fixture store's numbering held and its sentences true, and the licences and commits gates' messages and range held by checks. |
-| S08 | stash rows and rounded lines | 3 | Every stash a row of the graph, drawn as a stash, whose details list its untracked files; every change of lane drawn as a smooth curve. |
-| S09 | the details panel | 4 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
-| S10 | the changed files | 5 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
-| S11 | keyboard navigation | 6 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
-| S12 | panel size, place and options | 7 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
+| S08 | rounded lines | 3 | Every change of lane drawn as a smooth curve instead of a straight diagonal. |
+| S09 | the details panel | 5 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
+| S10 | the changed files | 6 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
+| S11 | keyboard navigation | 7 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
+| S12 | panel size, place and options | 8 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
 | S13 | unkept choice said without blocking | 3 | A choice that cannot be kept is said by a notice inside the window that blocks nothing, in place of a message box. |
+| S14 | stash rows | 4 | Every stash a row of the graph, drawn as a stash, whose details list its untracked files; the details read on the git the setup states. |
 
 **Owner's rulings of 2026-11-02:** the stash rows of E01-M02 come into this milestone, because a stash's details
 need its row (S08); and every setting `docs/PLAN.md` §2 names for E04-M01 is built with its alternative values and
@@ -41,6 +42,12 @@ a control in the view to choose them (S10, S12), which the settings UI of E02-M0
 owner found crooked (a screenshot of the `remotes` fixture); S08 draws them as curves. And the message box S03
 added for a choice that cannot be kept appeared during a test run and blocked the owner's screen until dismissed;
 S13 replaces it with a notice inside the window, and E04-M01-S04 finds the case that made a write fail.
+
+**Changed on 2026-11-07 by the orchestrator:** S08 was split. Its curves need no observation of the reference
+extension, so they stay in wave 3 as S08. Its stash rows need one, so they become S14 in a wave of their own,
+before the details panel, and S09 to S12 move one wave later. S14 also takes review round 02's C-10: the details
+read passes options newer than the git 2.25 that docs/ADR-0001-stack.md states, and it must read on git 2.25
+before S09 draws the details.
 
 **The orchestrator's choices, for the owner to overrule:** the control is a settings button on the panel's own
 strip; a choice that cannot be kept is said in the window (S03, then without blocking, S13); the Show Remote Branches
