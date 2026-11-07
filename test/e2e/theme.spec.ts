@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,7 @@ import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
 import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
+import { removeDirectory } from '../fixtures/shared-store';
 import { ended, fixture } from './support/fixtures';
 
 /**
@@ -103,7 +104,7 @@ function freshHome(): string {
  */
 test.afterEach(async () => {
   for (const child of children.splice(0)) await ended(child);
-  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+  for (const home of homes.splice(0)) removeDirectory(home);
 });
 
 /** Launch the built application on `home`. */

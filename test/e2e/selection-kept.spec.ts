@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
+import { removeDirectory } from '../fixtures/shared-store';
 import { ended, fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
 
 /**
@@ -250,7 +251,7 @@ test.beforeAll(() => {
  */
 test.afterAll(async () => {
   for (const child of children.splice(0)) await ended(child);
-  for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of temporary.splice(0)) removeDirectory(directory);
   removeOwnFixtures();
 });
 
