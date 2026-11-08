@@ -133,9 +133,10 @@ const LAUNCH_ATTEMPTS = 3;
  * start begins, and from the call to `electron.launch`, which also pays for
  * Playwright's own connection and is printed for comparison.
  *
- * A launch whose first window `launchBudgeted` reloaded, because an init script
- * reached its first document late, is closed untimed and launched again: its
- * first painted state came after a reload no person's start makes.
+ * A launch whose first window `launchBudgeted` reloaded, because the init
+ * scripts reached its first document late or missed the window altogether, is
+ * closed untimed and launched again: its first painted state came after a reload
+ * no person's start makes.
  */
 async function coldStart(open: string, wanted: (state: PaintState) => boolean): Promise<ColdStart> {
   for (let attempt = 1; attempt < LAUNCH_ATTEMPTS; attempt += 1) {

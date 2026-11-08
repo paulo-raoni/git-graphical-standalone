@@ -9,6 +9,8 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { removeDirectory } from '../fixtures/shared-store';
+import { initScriptFirst } from './support/budgets';
+import type { InitScriptRun } from './support/budgets';
 import { ended, fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
 
 /**
@@ -111,7 +113,26 @@ function readDrawn(): { rows: string[][]; first: boolean } {
   return { rows: scope.drawnRows ?? [], first: scope.viewBeforeScript === false };
 }
 
-/** Launch on `repository` with `home` as its user-data directory, its first page drawn. */
+/**
+ * Runs in the page: whether the renderer's view was there when
+ * {@link recordDrawn} ran, or `null` when it did not run in this document.
+ */
+function viewBeforeScript(): boolean | null {
+  return (globalThis as unknown as PageScope).viewBeforeScript ?? null;
+}
+
+/**
+ * Launch on `repository` with `home` as its user-data directory, its first page
+ * drawn, in a document {@link recordDrawn} ran first in.
+ *
+ * The script is added to the context after the launch, which has already let the
+ * application open its window, so it can reach the window's first document late,
+ * or none of its documents (`initScriptFirst` in `support/budgets.ts` says why,
+ * and how the window is brought to a document it ran first in). Measured by
+ * E04-M01-FIX-05 at its Base, where the window was never reloaded: with a wait of
+ * 60 to 600 ms planted before the `addInitScript` call, the restart case failed
+ * `drawn.first` in 12 of 12 launches. `firstPageMs` counts any reload made here.
+ */
 async function launch(repository: string, home: string): Promise<Instance> {
   const started = Date.now();
   const args = ['.', repository, `--user-data-dir=${home}`];
@@ -119,6 +140,13 @@ async function launch(repository: string, home: string): Promise<Instance> {
   children.push(application.process());
   await application.context().addInitScript(recordDrawn);
   const page = await application.firstWindow();
+  await initScriptFirst(page, recordDrawn, 'the drawn-rows recorder', async () => {
+    await page.waitForFunction(() => 'gitGraphicalView' in globalThis);
+    const before = await page.evaluate(viewBeforeScript);
+    const run: InitScriptRun =
+      before === null ? 'did not run' : before ? 'ran late or in part' : 'ran first';
+    return { run, seen: JSON.stringify(before) };
+  });
   await expect(box(page)).toBeEnabled();
   return { application, page, firstPageMs: Date.now() - started };
 }
