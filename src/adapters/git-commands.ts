@@ -15,9 +15,11 @@ import {
  * be read at once — including by the reviewer checking what the user's own
  * configuration is allowed to keep doing.
  *
- * **What is overridden, and why.** Three configuration variables, each because
+ * **What is overridden, and why.** Three configuration variables in every
+ * invocation, and three more in the reads of changed files alone
+ * ({@link CHANGED_FILE_CONFIGURATION} and {@link commitDetailsArgs}), each because
  * a user who has set it would otherwise change the shape of the output rather
- * than its content:
+ * than its content. The three of every invocation:
  *
  * - `log.showSignature=false`. With it on, `git log` runs the signature verifier
  *   and writes its lines into the log output, between the records. They are not
@@ -120,7 +122,10 @@ const REMOTE_BRANCHES = 'refs/remotes/';
  * dropdown builds a selection from the branches a page lists (E03-M01-S10), so
  * through it such a name can reach git only for a branch deleted since it was
  * chosen, in a repository holding a reference of that spelling; that is an
- * inference from how the dropdown builds names, not a measurement.
+ * inference from how the dropdown builds names, not a measurement. That gap is
+ * closed above this module: the utility process answers only a page whose own
+ * reference listing names every name its log was given as a branch or a remote
+ * branch (`readListed` of `src/app/repository-host.ts`, since E04-M01-S16).
  */
 function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
   return (
@@ -261,33 +266,57 @@ export function statusArgs(repositoryPath: string): string[] {
 }
 
 /**
+ * The configuration both reads of changed files override, ahead of the command:
+ * `diff.relative=false`, because with `diff.relative=true` a repository opened
+ * from a folder inside it lists only the files under that folder, by paths
+ * relative to it: git 2.51.0 listed `in.txt` alone for a commit that changed
+ * `out.txt` and `sub/in.txt`, run from `sub`, and both by their whole paths with
+ * `--no-relative` (measured by E04-M01-S06 on a scratch repository).
+ *
+ * A setting and not that option, because the option is first documented by git
+ * 2.28.0 and git 2.25 is the stated requirement (`docs/SETUP.md`). The setting is
+ * first documented by 2.28.0 as well, so a git older than that has no
+ * `diff.relative` to guard against, and reads a key it does not know as nothing:
+ * git documents `-c` as overriding the configuration files, and git 2.51.0 ran
+ * `log` with `-c no.such.key=1` as without it. Each version is read from git's own
+ * documentation at its release tag (E04-M01-S16's slice document).
+ *
+ * Two settings that look as though they need the same were measured and do not:
+ * a `diff.<driver>.textconv` changed a patch and left `--numstat`'s counts as they
+ * were, in `log` and in `diff`, and `notes.displayRef` added nothing to a
+ * `--format` that does not ask for `%N` (measured by E04-M01-S06).
+ */
+const CHANGED_FILE_CONFIGURATION = ['-c', 'diff.relative=false'];
+
+/**
  * The options both reads of changed files share, after the revisions they are
  * given: the changed files as `--raw` entries and `--numstat` line counts, every
  * path ended by a NUL (`-z`) and written as it is, renames detected (`-M`).
- *
- * And `--no-relative`, because with `diff.relative=true` a repository opened from
- * a folder inside it lists only the files under that folder, by paths relative
- * to it: git 2.51.0 listed `in.txt` alone for a commit that changed `out.txt` and
- * `sub/in.txt`, run from `sub`, and both by their whole paths with the option
- * (measured by E04-M01-S06 on a scratch repository). Two settings that look as
- * though they need the same were measured and do not: a `diff.<driver>.textconv`
- * changed a patch and left `--numstat`'s counts as they were, in `log` and in
- * `diff`, and `notes.displayRef` added nothing to a `--format` that does not ask
- * for `%N` (same measurement).
  */
-const CHANGED_FILE_OPTIONS = ['--raw', '--numstat', '-z', '-M', '--no-relative'];
+const CHANGED_FILE_OPTIONS = ['--raw', '--numstat', '-z', '-M'];
 
 /**
  * Read one commit's details, its changed files with them, in one process.
  *
  * The log of `hash` alone (`-1`), its header in {@link COMMIT_DETAILS_FORMAT}
  * with raw dates and the identities as git recorded them (`--no-use-mailmap`,
- * as a page reads them). The changed files are against the first parent
- * (`--diff-merges=first-parent`, an option git documents from 2.31, so a merge
- * lists what it brought to the branch it was made on) and against the empty
- * tree for a root commit (`--root`: with `log.showRoot=false`, git 2.51.0
- * printed a root commit with no changed file at all without it, and every file
- * as added with it; measured by E04-M01-S06 on a scratch repository).
+ * as a page reads them).
+ *
+ * **A merge's files are against its first parent**, so a merge lists what it
+ * brought to the branch it was made on: `-m --first-parent`, which git 2.25's
+ * documentation of `-m` names as showing "only diff against the first parent".
+ * `--first-parent` changes nothing else here, because `-1` shows `hash` itself.
+ * And `-c log.diffMerges=first-parent`, because from git 2.32.0 that setting
+ * chooses what `-m` shows: with `log.diffMerges=combined`, git 2.51.0 printed a
+ * merge with no changed file at all under `-m --first-parent --raw`, and its files
+ * against the first parent with the override (measured by E04-M01-S16 on a
+ * scratch repository).
+ *
+ * **A root commit's files are against the empty tree**: `-c log.showRoot=true`.
+ * With `log.showRoot=false`, git 2.51.0 printed a root commit with no changed
+ * file at all, and every file as added with the override (measured by
+ * E04-M01-S16; S06 measured the same of `--root`, an option git 2.25's
+ * `git log` documentation does not name).
  *
  * `hash` is put on the command line only once `detailsTargetOf` of
  * `src/contracts/commit-details.ts` has found it a full object name, so it can
@@ -296,13 +325,18 @@ const CHANGED_FILE_OPTIONS = ['--raw', '--numstat', '-z', '-M', '--no-relative']
 export function commitDetailsArgs(repositoryPath: string, hash: string): string[] {
   return [
     ...baseArgs(repositoryPath),
+    ...CHANGED_FILE_CONFIGURATION,
+    '-c',
+    'log.showRoot=true',
+    '-c',
+    'log.diffMerges=first-parent',
     'log',
     '-1',
     `--format=${COMMIT_DETAILS_FORMAT}`,
     '--date=raw',
     '--no-use-mailmap',
-    '--root',
-    '--diff-merges=first-parent',
+    '-m',
+    '--first-parent',
     ...CHANGED_FILE_OPTIONS,
     hash,
     '--',
@@ -316,5 +350,12 @@ export function commitDetailsArgs(repositoryPath: string, hash: string): string[
  * Untracked files are the status's to list (`statusArgs`).
  */
 export function uncommittedDiffArgs(repositoryPath: string, base: string): string[] {
-  return [...baseArgs(repositoryPath), 'diff', ...CHANGED_FILE_OPTIONS, base, '--'];
+  return [
+    ...baseArgs(repositoryPath),
+    ...CHANGED_FILE_CONFIGURATION,
+    'diff',
+    ...CHANGED_FILE_OPTIONS,
+    base,
+    '--',
+  ];
 }

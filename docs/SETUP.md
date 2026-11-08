@@ -11,10 +11,16 @@ already present. **Nothing has to be installed on this machine**, which is why t
 than it did: the two missing rows, Rust and the Microsoft C++ build tools, belong to candidates that were
 not chosen and are kept only so the decision can be re-read against what it cost.
 
-The git version floor the adapter needs is **2.14.0**, raised by `--no-optional-locks`. E01-M01-S03 derived it
+The git version floor the adapter needs is **2.15.0**, raised by `--no-optional-locks`. E01-M01-S03 derived it
 from git's documented history of each option it uses and **did not measure it**, because no git older than
-2.51.0 is installed on this machine; its slice document, *The version floor*, carries the derivation. The floor
-`docs/ADR-0001-stack.md` assumes, git 2.25, is above it and stays the stated requirement.
+2.51.0 is installed on this machine; its slice document, *The version floor*, carries the derivation. That
+derivation named 2.14.0: E04-M01-S16 read `Documentation/git.txt` of git/git at the tags `v2.14.0`, which does not
+name the option, and `v2.15.0`, which does (2026-11-08). The floor `docs/ADR-0001-stack.md` assumes, git 2.25, is
+above it and stays the stated requirement. Until E04-M01-S16 the details read passed three options git 2.25 does
+not document, so on git 2.25 to 2.30 it would have failed (an inference from that documentation; no such git was
+run); every option it passes now is documented by 2.25 or
+earlier, by the table in `docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S16-details-read-on-git-2-25.md`,
+and none of them raises the floor.
 
 ## What each candidate stack needed, at the time of the decision
 
