@@ -203,7 +203,7 @@ async function installedInView(page: Page): Promise<readonly boolean[]> {
  * `node_modules/playwright-core/lib/coreBundle.js`). `src/app/main.ts` opens the
  * window from `whenReady`, so the window can be attached, initialising or
  * loading while the `addInitScript` call below is on its way. E03-M01-FIX-05
- * saw a first window with four of the five, and E04-M01-FIX-04 three cases red
+ * saw a first window with four of the five, and E04-M01-FIX-04 read three cases red
  * at this guard with two or three after S05's reload.
  *
  * S05 wrote here that every script is in place once its call has resolved, so

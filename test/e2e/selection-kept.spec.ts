@@ -131,7 +131,7 @@ function viewBeforeScript(): boolean | null {
  * and how the window is brought to a document it ran first in). Measured by
  * E04-M01-FIX-05 at its Base, where the window was never reloaded: with a wait of
  * 60 to 600 ms planted before the `addInitScript` call, the restart case failed
- * `drawn.first` in 12 of 12 launches. `firstPageMs` counts any reload made here.
+ * `drawn.first` in 12 of 12 runs. `firstPageMs` counts any reload made here.
  */
 async function launch(repository: string, home: string): Promise<Instance> {
   const started = Date.now();
