@@ -50,7 +50,8 @@ const LINE_WIDTH = 1.6;
 const HEAD_RING_RADIUS = VERTEX_RADIUS + 2;
 
 /**
- * Scratch for `segmentLines`, which writes at most two lines of four numbers.
+ * Scratch for `segmentLines`, which writes a start point and at most two pieces
+ * of six numbers, fourteen in all.
  *
  * Module-level and reused, which is the one piece of state in this file. It is
  * safe because a paint runs synchronously from its first line to its last and
@@ -58,7 +59,7 @@ const HEAD_RING_RADIUS = VERTEX_RADIUS + 2;
  * fresh array per segment per row per frame — is a few thousand short-lived
  * allocations a second while a finger is on the wheel.
  */
-const scratch: number[] = [0, 0, 0, 0, 0, 0, 0, 0];
+const scratch: number[] = new Array<number>(14).fill(0);
 
 /**
  * Match the canvas's backing store to its box and to the display.
@@ -78,55 +79,60 @@ export function resizeCanvas(canvas: HTMLCanvasElement, width: number, height: n
 }
 
 /**
- * Every line of one row, in its lanes' colours.
+ * The halves of one row's lines that are of one kind, the curved ones when
+ * `curves` is true and the straight ones when it is false, each in its line's
+ * colour.
  *
- * A line whose two ends are in one lane is stroked straight. A line whose ends
- * are in two lanes — a lane change, from `segmentLines`'s first branch — is
- * stroked as a cubic Bézier curve between the same two ends, with both control
- * points at the height halfway between them and each directly above or below
- * its own end: `(x0, bend)` and `(x1, bend)`. A control point straight above or
- * below an end makes the curve's direction at that end vertical, so it meets the
- * vertical line of the next row, or the vertex it leaves or reaches, with no
- * corner; putting both at the same height makes the curve symmetric about its
- * middle, so a line leaving a vertex and a line arriving at one are the same
- * shape turned over. The ends are `segmentLines`'s four numbers and nothing
- * else: the curve adds no number to the geometry, and the reasons are in
- * `docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S08-rounded-lines.md`.
+ * `segmentLines` writes every number of the path, control points included, so
+ * this only strokes it: a half whose two ends share an `x` is a `lineTo`, any
+ * other a `bezierCurveTo`. A segment's two halves meet at the centre height, so
+ * two of one kind are one stroke and a straight line through a row has no join
+ * there. A segment with nothing of the kind asked for costs no stroke.
+ *
+ * Painting the two kinds apart is what puts every vertical line over every curve
+ * that crosses it: `paintGraph` paints all the curves first.
  */
 function paintRow(
   context: CanvasRenderingContext2D,
   rows: LayoutRows,
   row: number,
   top: number,
+  curves: boolean,
 ): void {
-  const vertexLane = entryAt(rows.laneIndex, row);
-  const flags = entryAt(rows.flags, row);
   const last = entryAt(rows.segmentOffsets, row + 1);
   for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
-    const lines = segmentLines(
-      scratch,
-      entryAt(rows.segmentFromLane, segment),
-      entryAt(rows.segmentToLane, segment),
-      vertexLane,
-      flags,
-      top,
-    );
-    context.strokeStyle = laneColour(entryAt(rows.segmentColour, segment));
-    context.beginPath();
-    for (let line = 0; line < lines; line += 1) {
-      const x0 = entryAt(scratch, line * 4);
-      const y0 = entryAt(scratch, line * 4 + 1);
-      const x1 = entryAt(scratch, line * 4 + 2);
-      const y1 = entryAt(scratch, line * 4 + 3);
-      context.moveTo(x0, y0);
-      if (x0 === x1) {
-        context.lineTo(x1, y1);
+    const halves = segmentLines(scratch, rows, row, segment, top);
+    let pen = false;
+    for (let half = 0; half < halves; half += 1) {
+      const at = 2 + 6 * half;
+      const x = entryAt(scratch, at + 4);
+      const y = entryAt(scratch, at + 5);
+      if ((entryAt(scratch, at - 2) !== x) !== curves) {
+        continue;
+      }
+      if (!pen) {
+        context.strokeStyle = laneColour(entryAt(rows.segmentColour, segment));
+        context.beginPath();
+        context.moveTo(entryAt(scratch, at - 2), entryAt(scratch, at - 1));
+        pen = true;
+      }
+      if (curves) {
+        const c = scratch;
+        context.bezierCurveTo(
+          entryAt(c, at),
+          entryAt(c, at + 1),
+          entryAt(c, at + 2),
+          entryAt(c, at + 3),
+          x,
+          y,
+        );
       } else {
-        const bend = (y0 + y1) / 2;
-        context.bezierCurveTo(x0, bend, x1, bend, x1, y1);
+        context.lineTo(x, y);
       }
     }
-    context.stroke();
+    if (pen) {
+      context.stroke();
+    }
   }
 }
 
@@ -180,8 +186,17 @@ function paintVertex(
  *
  * The caller has already decided which rows those are, from the scroll offset
  * and the viewport height (`./geometry`), so this reads exactly that slice of
- * the layout arrays. It is the whole of the drawing cost, and it is proportional
- * to the viewport.
+ * the layout arrays, and the segments of the one row on either side of it,
+ * which `segmentLines` reads to find where a line bends. It is the whole of the
+ * drawing cost, and it is proportional to the viewport.
+ *
+ * **The order is the layering, in two passes.** Every curved half of every row
+ * first, then, row by row, the straight halves and the dot. So a vertical line
+ * is drawn over every curve that crosses it, which is what the reference
+ * extension was seen to do (E04-M01-S15), and every dot over every line that
+ * reaches it. Where two curves cross, the one drawn later is on top: within one
+ * row's band that is segment order, the lines passing through in lane order from
+ * the left and then the lines born at the vertex.
  */
 export function paintGraph(
   context: CanvasRenderingContext2D,
@@ -197,8 +212,11 @@ export function paintGraph(
   context.lineWidth = LINE_WIDTH;
   context.lineCap = 'round';
   for (let row = first; row < first + count; row += 1) {
+    paintRow(context, rows, row, rowTopY(row, scrollTop), true);
+  }
+  for (let row = first; row < first + count; row += 1) {
     const top = rowTopY(row, scrollTop);
-    paintRow(context, rows, row, top);
+    paintRow(context, rows, row, top, false);
     paintVertex(context, rows, row, top, row === 0 && page.workingTree.hasChanges);
   }
 }

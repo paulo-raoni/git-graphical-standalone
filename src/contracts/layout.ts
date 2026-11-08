@@ -62,10 +62,15 @@ export type RowFlag = (typeof RowFlag)[keyof typeof RowFlag];
  * `segmentFromLane` and `segmentToLane` are equal. A line that moves to another
  * lane over the height of one row is a segment whose two lanes differ. That is
  * the whole vocabulary: it holds no curves, no multi-row edges and no scene
- * graph, so painting a viewport is a walk over a slice of these arrays. A curve
- * is the painter's way of drawing a segment whose two lanes differ, between the
- * two ends the segment names (`src/ui/graph-canvas.ts`, since E04-M01-S08); it
- * adds nothing to this vocabulary.
+ * graph, so painting a viewport is a walk over a slice of these arrays. The
+ * lanes a segment names are where the layout puts its line, and the drawing
+ * bends between them: since E04-M01-S15 the painter draws every change of lane
+ * as one S-curve from the centre height of one row to the centre height of the
+ * next, with its middle on the boundary between them, so a line crossing that
+ * boundary is drawn half-way between the two lanes there, and each of the two
+ * rows paints the half of the curve in its own band (`segmentLines` in
+ * `src/ui/geometry.ts`). It finds the other lane from the neighbouring row's
+ * segments, which already say it; the curve adds nothing to this vocabulary.
  *
  * A segment spans the **whole** band unless the row says otherwise. A branch tip
  * has no line above its dot and a root has none below, so each occupies half of
@@ -116,9 +121,16 @@ export interface LayoutRows {
   readonly maxLane: number;
   /** Offsets into the three segment arrays, `rowCount + 1` entries. */
   readonly segmentOffsets: Uint32Array;
-  /** Lane each segment's line enters at the top edge of its row. */
+  /**
+   * Lane each segment's line enters at the top edge of its row. Where the line
+   * changes lane between the row above's centre and this row's, it is drawn
+   * half-way between the two lanes at that edge (E04-M01-S15).
+   */
   readonly segmentFromLane: Uint16Array;
-  /** Lane each segment's line leaves at the bottom edge of its row. */
+  /**
+   * Lane each segment's line leaves at the bottom edge of its row, drawn
+   * half-way to the next row's lane where the two differ, as above.
+   */
   readonly segmentToLane: Uint16Array;
   /** Palette index of each segment. Not a colour. */
   readonly segmentColour: Uint8Array;

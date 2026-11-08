@@ -157,82 +157,141 @@ export function graphColumnWidth(maxLane: number): number {
   return Math.min(Math.max(wanted, MIN_GRAPH_WIDTH), MAX_GRAPH_WIDTH);
 }
 
+/** Half a row: from a row's edge to its centre height. */
+const HALF_ROW = ROW_HEIGHT / 2;
+
 /**
- * Turn one segment into the lines that are actually painted, writing
- * `x0, y0, x1, y1` quadruples into `into` and returning how many it wrote.
+ * The lane a segment's line is in at its row's centre height.
  *
- * It writes into a caller's array rather than returning one, because it is
- * called once per segment per visible row per frame and a fresh array each time
- * is garbage the 8 ms frame budget does not need to collect.
+ * A line arriving at the vertex is in the vertex's lane there, because that is
+ * where it ends; every other line is in the lane it entered the band in, which
+ * for a line born at the vertex is the vertex's lane too.
+ */
+function centreLane(rows: LayoutRows, segment: number, vertexLane: number): number {
+  const toLane = entryAt(rows.segmentToLane, segment);
+  return toLane === vertexLane ? vertexLane : entryAt(rows.segmentFromLane, segment);
+}
+
+/**
+ * The lane, at the centre height of `row`, of the line that crosses `row`'s
+ * bottom edge in `lane` (when `edge` is `segmentToLane`, asked of the row above)
+ * or its top edge in `lane` (when `edge` is `segmentFromLane`, asked of the row
+ * below).
  *
- * A segment spans the whole band unless the row says otherwise, so there are
- * four cases and the vertex decides three of them:
+ * At most one line crosses an edge in a lane other than the vertex's: the layout
+ * gives a line a lane of its own, a line born at the vertex starts at the centre
+ * and not at the top edge, and a line arriving at the vertex ends at the centre
+ * and not at the bottom edge. So the first segment of the row whose lane at that
+ * edge is `lane` is the line's. Outside the rows, or in the vertex's own lane,
+ * the answer is the lane itself: a line there meets the vertex in its own lane.
+ */
+function neighbourLane(rows: LayoutRows, row: number, lane: number, edge: Uint16Array): number {
+  if (row < 0 || row >= rows.rowCount || lane === entryAt(rows.laneIndex, row)) {
+    return lane;
+  }
+  const vertexLane = entryAt(rows.laneIndex, row);
+  const last = entryAt(rows.segmentOffsets, row + 1);
+  for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
+    if (entryAt(edge, segment) === lane) {
+      return centreLane(rows, segment, vertexLane);
+    }
+  }
+  return lane;
+}
+
+/**
+ * Turn one segment of `row` into the path that is painted, and return how many
+ * halves it has: none, one or two.
  *
- * - **a straight segment in a lane that is not the vertex's** crosses the whole
- *   band, whatever the clip bits say. They are about the vertex's lane only;
- *   `src/contracts/layout.ts` is explicit that a painter which clips on the
- *   segments instead leaves a gap at the foot of every page;
- * - **a straight segment in the vertex's own lane** is the arriving line and the
- *   departing line as one segment, so it is painted as two halves and each half
- *   is painted only when its clip bit is clear. That is the difference between a
- *   branch tip and a line continuing off the page, and neither bit is advice;
- * - **a segment whose lower end is the vertex's lane** is a line dying at this
- *   commit. It leans from where it entered the band down to the vertex, and
- *   stops there — drawing it to the bottom edge would put a stub below a dot it
- *   has already reached;
- * - **a segment whose upper end is the vertex's lane** is a line born at this
- *   commit, a merge's further parent. It starts at the vertex and leans out to
- *   the lane it will descend in.
+ * **What is written.** A start point, `x, y`, and then per half the three points
+ * of one cubic Bézier piece, `c1x, c1y, c2x, c2y, x, y`, each piece starting
+ * where the one before it ends. The upper half runs from the top edge to the
+ * centre height and is written first; the lower half from the centre height to
+ * the bottom edge. A half whose two ends share an `x` is straight, and its
+ * control points lie on it. It writes into a caller's array, at most fourteen
+ * numbers, because it is called once per segment per visible row per frame.
  *
- * A leaning segment touching neither — which the pass in `src/core/layout/`
- * does not emit, its every lane change having one end at the vertex — is drawn
- * corner to corner, so that a future layout cannot make this function silently
- * paint nothing.
+ * **Which halves exist.** The segment's line crosses the top edge unless it is
+ * born at the vertex, and the bottom edge unless it dies there; in the vertex's
+ * own lane a straight segment is the arriving and the departing line in one, so
+ * there the clip bits decide, exactly as `src/contracts/layout.ts` requires.
+ * Every other lane's line crosses the whole band, whatever the clip bits say.
  *
- * What it writes is a line's two **ends**, never its shape. A line whose ends
- * are in one lane is stroked straight; a line whose ends are in two lanes — the
- * three leaning cases above — is stroked by `paintRow` in `./graph-canvas` as a
- * curve between the same two ends that leaves and arrives vertically, so
- * "leans" above means the curve's course from one lane to the other, not a
- * straight diagonal (E04-M01-S08).
+ * **The shape (E04-M01-S15).** The reference extension draws every change of
+ * lane as one S-curve from the centre height of one row to the centre height of
+ * the next, vertical at both ends, with its middle on the boundary between the
+ * two rows. That is a cubic from `(xa, ya)` to `(xb, yb)` whose control points are
+ * `(xa, m)` and `(xb, m)`, `m` the boundary's height. A row paints the half of it
+ * that lies in its band, which is the curve cut at its middle: the lower half of
+ * the row above's band holds its first half, the upper half of this band its
+ * second. Each half is written here exactly as that cut gives it, so the two
+ * halves, painted by two rows, are one curve. The lane at the other end comes
+ * from the neighbouring row's segments ({@link neighbourLane}); the layout says
+ * nothing new, and a line whose two centres share a lane is straight.
  */
 export function segmentLines(
   into: number[],
-  fromLane: number,
-  toLane: number,
-  vertexLane: number,
-  flags: number,
+  rows: LayoutRows,
+  row: number,
+  segment: number,
   rowTop: number,
 ): number {
-  const middle = rowTop + ROW_HEIGHT / 2;
-  const bottom = rowTop + ROW_HEIGHT;
-  const xFrom = laneCentreX(fromLane);
-  const xTo = laneCentreX(toLane);
-  if (fromLane !== toLane) {
-    const arriving = toLane === vertexLane;
-    const departing = fromLane === vertexLane;
-    write(into, 0, xFrom, departing ? middle : rowTop, xTo, arriving ? middle : bottom);
-    return 1;
+  const vertexLane = entryAt(rows.laneIndex, row);
+  const flags = entryAt(rows.flags, row);
+  const fromLane = entryAt(rows.segmentFromLane, segment);
+  const toLane = entryAt(rows.segmentToLane, segment);
+  const x = laneCentreX(centreLane(rows, segment, vertexLane));
+  const middle = rowTop + HALF_ROW;
+  into[0] = x;
+  into[1] = middle;
+  let halves = 0;
+  if (
+    fromLane !== vertexLane ||
+    (toLane === vertexLane && (flags & RowFlag.ClipAboveVertex) === 0)
+  ) {
+    const other = laneCentreX(neighbourLane(rows, row - 1, fromLane, rows.segmentToLane));
+    into[0] = (x + other) / 2;
+    into[1] = rowTop;
+    piece(into, 2, (3 * x + other) / 4, rowTop + HALF_ROW / 4, x, rowTop + HALF_ROW / 2, x, middle);
+    halves = 1;
   }
-  if (fromLane !== vertexLane) {
-    write(into, 0, xFrom, rowTop, xFrom, bottom);
-    return 1;
+  if (
+    toLane !== vertexLane ||
+    (fromLane === vertexLane && (flags & RowFlag.ClipBelowVertex) === 0)
+  ) {
+    const other = laneCentreX(neighbourLane(rows, row + 1, toLane, rows.segmentFromLane));
+    const bottom = rowTop + ROW_HEIGHT;
+    piece(
+      into,
+      2 + 6 * halves,
+      x,
+      middle + HALF_ROW / 2,
+      (3 * x + other) / 4,
+      bottom - HALF_ROW / 4,
+      (x + other) / 2,
+      bottom,
+    );
+    halves += 1;
   }
-  let written = 0;
-  if ((flags & RowFlag.ClipAboveVertex) === 0) {
-    write(into, written++, xFrom, rowTop, xFrom, middle);
-  }
-  if ((flags & RowFlag.ClipBelowVertex) === 0) {
-    write(into, written++, xFrom, middle, xFrom, bottom);
-  }
-  return written;
+  return halves;
 }
 
-function write(into: number[], line: number, x0: number, y0: number, x1: number, y1: number): void {
-  into[line * 4] = x0;
-  into[line * 4 + 1] = y0;
-  into[line * 4 + 2] = x1;
-  into[line * 4 + 3] = y1;
+function piece(
+  into: number[],
+  at: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x: number,
+  y: number,
+): void {
+  into[at] = x1;
+  into[at + 1] = y1;
+  into[at + 2] = x2;
+  into[at + 3] = y2;
+  into[at + 4] = x;
+  into[at + 5] = y;
 }
 
 /**
