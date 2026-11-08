@@ -189,6 +189,83 @@ on 2026-11-08. The base was measured over a `git archive` of `8268e69`. That is 
 so its budget was reset once by the margin rule to 21 504, and the total to 75 545
 (`comment-e04-m01-s15` in `scripts/gates/size-budget.json`).
 
+## Gates
+
+The layout did not change, and the perf gate's layout readings at this lane's head (`e4d9fc5`, `npm run gates:perf`
+on 2026-11-08) were:
+
+- 130.49 typed-array bytes allocated per row, against a baseline of 130.491;
+- 18.747 units of layout work per row, against 18.747;
+- 3.965 times the work at 40 000 rows over 10 000, against 3.966.
+
+## The frame budget
+
+All readings were taken at this lane's head, `e4d9fc5`, and at Base. Base was a `git archive` of `8268e69`, built
+and run in a scratch folder with the same dependencies, so it carries S08's painter. All were taken on 2026-11-08,
+interleaved, each started only after a minute whose other load averaged under 40 per cent with no other gate run
+of this project listed. Two instruments sampled the load:
+
+- **S08's driver:** the operating system's process table every 2 seconds, the reading's own processes known by id
+  and creation time and taken out;
+- **a Windows job object:** every second, the job's own processor time taken out. The job counts every process
+  that was ever in it, short-lived ones included. These are the `job-` readings.
+
+A reading is kept when the minute before it and the reading itself averaged under 40 per cent other load, no
+sample during it was over 75, and its reference timings' 95th percentile was 4 ms or under (`AGENTS.md` §11).
+
+| reading | other load, minute before / during / highest | reference 95th percentile | mean per reference | fifth-slowest per reference | longest as timed | kept |
+| --- | --- | --- | --- | --- | --- | --- |
+| head 1 | 33.8 / 19.9 / 85.5 % | 4.0 ms | 4.823 | 5.959 | 7.7 | no: a sample over 75 |
+| Base 1 | 30.3 / 23.0 / 72.0 % | 4.3 ms | 4.965 | 6.21 | 8.2 | no: percentile |
+| head 2 | 35.5 / 39.1 / 77.1 % | 6.8 ms | 4.484 | 6.517 | 10.1 | no: both |
+| Base 2 | 34.7 / 33.7 / 84.2 % | 5.9 ms | 5.088 | 6.377 | 13.3 | no: both |
+| head 3 | 35.9 / 14.1 / 51.5 % | 3.6 ms | 4.828 | 5.855 | 7.7 | **yes** |
+| Base 3 | 36.3 / 20.7 / 72.8 % | 4.4 ms | 5.148 | 6.256 | 8.6 | no: percentile |
+| head 4 | 39.2 / 17.9 / 65.3 % | 3.7 ms | 4.881 | 5.855 | 7.0 | **yes** |
+| head, whole `gates:budgets` | 35.5 / 17.9 / 54.4 % | 4.1 ms | 4.62 | 6.348 | 8.6 | no: percentile |
+| Base 4 | 28.0 / 33.4 / 82.5 % | 4.5 ms | 4.627 | 6.482 | 11.8 | no: both |
+| head 5 | 37.0 / 33.3 / 90.9 % | 4.4 ms | 4.47 | 6.024 | 8.6 | no: both |
+| Base 5 | 30.1 / 38.9 / 81.1 % | 6.0 ms | 4.621 | 6.174 | 9.9 | no: both |
+| head 6 | 22.5 / 22.9 / 52.7 % | 4.4 ms | 4.627 | 6.232 | 10.1 | no: percentile |
+| Base 6 | 27.4 / 27.0 / 76.0 % | 4.3 ms | 4.564 | 6.716 | 9.0 | no: both |
+| head, second whole `gates:budgets` | 35.2 / 31.9 / 68.3 % | 5.5 ms | 4.431 | 6.703 | 11.0 | no: percentile |
+| Base 7, job | 21.6 / 21.0 / 59.0 % | 4.1 ms | 4.628 | 6.469 | 9.3 | no: percentile |
+| Base 8, job | 27.9 / 18.4 / 43.0 % | 3.7 ms | 4.691 | 6.024 | 7.2 | **yes** |
+| head 7, job | 38.9 / 36.5 / 75.0 % | 6.6 ms | 4.646 | 6.383 | 8.8 | no: percentile |
+| Base 9, job | 35.2 / 43.9 / 79.0 % | 7.7 ms | 4.82 | 6.79 | 12.2 | no: both |
+
+All times are in milliseconds. The limits are 7.41 for the mean, 10.0365 for the fifth-slowest and 16.7 for the
+longest frame as timed. Every reading, kept or not, was under all three. While these readings were taken, the
+process table listed two other lanes' gate runs of this project at times. The job samples name the WSL virtual
+machine (`vmmemWSL`, outside this project) and the malware scanner among the busiest processes outside the reading.
+
+- **Kept at head:** 4.828 and 4.881 for the mean, 5.855 twice for the fifth-slowest, 7.7 and 7.0 for the longest.
+- **Kept at Base:** one reading, at 4.691, 6.024 and 7.2.
+- **What that shows.** The two kept head means lie 0.14 to 0.19 ms above the one kept Base mean. Their
+  fifth-slowest and longest lie below it. One Base reading cannot say whether a difference of that size is the
+  curve's cost or the spread between readings.
+- **Other figures, not measured here.** S08's slice document records kept readings of its own painter, which is
+  Base's, at 4.711 to 4.994 for the mean. Those are S08's measurements, and this lane did not reproduce them.
+- **What these readings do show:** the kept readings at head are inside the frame budget with the margin
+  above.
+
+**The cases of `gates:budgets` other than the scrolled one.** Both whole runs passed all six cases and the
+three timed benchmarks. Read against the same rule:
+
+- **Benchmarks:** free in the second run (34.3 / 34.5 / 59.0 %).
+- **The memory case:** free in the first run (18.4 / 31.9 / 72.8 %).
+- **The three cold-start cases and the large-load case of `open-repository.spec.ts`:** not free in either run.
+  Across the two runs, other load during them was 34.9 to 75.9 per cent, with samples up to 96.9. They were read a
+  third time inside the job object (25.1 / 49.5 / 70.0 % for the first case), and were again not free, and green.
+- **Why.** In that job reading, the operating system's malware scanner (`MsMpEng`) was the busiest process
+  outside the job in 27 of 68 samples, at 13.5 per cent of the machine on average when it was. In the job reading of
+  the scrolled case just before (Base 7), it was the busiest in 13 of 74 samples, at 5.0 per cent on average.
+- **Not this lane's machine alone.** S08's own whole run of 2026-11-07, read again by this lane with the same
+  per-case arithmetic over S08's samples, shows the same pattern on a quiet machine. The first cold-start case had
+  13.9 per cent other load in the minute before it and 55.3 during it.
+- **An inference, not a measurement.** That each launch of a fresh profile makes the scanner work for the reading,
+  outside its process tree, so that §11's measure cannot keep a cold-start reading on this machine.
+
 ## Sentences corrected
 
 - `src/contracts/layout.ts`: the paragraph on the vocabulary now says that the lanes a segment names are where the
