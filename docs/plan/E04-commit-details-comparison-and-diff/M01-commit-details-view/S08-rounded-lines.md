@@ -8,6 +8,16 @@ row above or below, or the dot it leaves or reaches, the stroke has no corner. L
 straight, as before. Nothing else in the window changed: not the layout, not the colours, not the line width,
 not the dots.
 
+*Corrected by E04-M01-S15, 2026-11-08:* this section and the next describe a curve that lies within half a row, in
+the band of the row whose segment changes lane, between the two ends `segmentLines` wrote for it. That is no longer
+what is drawn. Every change of lane is now one curve from the centre height of one row to the centre height of the
+next, with its middle on the row boundary, as the reference extension was seen to draw it. Each of the two rows
+paints the half in its own band. The control-point rule below still holds for that whole curve, `(xa, m)` and
+`(xb, m)` with `m` half-way between its ends. But `segmentLines` now writes every point of each half, control
+points included, and `paintRow` only strokes them, so the painter no longer derives the curve from four numbers.
+`docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S15-curves-as-observed.md` has the curve,
+what carries the other lane, and what was seen.
+
 ## The curve
 
 `paintRow` in `src/ui/graph-canvas.ts` takes the four numbers `segmentLines` writes for a line, `x0, y0, x1,
@@ -51,6 +61,11 @@ green: the straight line put back, the curve made to leave its dot at a slant (i
 halfway across, on lines whose upper end is mid-row), and only the line arriving at a dot drawn straight. The
 golden image covers one fixture, `branch-and-merge`, which has one line leaving a dot and one arriving at a dot,
 each across one lane; a fault that only changed a curve across two or more lanes would not reach it.
+
+*Corrected by E04-M01-S15, 2026-11-08:* the curve's shape is now asserted without a window. Because `segmentLines`
+writes the control points, `test/e2e/graph-geometry.spec.ts` asserts every half it writes, across one lane and
+across three, against the curve cut at its middle. The golden image is still the check on the drawn pixels, and was
+recorded again by that slice.
 
 ## What was seen
 
