@@ -68,6 +68,16 @@ fixtures suite holds (*detects a rename whatever diff.renames says*). `--no-rela
 `diff.relative=true`, from a folder inside the repository, git listed only the files under that folder by paths
 relative to it; the fixtures suite holds a read from `deep/er` under that setting equal to one from the root.
 
+*Note of E04-M01-S16, 2026-11-08:* three of the options above are not named by the documentation of git 2.25,
+the requirement `docs/SETUP.md` states: `--diff-merges=first-parent` (first documented by 2.31.0),
+`--no-relative` (2.28.0) and `--root`, which 2.25's `git log` documentation does not name. With the first two
+given to every commit, on git 2.25 to 2.30 every commit's details would have failed, not a merge's alone (an
+inference from that documentation; no git older than 2.51.0 was run). The read now passes `-m --first-parent` with `-c log.diffMerges=first-parent`,
+`-c log.showRoot=true` and `-c diff.relative=false` in their place, and the uncommitted read the last of these in
+place of `--no-relative`. Every commit of every fixture of the adapter suite read the same bytes both ways on git
+2.51.0. The per-option table, with how each version was read, is in
+`S16-details-read-on-git-2-25.md`.
+
 **What the output is.** The header record, ended by the NUL `-z` puts after a commit's formatted text; then
 a line feed and the raw entries, `:<mode> <mode> <object> <object> <status>` each followed by its path, or for
 a rename the old path and the new one, every path a NUL-ended record; then the line counts,
@@ -112,6 +122,11 @@ The adapter runs git and streams every chunk to a parser; `src/app/` only forwar
   record, which suits its line-terminated format and the page's fields, and is wrong for a path: a file name may
   end in a carriage return where the file system allows one, and git writes it as it is. Each record is handed
   over as a copy of its own, through one path with no short cut a test could not tell apart;
+
+  *Note of E04-M01-S16, 2026-11-08:* `./records.ts` now drops that carriage return from a line-terminated record
+  only, and keeps every byte of a NUL-terminated one: fed records ending in one, it had dropped the return from
+  NUL-terminated records too, and git 2.51.0 writes `status --porcelain=v2 -z`'s record of a path ending in a
+  carriage return with the return before the NUL. The measurements are in `S16-details-read-on-git-2-25.md`;
 - `changed-files.ts` reads the raw entries and the line counts and joins them by the new path. Which shape a
   record is follows from the record before it, never from what it holds, so a path beginning with `:`, holding a
   tab or two, a quotation mark or a line feed, or looking like a line count is read as a path;

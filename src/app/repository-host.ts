@@ -1,10 +1,12 @@
 import { createGitRepositoryReader } from '../adapters/git-repository-reader';
-import { FailureKind } from '../contracts/index';
+import { entryAt } from '../contracts/column-read';
+import { FailureKind, RefKind } from '../contracts/index';
 import type {
   BranchSelection,
   CommitDetails,
   DetailsTarget,
   GraphPage,
+  Refs,
   Result,
   UncommittedDetails,
 } from '../contracts/index';
@@ -156,6 +158,76 @@ function superseded(): Result<never> {
   );
 }
 
+/**
+ * The full names of the branches `refs` lists, as a selection names them: every
+ * local branch, and while they are shown every remote-tracking branch and
+ * remote's HEAD — the entries the Branches dropdown offers (`branchEntries` of
+ * `src/contracts/branch-menu.ts`). Read here from the columns themselves rather
+ * than through that module, which this process's bundle does not carry: with it,
+ * `npm run gates:size` measured `src/contracts/branch-menu.ts` and
+ * `src/contracts/ref-list.ts` arriving in `repository.cjs`, 891 bytes the module
+ * manifest refuses (E04-M01-S16, 2026-11-08).
+ */
+function listedBranches(refs: Refs, showRemoteBranches: boolean): Set<string> {
+  const listed = new Set<string>();
+  for (let ref = 0; ref < refs.count; ref += 1) {
+    const kind = entryAt(refs.kind, ref);
+    const name = refs.names.slice(
+      entryAt(refs.nameOffsets, ref),
+      entryAt(refs.nameOffsets, ref + 1),
+    );
+    if (kind === RefKind.LocalHead) {
+      listed.add(`refs/heads/${name}`);
+    } else if (
+      showRemoteBranches &&
+      (kind === RefKind.RemoteBranch || kind === RefKind.RemoteSymbolicHead)
+    ) {
+      listed.add(`refs/remotes/${name}`);
+    }
+  }
+  return listed;
+}
+
+/**
+ * Read a page of `repositoryPath` under `selection`, of a log given only names its
+ * own reference listing names as a branch or a remote branch.
+ *
+ * A selected name that passes the adapter's checks can still read another
+ * reference: git tries a name under `refs/tags/` among other places, so where the
+ * branch `refs/heads/gone` was deleted while it was selected, a tag spelled
+ * `refs/heads/gone` was read in its place (review round 01 of E04-M01, on git
+ * 2.51.0). The listing a page is read with is what says which branches exist, and
+ * it is read in the same request as the log, after it (`readGitPage` of
+ * `src/adapters/git-page.ts`). So the page is read, and if its listing does not
+ * name every selected name as a branch, it is read again under the names it does
+ * name. Every read after the first drops at least one name, so there is at most
+ * one read more than there are names, and the page answered is one whose own
+ * listing names every name its log was given. A repository with every selected
+ * branch present pays for one read, as before.
+ *
+ * The selection kept is the one asked for, never the narrowed one: a branch made
+ * again under a deleted name is read again from the next page on.
+ */
+async function readListed(
+  repositoryPath: string,
+  pageSize: number,
+  selection: BranchSelection,
+): Promise<Result<RepositoryPage>> {
+  let narrowed = selection;
+  for (;;) {
+    const read = await reader.readPage({ repositoryPath, pageSize, selection: narrowed });
+    if (!read.ok || narrowed.branches === null) {
+      return read;
+    }
+    const listed = listedBranches(read.value.refs, narrowed.showRemoteBranches);
+    const branches = narrowed.branches.filter((name) => listed.has(name));
+    if (branches.length === narrowed.branches.length) {
+      return read;
+    }
+    narrowed = { ...narrowed, branches };
+  }
+}
+
 /** A failure of this process rather than of git, which the contract has no kind for. */
 function failed(kind: FailureKind, message: string): Result<never> {
   return { ok: false, kind, message };
@@ -216,11 +288,7 @@ async function openRepository(
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const read = await reader.readPage({
-    repositoryPath: path,
-    pageSize: FIRST_PAGE_COMMITS,
-    selection,
-  });
+  const read = await readListed(path, FIRST_PAGE_COMMITS, selection);
   if (open !== null && open.ticket > ticket) {
     return superseded();
   }
@@ -248,11 +316,7 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
     return failed(FailureKind.Cancelled, 'No repository is open, so there is nothing to add to.');
   }
   const pageSize = repository.block.rowCount + count;
-  const read = await reader.readPage({
-    repositoryPath: repository.path,
-    pageSize,
-    selection: repository.selection,
-  });
+  const read = await readListed(repository.path, pageSize, repository.selection);
   if (open !== repository) {
     return superseded();
   }
@@ -291,11 +355,7 @@ async function refresh(selection: BranchSelection | undefined): Promise<Result<G
     return select(repository, selection);
   }
   const pageSize = Math.max(repository.block.rowCount, FIRST_PAGE_COMMITS);
-  const read = await reader.readPage({
-    repositoryPath: repository.path,
-    pageSize,
-    selection: repository.selection,
-  });
+  const read = await readListed(repository.path, pageSize, repository.selection);
   if (open !== repository) {
     return superseded();
   }
@@ -323,11 +383,7 @@ async function select(
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const read = await reader.readPage({
-    repositoryPath: repository.path,
-    pageSize: FIRST_PAGE_COMMITS,
-    selection,
-  });
+  const read = await readListed(repository.path, FIRST_PAGE_COMMITS, selection);
   if (open?.ticket !== repository.ticket || open.selectedBy > ticket) {
     return superseded();
   }

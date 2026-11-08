@@ -67,6 +67,12 @@ builds names from the branches a page lists (E03-M01-S10), so through it such a 
 branch deleted since it was chosen, in a repository holding a reference of that spelling; that is an inference
 from how the dropdown builds names, not a measurement. Closing it is not in this slice: it is raised in its audit.
 
+*Note of E04-M01-S16, 2026-11-08:* the gap no longer remains. The utility process answers only a page whose own
+reference listing names every name its log was given as a branch or a remote branch, reading it again under the
+names the listing does name when it does not (`readListed` of `src/app/repository-host.ts`). An end-to-end case
+builds that tag, selects `refs/heads/gone`, deletes the branch and refreshes: the page holds `main`'s history alone,
+where git given the same names reads the tag's commit (`test/e2e/details-dropped-and-listed-branches.spec.ts`).
+
 **The sentences.** `isReadBranch`'s comment, the description of `BranchSelection` in `src/contracts/ipc.ts`, and
 the S09 slice document of E03-M01 now say what is refused, why, and who measured it; the S09 document keeps its
 original sentence's place with a dated correction rather than a silent rewrite.

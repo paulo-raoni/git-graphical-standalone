@@ -31,7 +31,7 @@ export const NUL_TERMINATOR = 0x00;
 /** Ends a record of a format git writes one line at a time. */
 export const LINE_TERMINATOR = 0x0a;
 
-/** A carriage return, dropped from a line-terminated record. */
+/** A carriage return, dropped from the end of a line-terminated record. */
 const CARRIAGE_RETURN = 0x0d;
 
 /** Bytes the carry starts with, which is more than any record git writes here. */
@@ -78,15 +78,29 @@ function carryBytes(reader: RecordReader, chunk: Uint8Array, from: number, to: n
 }
 
 /**
- * The end of the record, with a carriage return dropped.
+ * The end of the record, with a carriage return dropped from a line-terminated
+ * one.
  *
  * Git writes a line feed to a pipe on every platform, but a repository read
  * through a tool that rewrites line endings would otherwise leave the return
  * inside the last field of the record. `docs/ADR-0001-stack.md` Axis 5 puts that
- * normalisation here, at the parser, rather than at each field.
+ * normalisation here, at the parser, rather than at each field. Only there: the
+ * one line-terminated format read here, `for-each-ref`'s, holds no field that may
+ * contain a control character.
+ *
+ * **A NUL-terminated record keeps every byte.** Under `-z` git ends a record with
+ * the NUL alone, so a return before it is the data's: git 2.51.0 ended
+ * `status --porcelain=v2 -z`'s record of an index path `cr-name\r` with the
+ * return before the NUL, and this function, which dropped it from every record
+ * until then, read that path as `cr-name` (measured by E04-M01-S16 on a scratch
+ * repository, and by feeding such records to the reader).
  */
-function withoutReturn(bytes: Uint8Array, from: number, to: number): number {
-  if (to > from && entryAt(bytes, to - 1) === CARRIAGE_RETURN) {
+function withoutReturn(reader: RecordReader, bytes: Uint8Array, from: number, to: number): number {
+  if (
+    reader.terminator === LINE_TERMINATOR &&
+    to > from &&
+    entryAt(bytes, to - 1) === CARRIAGE_RETURN
+  ) {
     return to - 1;
   }
   return to;
@@ -107,10 +121,10 @@ export function pushRecords(reader: RecordReader, chunk: Uint8Array, onRecord: R
       continue;
     }
     if (reader.carried === 0) {
-      onRecord(chunk, start, withoutReturn(chunk, start, at));
+      onRecord(chunk, start, withoutReturn(reader, chunk, start, at));
     } else {
       carryBytes(reader, chunk, start, at);
-      onRecord(reader.carry, 0, withoutReturn(reader.carry, 0, reader.carried));
+      onRecord(reader.carry, 0, withoutReturn(reader, reader.carry, 0, reader.carried));
       reader.carried = 0;
     }
     start = at + 1;
@@ -127,7 +141,7 @@ export function pushRecords(reader: RecordReader, chunk: Uint8Array, onRecord: R
  */
 export function finishRecords(reader: RecordReader, onRecord: RecordSink): void {
   if (reader.carried > 0) {
-    onRecord(reader.carry, 0, withoutReturn(reader.carry, 0, reader.carried));
+    onRecord(reader.carry, 0, withoutReturn(reader, reader.carry, 0, reader.carried));
     reader.carried = 0;
   }
 }
