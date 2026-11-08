@@ -266,6 +266,25 @@ three timed benchmarks. Read against the same rule:
 - **An inference, not a measurement.** That each launch of a fresh profile makes the scanner work for the reading,
   outside its process tree, so that §11's measure cannot keep a cold-start reading on this machine.
 
+**Note of 2026-11-08, second session: the inference above is false.** At head `6f4c102`, which differs from the
+readings above only in this document, the four cases were read again one case per job-object reading. Each
+reading started only after a minute whose other load averaged under 25, 20 or 15 per cent, by series, with no
+other gate run of this project listed. The load was sampled every second, with the job's own
+processor time taken out. Every reading passed. At least one reading of each case was free and kept:
+
+| case | readings | kept | other load of the kept one, minute before / during / highest | figure of the kept one | strict limit |
+| --- | --- | --- | --- | --- | --- |
+| cold start, empty repository | 10 | 1 | 14.6 / 39.0 / 65.0 % | fastest of ten 1 084 ms | 1 486.5 ms |
+| cold start, 10 000 commits | 2 | 1 | 18.3 / 38.8 / 61.0 % | fastest of ten 1 125 ms | 1 560 ms |
+| 10 000 commits, one load | 1 | 1 | 20.2 / 36.3 / 73.0 % | fastest of ten 483.6 ms | 635.25 ms |
+| large load, main process answering | 1 | 1 | 19.5 / 28.3 / 42.0 % | a 636 ms load, 3 358 round trips, worst 2 ms | passed |
+
+The strict limits are each case's baseline in `perf/baselines.json` times its tolerance of 1.5, as the log of each
+reading prints the baseline. Every discarded reading of the empty-repository case was discarded on the load during
+it, 40.8 to 54.1 per cent, never on the minute before it. The malware scanner was the process outside the job most
+often the busiest during 9 of the 10 empty-repository readings and both 10 000-commit cold starts. So the scanner
+does load a cold start, but not always enough to discard it.
+
 ## Sentences corrected
 
 - `src/contracts/layout.ts`: the paragraph on the vocabulary now says that the lanes a segment names are where the
