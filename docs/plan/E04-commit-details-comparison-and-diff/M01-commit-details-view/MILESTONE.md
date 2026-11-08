@@ -27,12 +27,14 @@ literal 16.7 ms frame check and the bound on a reading's reference time the owne
 | S06 | commit details read | 2 | The details of a commit and of the uncommitted changes, with every changed file, its status and its line counts, read from git on request and handed to the window. |
 | S07 | fixture store and gate messages | 3 | The fixture store's numbering held and its sentences true, and the licences and commits gates' messages and range held by checks. |
 | S08 | rounded lines | 3 | Every change of lane drawn as a smooth curve instead of a straight diagonal. |
-| S09 | the details panel | 5 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
-| S10 | the changed files | 6 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
-| S11 | keyboard navigation | 7 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
-| S12 | panel size, place and options | 8 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
+| S09 | the details panel | 6 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
+| S10 | the changed files | 7 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
+| S11 | keyboard navigation | 8 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
+| S12 | panel size, place and options | 9 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
 | S13 | unkept choice said without blocking | 3 | A choice that cannot be kept is said by a notice inside the window that blocks nothing, in place of a message box. |
-| S14 | stash rows | 4 | Every stash a row of the graph, drawn as a stash, whose details list its untracked files; the details read on the git the setup states. |
+| S14 | stash rows | 5 | Every stash a row of the graph, drawn as the reference draws one, whose details list its untracked files. |
+| S15 | curves as observed | 4 | Every change of lane one S-curve from row centre to row centre, placed and drawn as observed in the reference extension. |
+| S16 | details read on git 2.25 | 4 | The details read on the git the setup states, a trailing carriage return kept, a stale reply and a listed-only selection held. |
 
 **Owner's rulings of 2026-11-02:** the stash rows of E01-M02 come into this milestone, because a stash's details
 need its row (S08 when ruled; S14 since the split of 2026-11-07); and every setting `docs/PLAN.md` §2 names
@@ -49,6 +51,13 @@ extension, so they stay in wave 3 as S08. Its stash rows need one, so they becom
 before the details panel, and S09 to S12 move one wave later. S14 also takes review round 02's C-10: the details
 read passes options newer than the git 2.25 that docs/ADR-0001-stack.md states, and it must read on git 2.25
 before S09 draws the details.
+
+**Changed on 2026-11-08:** the owner ruled that the lines be smooth as in the reference extension, with nothing
+reinvented. An observation of the running extension was taken the same day (`.omc/observations`, not committed).
+It found every change of lane drawn as one S-curve spanning a full row, from row centre to row centre, not the
+half-row curve S08 drew. S15 redraws them in wave 4. Beside it, S16 takes C-10 from S14, with C-13, C-04 and C-15's
+first half, so the details read works on git 2.25 before S09. S14's stash rows move to wave 5, and S09 to S12 move
+one wave later again. The same observation recorded how a stash row is drawn.
 
 **The orchestrator's choices, for the owner to overrule:** the control is a settings button on the panel's own
 strip; a choice that cannot be kept is said in the window (S03), then without blocking (S13): by a strip inside the
