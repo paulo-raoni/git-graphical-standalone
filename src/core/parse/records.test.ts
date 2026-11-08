@@ -101,6 +101,12 @@ describe('pushRecords', () => {
     expect(readIn(`unended\r`, 64, NUL_TERMINATOR)).toEqual(['unended\r']);
   });
 
+  it('keeps an empty line-terminated record empty, wherever a chunk begins', () => {
+    for (const found of everySize('\none\r\n\r\n\ntwo\n', LINE_TERMINATOR)) {
+      expect(found).toEqual(['', 'one', '', '', 'two']);
+    }
+  });
+
   it('drops one carriage return only, from a line-terminated record and its unended last', () => {
     expect(readIn('one\r\r\ntwo\r', 64, LINE_TERMINATOR)).toEqual(['one\r', 'two']);
   });
