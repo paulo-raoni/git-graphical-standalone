@@ -11,6 +11,8 @@ import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
 import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
 import { removeDirectory } from '../fixtures/shared-store';
+import { initScriptFirst } from './support/budgets';
+import type { InitScriptRun } from './support/budgets';
 import { ended, fixture } from './support/fixtures';
 
 /**
@@ -121,11 +123,16 @@ async function launch(home: string, options: LaunchOptions): Promise<Launched> {
   });
   children.push(application.process());
   if (options.initScript !== undefined) {
-    // Not always in place before the first document: the launch releases the
-    // application's `ready` before it returns, so the window can already be
-    // loading (E04-M01-S05 read where Playwright does it; `launchBudgeted` in
-    // `support/budgets.ts`). It is in place for every document created after
-    // this call has resolved, which is what a reload relies on.
+    // Not always in the first document, and not always in any: the launch
+    // releases the application's `ready` before it returns, so the window can
+    // already be attached or loading (E04-M01-S05 read where Playwright does it).
+    // A call that lands after the window was initialised is in its next document;
+    // one that lands while it is attached and not yet initialised is in none of
+    // them, reloads included (read and measured by E04-M01's review round 05, and
+    // measured for this suite by E04-M01-FIX-05: the first-paint case red at its
+    // Base with a wait of 60 to 150 ms planted before this call). The case that
+    // passes a script brings the window to a document it ran first in with
+    // `initScriptFirst` of `support/budgets.ts`, which says how.
     await application.context().addInitScript(options.initScript);
   }
   return { application, page: await application.firstWindow() };
@@ -306,16 +313,25 @@ test('the choice survives a relaunch and is the scheme of the first paint', asyn
   const options = { emulated: null, initScript: recordFirstFrame };
   await withApplication(home, options, async (launched) => {
     const { page } = launched;
-    // The script can miss the first document (`launch` says why). Once the
-    // renderer's view is in the window's document, one the script did not run
-    // in first is reloaded, once: the script is in the context by then, so the
-    // reloaded document runs it before its own scripts. `beforeRenderer: true`
-    // below is what refuses a document it still did not run in first. A reloaded
-    // document starts in the scheme the main process holds at the reload, so a
-    // stored choice applied after the window was made, and before the reload,
-    // is seen only on a launch that does not reload.
-    await page.waitForFunction(() => 'gitGraphicalView' in globalThis);
-    if ((await page.evaluate(readFirstFrame))?.['beforeRenderer'] !== true) await page.reload();
+    // The script can miss the first document, or every document of the window
+    // (`launch` says why). Once the renderer's view is in the window's document,
+    // one the script did not run in first is reloaded, and added to the page and
+    // reloaded again if it did not run in the reloaded one either.
+    // `beforeRenderer: true` below is what refuses a document it still did not
+    // run in first. A reloaded document starts in the scheme the main process
+    // holds at the reload, so a stored choice applied after the window was made,
+    // and before the reload, is seen only on a launch that does not reload.
+    await initScriptFirst(page, recordFirstFrame, 'the first-frame recorder', async () => {
+      await page.waitForFunction(() => 'gitGraphicalView' in globalThis);
+      const record = await page.evaluate(readFirstFrame);
+      const run: InitScriptRun =
+        record === undefined
+          ? 'did not run'
+          : record['beforeRenderer'] === true
+            ? 'ran first'
+            : 'ran late or in part';
+      return { run, seen: JSON.stringify(record ?? null) };
+    });
     await expect(control(page)).toHaveValue(against);
     // The control shows the choice from an IPC reply that does not wait for a
     // frame, so the first frame's callback may not have run yet: in 6 of 20

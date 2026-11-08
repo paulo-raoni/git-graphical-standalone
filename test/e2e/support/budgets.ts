@@ -26,7 +26,9 @@ import type { PaintMark, PaintState } from './budgets-page';
  * What the end-to-end budget suites share on the Node side: launching the built
  * application with the probes of `./budgets-page.ts` in place, reading its
  * processes from the operating system, waiting for a painted state, and holding
- * a measurement against `perf/baselines.json`.
+ * a measurement against `perf/baselines.json`. {@link initScriptFirst}, which
+ * brings a window to a document its init script ran first in, is shared with the
+ * theme and selection suites, which add one init script each.
  *
  * **Every comparison goes through {@link holdToBaseline}**, which calls
  * `compareInRegime` in `perf/baselines.ts`, which calls `compareWithBaseline`.
@@ -60,7 +62,10 @@ export interface Budgeted {
   readonly launched: ChildProcess;
   /** The user-data directory made for this launch, removed by {@link closeBudgeted}. */
   readonly home: string;
-  /** Whether the first window was reloaded because an init script missed its first document. */
+  /**
+   * Whether the document measured is not the first window's first: the window
+   * was reloaded because the init scripts missed its first document.
+   */
   readonly reloaded: boolean;
 }
 
@@ -71,7 +76,7 @@ export interface LaunchOptions {
   readonly switches?: readonly string[];
 }
 
-/** The init scripts of `./budgets-page.ts`, in the order they are added and run. */
+/** The init scripts of `./budgets-page.ts`, in the order they run. */
 const INIT_SCRIPTS = [
   installProbe,
   installStateReader,
@@ -81,11 +86,94 @@ const INIT_SCRIPTS = [
 ] as const;
 
 /**
+ * The five init scripts as the source of **one**, which calls each in turn in
+ * the order of {@link INIT_SCRIPTS}, and is added to the application by one
+ * call (E04-M01-FIX-05). One script reaches a window whole or not at all, so a
+ * launch never has to add back some of the five behind the others: a script
+ * added to a page runs after every script of its context (`allInitScripts` in
+ * Playwright 1.63.0, read by FIX-05), and the four after the probe need the
+ * probe in place. Each function is sent as its source text, as Playwright sends
+ * a function given to `addInitScript`.
+ */
+const INIT_SOURCE = INIT_SCRIPTS.map((script) => `(${script.toString()})();`).join('\n');
+
+/** What a window's document holds of an init script, once the renderer's view is in it. */
+export type InitScriptRun = 'ran first' | 'ran late or in part' | 'did not run';
+
+/** {@link InitScriptRun}, and what was read, as a reload prints it. */
+export interface InitScriptReading {
+  readonly run: InitScriptRun;
+  readonly seen: string;
+}
+
+/**
+ * Bring a window to a document in which `script`, already added to the
+ * application's context, ran before the renderer, and return how many times the
+ * window was reloaded for it: 0, 1 or 2. `read` waits for the renderer's view in
+ * the window's current document and says what that document holds of the
+ * script; `name` is what a reload prints.
+ *
+ * **A context init script can miss a window in two ways, and a reload repairs
+ * only one.** Read by E04-M01's review round 05, and again by E04-M01-FIX-05, in
+ * Playwright 1.63.0's `node_modules/playwright-core/lib/coreBundle.js`:
+ * `BrowserContext._internalAddInitScript` pushes the script into the context's
+ * list and hands it to `pages()` alone, which keeps only the pages that are
+ * initialised (`doAddInitScript`, `pages`); a Chromium page's
+ * `FrameSession._initialize` copies `allInitScripts()` once, as it starts; and
+ * the page counts as initialised only once that has finished, its first
+ * navigation committed (`_markInitialized`).
+ *
+ * - A call that lands after the window was initialised reaches it for its next
+ *   document: the script is **late**, and a reload repairs it.
+ * - A call that lands while the window is attached and not yet initialised
+ *   reaches neither path: the script is **lost**, from every document of that
+ *   window, reloads included. FIX-05 measured it at its Base, with a wait planted
+ *   before one of `launchBudgeted`'s five calls: 12 of 18 launches lost every
+ *   script from the delayed one on, in the document after the reload too.
+ *
+ * So the first document that misses the script is reloaded, and a reloaded
+ * document still without it is one whose script was lost, not late: every
+ * script that reached the window is in place before the reload, because
+ * `firstWindow` resolves only with an initialised page and the caller's
+ * `addInitScript` call, which awaits the page it reaches, has resolved before
+ * that. The lost script is then added to the window's page itself, with
+ * `page.addInitScript`, which hands it to the page's frame sessions directly,
+ * and the window is reloaded once more. **That second `page.reload`, after
+ * `page.addInitScript`, is the line the guarantee hinges on.** A late script is
+ * never added again, so none runs twice; the caller's own check on the document
+ * it is left with refuses one that ran twice, in part, or after the renderer.
+ */
+export async function initScriptFirst(
+  page: Page,
+  script: string | (() => void),
+  name: string,
+  read: () => Promise<InitScriptReading>,
+): Promise<number> {
+  const first = await read();
+  if (first.run === 'ran first') {
+    return 0;
+  }
+  process.stdout.write(`    the first document holds ${name} ${first.seen}: reloaded\n`);
+  await page.reload();
+  const reloaded = await read();
+  if (reloaded.run !== 'did not run') {
+    return 1;
+  }
+  process.stdout.write(
+    `    the reloaded document holds ${name} ${reloaded.seen}: they never reached this ` +
+      'window, so they are added to its page and it is reloaded again\n',
+  );
+  await page.addInitScript(script);
+  await page.reload();
+  return 2;
+}
+
+/**
  * The renderer's document of `page` once its view exists, and what the init
  * scripts recorded in it. Polled from here, with the page's own timers left
  * alone, because a wait run in the page would be counted by the probe.
  */
-async function installedInView(page: Page): Promise<readonly boolean[] | null> {
+async function installedInView(page: Page): Promise<readonly boolean[]> {
   const until = Date.now() + 60_000;
   for (;;) {
     const installed = await page.evaluate(readInstalled).catch(() => null);
@@ -105,26 +193,36 @@ async function installedInView(page: Page): Promise<readonly boolean[] | null> {
  * `./budgets-page.ts` in its first window's document before `renderer.js` runs,
  * and refuse the launch if any of them ran after the renderer had.
  *
- * **The scripts can reach the first document late, so a first window that
- * missed one is reloaded.** `electron.launch` does hold the application's
+ * **The scripts can reach the first window late, or miss it altogether, so
+ * the window is brought to a document that holds them by
+ * {@link initScriptFirst}.** `electron.launch` does hold the application's
  * `ready` until Playwright has connected, but it also releases it before it
  * returns: Playwright 1.63.0's launcher calls `__playwright_run()` in the main
  * process from `ElectronApplication.initialize()`, inside the launch (E03-M01's
- * review round 07 read it, and this lane read it again in
+ * review round 07 read it, and E04-M01-S05 read it again in
  * `node_modules/playwright-core/lib/coreBundle.js`). `src/app/main.ts` opens the
- * window from `whenReady`, so the window can be loading while the five
- * `addInitScript` calls below are still on their way, and a script that arrives
- * after the document was created runs only in the next one. E03-M01-FIX-05 saw
- * a first window with four. Every script is in place once its call has
- * resolved, so the document of a reload after the last one holds all five,
- * whatever the order of events before. The reload is only made when one is
- * missing, because a reload delays the first painted state a start case times;
- * `budgets-start.spec.ts` times no launch that {@link Budgeted.reloaded}.
+ * window from `whenReady`, so the window can be attached, initialising or
+ * loading while the `addInitScript` call below is on its way. E03-M01-FIX-05
+ * saw a first window with four of the five, and E04-M01-FIX-04 read three cases red
+ * at this guard with two or three after S05's reload.
+ *
+ * S05 wrote here that every script is in place once its call has resolved, so
+ * that one reload is always enough. That holds only for a window initialised
+ * before the call landed: E04-M01's review round 05 read and measured that a
+ * call landing while the window is attached and not yet initialised reaches none
+ * of its documents, and E04-M01-FIX-05 measured it red at this guard at its Base
+ * ({@link initScriptFirst} has the reading). So the five are added as one script
+ * ({@link INIT_SOURCE}), a first document without them is reloaded, and a
+ * reloaded one still without them gets them added to the window's page and is
+ * reloaded again. A reload is only made when they are missing, because it
+ * delays the first painted state a start case times; `budgets-start.spec.ts`
+ * times no launch that {@link Budgeted.reloaded}, whether once or twice.
  *
  * Every init script records whether the renderer's view already existed when it
- * ran; this reads that in the document that has the view, after the reload if
- * there was one, and a launch where any is missing or late is failed here, the
- * application closed and its directory removed, rather than measured.
+ * ran; this reads that in the document that has the view, after the last reload
+ * if there was one, and a launch where any is missing, late or run twice is
+ * failed here, the application closed and its directory removed, rather than
+ * measured.
  *
  * **The user-data directory is made for the launch and removed by
  * {@link closeBudgeted}** (E04-M01-S05), so that a choice the application
@@ -153,23 +251,21 @@ export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budge
   }
   const launched = application.process();
   try {
-    const context = application.context();
-    for (const script of INIT_SCRIPTS) {
-      await context.addInitScript(script);
-    }
+    await application.context().addInitScript(INIT_SOURCE);
     const page = await application.firstWindow();
-    const first = await installedInView(page);
-    const reloaded = !allBeforeRenderer(first);
-    if (reloaded) {
-      process.stdout.write(
-        `    the first document holds init scripts ${JSON.stringify(first)}: reloaded\n`,
-      );
-      await page.reload();
-    }
-    const installed = reloaded ? await installedInView(page) : first;
+    const reloads = await initScriptFirst(page, INIT_SOURCE, 'init scripts', async () => {
+      const flags = await installedInView(page);
+      const run: InitScriptRun = allBeforeRenderer(flags)
+        ? 'ran first'
+        : flags.length === 0
+          ? 'did not run'
+          : 'ran late or in part';
+      return { run, seen: JSON.stringify(flags) };
+    });
+    const installed = await installedInView(page);
     // Five, written out: a script dropped from the list must fail here, not shrink the check.
     expect(installed).toEqual([true, true, true, true, true]);
-    return { application, page, launchedAt, launched, home, reloaded };
+    return { application, page, launchedAt, launched, home, reloaded: reloads > 0 };
   } catch (error) {
     await application.close().catch(() => undefined);
     removeHome(home);
@@ -178,8 +274,8 @@ export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budge
 }
 
 /** Whether every init script ran, and ran before the renderer. */
-function allBeforeRenderer(installed: readonly boolean[] | null): boolean {
-  return installed?.length === INIT_SCRIPTS.length && installed.every((before) => before);
+function allBeforeRenderer(installed: readonly boolean[]): boolean {
+  return installed.length === INIT_SCRIPTS.length && installed.every((before) => before);
 }
 
 /**

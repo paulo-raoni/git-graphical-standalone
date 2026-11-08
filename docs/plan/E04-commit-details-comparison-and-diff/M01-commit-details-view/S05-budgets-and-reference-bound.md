@@ -234,6 +234,16 @@ Of the two repairs the task offered the lane took the reload:
   renderer's view, which scripts ran and whether each ran before the renderer (`readInstalled` in
   `budgets-page.ts`, polled from Node so that the probe does not count the polling), and reloads the window if any
   is missing or late.
+
+  > **Corrected 2026-11-08 by E04-M01-FIX-05.** The first sentence of this bullet holds only for a window that was
+  > initialised before the call landed. E04-M01's review round 05 read in Playwright 1.63.0's `coreBundle.js` that
+  > a context's `addInitScript` reaches only the pages already initialised, and that a Chromium page copies the
+  > context's scripts once, as its initialisation starts. A call that lands between the two reaches no document of
+  > that window, reloads included. FIX-05 read the same lines again, then planted a wait before one of the five
+  > calls at its own Base (`7612190`). 12 of 18 launches of `budgets-frames.spec.ts:60` lost every script from
+  > the delayed one on, after the reload too, and failed the guard. The waits were 20, 100 and 300 ms, before the
+  > second, third or fifth call. FIX-05 now adds the five as one script. A reloaded document still without it gets
+  > it added to the window's page and is reloaded again (`initScriptFirst` in `test/e2e/support/budgets.ts`).
 - Holding the window instead would have needed code of the lane's in the application's main process, and would
   have added the five calls' round trips to every cold start a start case times. The reload changes nothing on a
   launch whose first document holds all five.

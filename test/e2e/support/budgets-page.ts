@@ -11,14 +11,16 @@ import type { GitGraphicalBridge, GraphPage } from '../../../src/contracts/index
  *
  * The five `install…` functions are **init scripts**: added to the
  * application's browser context by `launchBudgeted` in `./budgets.ts` straight
- * after launch, in the order they are declared, so that they run in a document
- * before `renderer.js` does. Installed any later they would miss what the
- * renderer registered while mounting, which is exactly where a polling loop
- * would be written. They can reach the first document late, because the launch
- * has already let the application open its window when they are added, so
- * `launchBudgeted` reloads a first window that missed one (its comment says
- * why). Each records whether the renderer's view already existed when it ran,
- * and the suites refuse a reading taken after it did.
+ * after launch, as one script that calls them in the order they are declared, so
+ * that they run in a document before `renderer.js` does. Installed any later
+ * they would miss what the renderer registered while mounting, which is exactly
+ * where a polling loop would be written. They can reach the first document late,
+ * or miss the window altogether, because the launch has already let the
+ * application open its window when they are added, so `launchBudgeted` reloads a
+ * first window that missed them, and adds them to the window's page and reloads
+ * it again when they missed it altogether (`initScriptFirst` there says why).
+ * Each records whether the renderer's view already existed when it ran, and the
+ * suites refuse a reading taken after it did.
  *
  * ### What "painted" means here
  *
