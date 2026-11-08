@@ -89,6 +89,21 @@ describe('pushRecords', () => {
       expect(found).toEqual(['one', 'two']);
     }
   });
+
+  // Under `-z` git ends a record with a NUL and nothing else, so a carriage
+  // return before it is data: git 2.51.0 wrote `status --porcelain=v2 -z`'s
+  // record of an index path `cr-name\r` with the return before the NUL
+  // (measured by E04-M01-S16 on a scratch repository).
+  it('keeps a carriage return that ends a NUL-terminated record, at every chunk size', () => {
+    for (const found of everySize(`one\r${NUL}two\r\r${NUL}\r${NUL}`, NUL_TERMINATOR)) {
+      expect(found).toEqual(['one\r', 'two\r\r', '\r']);
+    }
+    expect(readIn(`unended\r`, 64, NUL_TERMINATOR)).toEqual(['unended\r']);
+  });
+
+  it('drops one carriage return only, from a line-terminated record and its unended last', () => {
+    expect(readIn('one\r\r\ntwo\r', 64, LINE_TERMINATOR)).toEqual(['one\r', 'two']);
+  });
 });
 
 describe('finishRecords', () => {
