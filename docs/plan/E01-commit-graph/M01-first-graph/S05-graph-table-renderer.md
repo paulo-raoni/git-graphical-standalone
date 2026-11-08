@@ -111,6 +111,15 @@ rows, whose ends share a lane, are still straight. That slice's document,
 `docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S08-rounded-lines.md`, has the curve
 and what was seen of it.
 
+*Corrected by E04-M01-S15, 2026-11-08:* a change of lane no longer lies within the row whose segment changes lane.
+The table's lanes are still the layout's, but the drawn line now moves between lanes in a curve from the centre
+height of one row to the centre height of the next, half in each row's band. So the line of `(L, V)` enters the top
+edge half-way between `L` and the lane it held at the row above's centre. The line of `(V, R)` leaves the bottom
+edge half-way between `V` and the lane it holds at the next row's centre. A `(L, L)` segment next to such a row
+curves in the half of its band that touches the change. `segmentLines` now reads the neighbouring row's segments,
+and writes a start point and up to two curve pieces rather than up to two lines.
+`docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S15-curves-as-observed.md` has the curve.
+
 ## The recycling scheme, and its invariants
 
 A fixed pool of row elements over a spacer. The three invariants:
