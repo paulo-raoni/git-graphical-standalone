@@ -61,7 +61,10 @@ export { excerptOf, plainFiles } from './mutation-output.js';
  *   for a kill chosen for the clock alone, **past the outer clock**: killed, by
  *   a test the mutant itself keeps from finishing, which is a detection on a
  *   clock exactly as Stryker's `Timeout` is;
- * - **a failing test**, with no sign of starving: killed, as Stryker said;
+ * - **a failing test**, with no sign of starving: killed, as Stryker said; and
+ *   so is a failing test whose only sign of starving is V8 refusing a buffer
+ *   the mutated file itself asked for, which *A mutant's own refused
+ *   allocation* below argues;
  * - **a failed test file and an error that names the mutated file**, with no
  *   failing test and no sign of starving: killed, by its own module breaking on
  *   import, which is the one legitimate kill that names no failing test;
@@ -139,7 +142,77 @@ export { excerptOf, plainFiles } from './mutation-output.js';
  * file: none in `src/`, `test/` or `perf/`, the folders whose files a test run
  * prints code frames of, which is what keeps an honest kill's code frame from
  * matching it; four lines of `scripts/gates/`, three of them in this file and one
- * in `mutation.js`, whose frames no run of the unit suite prints.
+ * in `mutation.js`, whose frames no run of the unit suite prints. Grepped again
+ * by E04-M01-FIX-04 at its head, with the same phrases over `src/`, `test/`,
+ * `perf/` and `scripts/`: none in `src/` or `perf/`; in `test/` only
+ * `test/gates/fixtures/remeasure-report.json`, which the checks read as data,
+ * never a module whose lines a stack frame can show; in `scripts/` this file
+ * alone.
+ *
+ * ## A mutant's own refused allocation
+ *
+ * **A second run that fails a test, and whose only sign of starving is V8
+ * refusing a buffer the mutated file itself asked for, is a kill.** Until
+ * E04-M01-FIX-04 it was read "could not get memory again" and refused the build,
+ * because `STARVED` matches `allocation failed` and was tested first; and the gate
+ * went red on an unchanged product in E04-M01-S07's and S08's lanes, both times on
+ * `hash-index.ts` 120:7 run again alone beside another lane's mutation run.
+ *
+ * Both mutants of that line, `ConditionalExpression` to `true` and
+ * `EqualityOperator` to `<=`, make the index rehash at almost every insert, so its
+ * table doubles at almost every insert. The suite's files run one at a time,
+ * `commit-store.test.ts` before `hash-index.test.ts`, and `--bail=1` stops the run
+ * at the first failure, which is always the store's 200-insert test of its work
+ * counter. What that test fails with depends on how much memory one process can
+ * get at that moment, not on the mutant. E04-M01's review round 04 measured it on
+ * 2026-11-07 at `8e645c8`, each mutant planted in turn and the per-mutant command
+ * run alone: uncapped on a free machine, 12 of 12 runs failed that test with a
+ * `RangeError` saying a column entry is outside a column of 4 294 967 296 entries,
+ * which carries no `STARVED` phrase and was always read as a kill; with the run's
+ * memory capped by a Windows job object, at 2, 4, 8 and 16 GiB for `<=` and at
+ * 8 GiB for `true`, 5 of 5 failed it with V8's `RangeError: Array buffer
+ * allocation failed`, whose first frame is `rehash` in `hash-index.ts`; and the
+ * suite with no mutant passed all 524 tests under the 2 GiB cap. FIX-04 measured
+ * it again at its head on the same day, the same way, each mutant once under a
+ * 2 GiB cap, once under an 8 GiB cap and once uncapped: under either cap both
+ * failed that test with `RangeError: Array buffer allocation failed`, first frame
+ * `rehash` at `hash-index.ts:103:17`, in 6 to 21 s; uncapped both failed it with
+ * the column's `RangeError`, in 37 and 50 s; the suite with no mutant passed 524 of
+ * 524 under the 2 GiB cap; and each of the six outputs, handed to `remeasure` as a
+ * second run, read "assertion". Either way the test fails because of the mutant,
+ * so either way it is a detection.
+ *
+ * `refusedOwnBuffer` reads it, before `STARVED` is tested, and only when every one
+ * of these holds: the output names a failing test (`FAILING_TESTS`); the only
+ * `STARVED` phrase in it is V8's `RangeError: Array buffer allocation failed`, so
+ * node's `Allocation failed - JavaScript heap out of memory`, `out of memory`,
+ * `OUT_OF_MEMORY`, `VirtualAlloc failed` and a worker that `exited unexpectedly`
+ * still refuse; and the first line under every such refusal is a frame of a stack
+ * naming the mutated file, so a buffer refused to any other file, a test's own
+ * included, still refuses. Its verdict is printed "a test failed on the mutant's
+ * own allocation", so that a reader of the gate's output can tell it from an
+ * ordinary assertion.
+ *
+ * **What it leaves:** a healthy suite starved so hard that a buffer the mutated
+ * file asks for is refused, with a test failing on it and nothing else printed
+ * that says starving, now reads as a kill, and a mutant that survives the tests
+ * could be counted as detected. That is accepted, on three grounds. Every
+ * `Array buffer allocation failed` that FIX-04 found recorded, grepping `docs/` at
+ * its base, came from a mutant that grows a column without end: S12's six, in all
+ * nine of its reports, as its slice document records them (FIX-04 did not
+ * reproduce those), and the two of line 120 above. The starved suites this clause
+ * was written for, S12's five and review round 21's one, listed at the top of
+ * this header, said so in other ways, all of which still refuse: a worker's exit
+ * status, `VirtualAlloc failed`, node's own `Out of memory`, a worker that died
+ * before any test file was loaded, or nothing at all. And the clause has just run
+ * the same suite, in the same copy, with no mutant planted, and refuses every kill
+ * when that run fails. That the buffers a mutated file
+ * asks for in a healthy run are too small to be refused alone, while the rest of
+ * the suite gets its memory, is an inference, measured for one file only: FIX-04
+ * logged every table `hash-index.ts` allocates in one run of the per-mutant
+ * command with no mutant planted, 81 tables, the largest 32 768 bytes; the
+ * buffers of the other mutated files were not measured. Narrowing further, to
+ * buffers above some size, is not open: V8's message names no size.
  *
  * ## The outer clock
  *
@@ -205,6 +278,15 @@ const FAILING_FILES = /^\s*Test Files\s+\d+ failed\b/m;
 /** What a suite that could not get memory, or whose worker died, prints. See the header. */
 const STARVED =
   /allocation failed|out of memory|OUT_OF_MEMORY|VirtualAlloc failed|exited unexpectedly/i;
+
+/**
+ * V8's refusal of one `ArrayBuffer`, the one `STARVED` phrase a second run may carry and still
+ * be read as a kill, under *A mutant's own refused allocation* in the header.
+ */
+const REFUSED_BUFFER = 'RangeError: Array buffer allocation failed';
+
+/** A frame of a stack as vitest prints it (`❯ <function> <file>:<line>:<column>`) or as node does. */
+const FRAME = /^\s*(?:❯|at)\s/;
 
 /** Beyond this many kills to re-measure, the run is refused instead. Argued in the header. */
 const REMEASURED_AT_MOST = 50;
@@ -399,10 +481,36 @@ function pastTheOuterClock(suspect, clock) {
     : { verdict: 'unmeasured', why: 'ran past the outer clock, alone' };
 }
 
+/** The first non-blank line under the one at `at`, when it is a frame of a stack. */
+function frameUnder(lines, at) {
+  const next = lines.slice(at + 1).find((line) => line.trim() !== '');
+  return next !== undefined && FRAME.test(next) ? next : undefined;
+}
+
+/**
+ * **The line the reading of a refused buffer hinges on.** A test failed, and the only sign of
+ * starving is V8 refusing a buffer the mutated file asked for: every refusal's first frame names
+ * that file, and no other `STARVED` phrase is printed. See the header.
+ */
+function refusedOwnBuffer(output, suspect) {
+  if (!FAILING_TESTS.test(output) || STARVED.test(output.replaceAll(REFUSED_BUFFER, ''))) {
+    return false;
+  }
+  const lines = output.split(/\r?\n/);
+  const refusals = lines.flatMap((line, at) => (line.includes(REFUSED_BUFFER) ? [at] : []));
+  return (
+    refusals.length > 0 &&
+    refusals.every((at) => frameUnder(lines, at)?.includes(` ${suspect.file}:`) === true)
+  );
+}
+
 /** What the second run says about the mutant, read in the order the header gives. */
 function verdictOf({ code, timedOut, output }, suspect, clock) {
   if (timedOut) return pastTheOuterClock(suspect, clock);
   if (code === 0) return { verdict: 'survived', why: 'every test passed' };
+  if (refusedOwnBuffer(output, suspect)) {
+    return { verdict: 'assertion', why: "a test failed on the mutant's own allocation" };
+  }
   if (STARVED.test(output)) return { verdict: 'unmeasured', why: 'could not get memory again' };
   if (clock.test(output))
     return { verdict: 'clock', why: "a test ran out of vitest's clock again" };
