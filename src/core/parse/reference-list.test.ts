@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { HASH_BYTE_LENGTH, RefFlag, RefKind, UNKNOWN_INDEX } from '../../contracts/index';
 
-import { addReference, buildRefs, createReferenceList, markDetachedFrom } from './reference-list';
+import {
+  addReference,
+  addReferenceTo,
+  buildRefs,
+  createReferenceList,
+  markDetachedFrom,
+} from './reference-list';
 import type { ReferenceList } from './reference-list';
 
 const bytesOf = (text: string): Uint8Array =>
@@ -67,6 +73,26 @@ describe('addReference', () => {
     expect(list.targets[0]).toBe(1);
     expect(list.targets[63 * HASH_BYTE_LENGTH]).toBe(64);
     expect(list.targets[64 * HASH_BYTE_LENGTH]).toBe(65);
+  });
+});
+
+describe('addReferenceTo', () => {
+  it('doubles the target column as addReference does, keeping what it held', () => {
+    const list = createReferenceList();
+    for (let at = 0; at < 65; at += 1) {
+      addReferenceTo(
+        list,
+        RefKind.Stash,
+        `stash@{${String(at)}}`,
+        0,
+        new Uint8Array(HASH_BYTE_LENGTH).fill(at + 1),
+      );
+    }
+    expect(list.count).toBe(65);
+    expect(list.targets.length).toBe(128 * HASH_BYTE_LENGTH);
+    expect(list.targets[63 * HASH_BYTE_LENGTH]).toBe(64);
+    expect(list.targets[64 * HASH_BYTE_LENGTH]).toBe(65);
+    expect(list.kinds[64]).toBe(RefKind.Stash);
   });
 });
 

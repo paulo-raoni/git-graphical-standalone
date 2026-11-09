@@ -52,7 +52,6 @@ export const COMMIT_LOG_FORMAT = `%x1e${COMMIT_FIELDS}`;
 /** Fields {@link COMMIT_FIELDS} asks for. */
 export const COMMIT_FIELD_COUNT = 9;
 
-const HASH = 0;
 const PARENTS = 1;
 const AUTHOR_NAME = 2;
 const AUTHOR_EMAIL = 3;
@@ -140,7 +139,7 @@ function readParents(buffers: CommitFieldBuffers, bytes: Uint8Array, index: numb
 
 /**
  * The commit whose {@link COMMIT_FIELDS} start at field `first` of a record
- * whose bounds `buffers` already holds.
+ * whose bounds `buffers` already holds. Its object name is that first field.
  */
 export function commitOfFields(
   buffers: CommitFieldBuffers,
@@ -149,8 +148,8 @@ export function commitOfFields(
 ): AppendedCommit {
   writeObjectName(
     bytes,
-    fieldFrom(buffers.bounds, first + HASH),
-    fieldTo(buffers.bounds, first + HASH),
+    fieldFrom(buffers.bounds, first),
+    fieldTo(buffers.bounds, first),
     buffers.hash,
     0,
   );

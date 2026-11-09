@@ -178,14 +178,13 @@ export function addStashReferences(references: ReferenceList, list: StashList): 
   }
 }
 
-/** Whether `left` and `right` start with the same object name. */
+/**
+ * Whether `left`, one object name, is the object name `right` starts with: a
+ * stash's own name or its first parent's, each exactly `HASH_BYTE_LENGTH` bytes,
+ * against a log commit's.
+ */
 function sameName(left: Uint8Array, right: Uint8Array): boolean {
-  for (let at = 0; at < HASH_BYTE_LENGTH; at += 1) {
-    if (left[at] !== right[at]) {
-      return false;
-    }
-  }
-  return true;
+  return left.every((byte, at) => byte === right[at]);
 }
 
 /**

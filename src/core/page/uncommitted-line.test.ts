@@ -18,7 +18,7 @@ import {
   layoutRowsOf,
   uncommittedLineEnd,
 } from './graph-page';
-import { appendRows, createRowBlock, NO_UNCOMMITTED_LINE } from './row-block';
+import { appendRows, createRowBlock, markStashRows, NO_UNCOMMITTED_LINE } from './row-block';
 import type { RowBlock } from './row-block';
 
 /**
@@ -103,6 +103,21 @@ function readingOf(count: number, dirty: boolean, head: number): RepositoryPage 
 const LINELESS = RowFlag.Uncommitted | RowFlag.ClipAboveVertex | RowFlag.ClipBelowVertex;
 
 describe('the stash rows', () => {
+  it('marks nothing for a stash reference past the rows of the block', () => {
+    const block = blockOfThreeRows();
+    const past: Refs = {
+      ...ONE_REF,
+      kind: Uint8Array.of(RefKind.Stash),
+      commitIndex: Uint32Array.of(3),
+    };
+    expect(() => {
+      markStashRows(block, past);
+    }).not.toThrow();
+    expect([...block.flags.subarray(0, 3)].map((flags) => flags & RowFlag.Stash)).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
   it('marks the row every loaded stash points at as a stash, and no other row', () => {
     const stashes: Refs = {
       count: 3,
@@ -199,6 +214,7 @@ describe("the uncommitted row's line", () => {
     const plain = layoutReading(createLayoutState(), clean, chainOf(2, false, 0));
     expect(clean.uncommittedHead).toBe(NO_UNCOMMITTED_LINE);
     expect(plain.flags[0]).toBe(RowFlag.ClipAboveVertex);
+    expect([...plain.laneIndex]).toEqual([0, 0]);
   });
 });
 

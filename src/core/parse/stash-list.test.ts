@@ -244,6 +244,13 @@ describe('interleaveStashes, on every branch', () => {
     expect(stash[0]?.parentHashes).toEqual(name(0x02));
   });
 
+  it('tells two object names apart by their last byte alone', () => {
+    const near = commit(0x01, 10);
+    near.hash[HASH_BYTE_LENGTH - 1] = 0x09;
+    const log = [LOG[0], LOG[1], near].filter((one) => one !== undefined);
+    expect(rowsOf(stashes([0x51, 5, 0x01]), false, log)).toEqual([0x03, 0x02, 0x01]);
+  });
+
   it('hands on no stash whose place the log never reaches', () => {
     expect(rowsOf(stashes([0x51, 5, 0x09]), true, LOG)).toEqual([0x03, 0x02, 0x01]);
   });
