@@ -195,8 +195,8 @@ interface Refs {
 
 type Result<TValue> = import("./result").Failure | import("./result").Success<TValue>
 
-type RowFlag = 1 | 2 | 4 | 8 | 16 | 32
-value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; }
+type RowFlag = 1 | 2 | 4 | 8 | 16 | 32 | 64
+value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; readonly UncommittedAbove: 64; }
 
 value SHOW_ALL: BranchMenu
 
@@ -221,6 +221,8 @@ type ThemeChoiceResponse = import("./result").Failure | import("./result").Succe
 interface ThemeSetting {
     readonly choice: "light" | "dark" | "system"
 }
+
+value UNCOMMITTED_COLOUR: 255
 
 value UNKNOWN_INDEX: 4294967295
 

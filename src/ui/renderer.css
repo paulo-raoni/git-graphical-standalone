@@ -355,6 +355,39 @@ body {
   border-radius: 9px;
 }
 
+/*
+ * A stash's label, as the reference extension was seen to draw it (E04-M01-S14):
+ * a square of the stash's lane colour holding a white inbox tray, then the name
+ * on dark grey inside a thin grey outline. The grey was seen in a dark theme
+ * only, and is the same in both themes here.
+ */
+.ref--stash {
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+  border-color: #6e6e6e;
+  background: #3c3c3c;
+  color: #e8e8e8;
+}
+
+.ref__icon {
+  display: flex;
+  width: 15px;
+  align-items: center;
+  justify-content: center;
+  background: var(--ref-colour);
+  color: #ffffff;
+}
+
+.ref__icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.ref__name {
+  padding: 0 5px;
+}
+
 .graph__canvas {
   position: absolute;
   top: var(--row-height);

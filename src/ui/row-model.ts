@@ -32,8 +32,17 @@ import type { GraphPage } from '../contracts/index';
 /** Characters of the object name the commit column shows. */
 const ABBREVIATED_HASH_LENGTH = 8;
 
-/** Kinds that get a label, in the order the description column shows them. */
-const LABELLED_KINDS: readonly RefKind[] = [RefKind.LocalHead, RefKind.RemoteBranch, RefKind.Tag];
+/**
+ * Kinds that get a label, in the order the description column shows them: a
+ * stash's first, where the reference extension was seen to start the column with
+ * it (E04-M01-S14).
+ */
+const LABELLED_KINDS: readonly RefKind[] = [
+  RefKind.Stash,
+  RefKind.LocalHead,
+  RefKind.RemoteBranch,
+  RefKind.Tag,
+];
 
 /** One reference label sitting on a row. */
 export interface RowLabel {
@@ -102,21 +111,23 @@ function pad(value: number): string {
 /**
  * The references sitting on `commitRow`, in the order the column shows them.
  *
- * It walks the whole block **once per labelled kind** — three times — for each
+ * It walks the whole block **once per labelled kind** — four times — for each
  * row that is about to be written, which is what puts the labels in kind order
- * without a sort. That is three times the repository's reference count and
- * nothing to do with its commit count, so a scroll of one row costs three walks
+ * without a sort. That is four times the repository's reference count and
+ * nothing to do with its commit count, so a scroll of one row costs four walks
  * however many commits are loaded. An index over the block, built once per page,
  * would turn that into a lookup and would be the obvious next step if a
  * repository with thousands of tags ever measured badly; it is not built now
  * because the measurement that would justify it does not exist yet
- * (`AGENTS.md` §7), and the constant is not what would decide it — three walks
+ * (`AGENTS.md` §7), and the constant is not what would decide it — four walks
  * and one walk are both linear in the reference count.
  *
- * Only the three kinds the reference behaviour names are shown. A remote's
- * symbolic HEAD and the stash's own reference point at commits too, and showing
- * them would put `origin/HEAD` beside `origin/main` on the same row and a
- * `stash` label on an ordinary commit.
+ * Only the kinds the reference behaviour names are shown. A remote's symbolic
+ * HEAD points at a commit too, and showing it would put `origin/HEAD` beside
+ * `origin/main` on the same row. A stash's reference was left out as well until
+ * E04-M01-S14, because it pointed at the commit the stash was made on and would
+ * have put a `stash` label on an ordinary commit; it now points at the stash's
+ * own row, which is where the reference extension shows it.
  */
 function labelsOn(page: GraphPage, commitRow: number): readonly RowLabel[] {
   const found: RowLabel[] = [];

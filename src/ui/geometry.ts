@@ -56,6 +56,13 @@ export const GRAPH_PADDING = 12;
 export const VERTEX_RADIUS = 3.5;
 
 /**
+ * Radius of the filled disc at the centre of a stash's ring: a third of the
+ * ring's width across, as the reference extension was seen to draw it
+ * (E04-M01-S14). The ring itself is drawn at {@link VERTEX_RADIUS}.
+ */
+export const STASH_CENTRE_RADIUS = VERTEX_RADIUS / 3;
+
+/**
  * How near a vertex a pointer counts as being on it.
  *
  * Larger than the dot that is drawn, because a 3.5-pixel target is not one a
@@ -274,6 +281,33 @@ export function segmentLines(
     halves += 1;
   }
   return halves;
+}
+
+/**
+ * The half of the uncommitted row's line that `row` paints, when it is the row
+ * the line ends at: from the top edge straight down the vertex's lane to the
+ * centre, written into `into` as the `x, y` of its start and of its end.
+ *
+ * That row carries `RowFlag.UncommittedAbove`, and is HEAD's (E04-M01-S14); the
+ * answer is whether `row` is it, and a row that is not paints nothing here.
+ * Every row above it down to the uncommitted row carries the line as an
+ * ordinary straight segment, so this is the one half the segments do not hold.
+ */
+export function uncommittedArrival(
+  into: number[],
+  rows: LayoutRows,
+  row: number,
+  rowTop: number,
+): boolean {
+  if ((entryAt(rows.flags, row) & RowFlag.UncommittedAbove) === 0) {
+    return false;
+  }
+  const x = laneCentreX(entryAt(rows.laneIndex, row));
+  into[0] = x;
+  into[1] = rowTop;
+  into[2] = x;
+  into[3] = rowTop + HALF_ROW;
+  return true;
 }
 
 function piece(

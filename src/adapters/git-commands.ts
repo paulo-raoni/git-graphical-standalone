@@ -151,6 +151,20 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * `refs/pull/*` namespace — is walked too. Only the stash was measured here;
  * the rest follows from what `--all` is documented to mean.
  *
+ * **The stashes** are rows of the page since E04-M01-S14 and are still not
+ * walked. On every branch the list ends with the object name of each commit a
+ * stash was made on, given by the caller from the stash list read before the
+ * log, so that a commit only a stash reaches, such as one on a branch deleted
+ * since, is read (the reference behaviour of that slice, item 4). The stash
+ * itself is put in from the stash list (`interleaveStashes` of
+ * `src/core/parse/stash-list.ts`), so the index and untracked-files commits git
+ * makes for a stash are never read at all. On the `stash` fixture this list
+ * still returns the two commits it returned before, and the page holds three
+ * rows, the stash among them (`git-page.spec.ts`). A name here is forty
+ * hexadecimal digits read from git's own output, so it cannot be read as an
+ * option. Under a selection none is given, and the slice document says what a
+ * selection shows of a stash.
+ *
  * **A selection** is read as the selected names alone, each a full reference
  * name, so a tag or a local branch of the same short name is never read in its
  * place: with a tag `side` beside a branch `side`, git 2.51.0 resolves `side` to
@@ -168,11 +182,11 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * revision` without `--ignore-missing` (measured by E03-M01-S09 on a scratch
  * repository; the fixture suite holds the first two on the `remotes` fixture).
  */
-function revisionArgs(selection: BranchSelection): string[] {
+function revisionArgs(selection: BranchSelection, stashBases: readonly string[]): string[] {
   if (selection.branches === null) {
     return selection.showRemoteBranches
-      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD']
-      : ['--branches', '--tags', '--ignore-missing', 'HEAD'];
+      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD', ...stashBases]
+      : ['--branches', '--tags', '--ignore-missing', 'HEAD', ...stashBases];
   }
   return [
     '--ignore-missing',
@@ -201,12 +215,29 @@ export function selectsAnyRevision(selection: BranchSelection = EVERY_BRANCH): b
  * Read the newest `limit` commits of the branches `selection` shows.
  *
  * Which revisions those are is {@link revisionArgs}'s to say, and its comment
- * says why each is there.
+ * says why each is there. `stashBases` are the object names of the commits the
+ * stashes were made on (`stashBaseNames` of `src/core/parse/stash-list.ts`),
+ * given on every branch only.
+ *
+ * **`--date-order`, so no commit is listed before any of its children**
+ * (E04-M01-S14, scope 10). Without an ordering option git's walk takes commits
+ * by commit time, and two tips of one second can be taken parent first: on a
+ * scratch repository whose `main two` and its child `on gone`, on `gone`, share
+ * a commit time, git 2.51.0 listed `main two` first for
+ * `log refs/heads/main refs/heads/gone`, and the page drew `on gone` as a dot
+ * with no line to its parent; with `--date-order` it listed `on gone` first.
+ * Git documents `--date-order` as showing no parent before all its children and
+ * otherwise keeping commit-time order, which is the order the stash rows are put
+ * in by (`interleaveStashes`), so it changes nothing else. `--topo-order` would
+ * also keep children first, and regroups the history by line of descent. The
+ * measurements, the cost to the first page and the choice against `--topo-order`
+ * are in the slice document.
  */
 export function commitLogArgs(
   repositoryPath: string,
   limit: number,
   selection: BranchSelection = EVERY_BRANCH,
+  stashBases: readonly string[] = [],
 ): string[] {
   return [
     ...baseArgs(repositoryPath),
@@ -215,8 +246,9 @@ export function commitLogArgs(
     `--format=${COMMIT_LOG_FORMAT}`,
     '--date=raw',
     '--no-use-mailmap',
+    '--date-order',
     `--max-count=${String(limit)}`,
-    ...revisionArgs(selection),
+    ...revisionArgs(selection, stashBases),
     '--',
   ];
 }
@@ -241,9 +273,24 @@ export function referenceArgs(repositoryPath: string, showRemoteBranches = true)
   ];
 }
 
-/** Read the stash entries, each with the commit it sits on. */
+/**
+ * Read the stash entries, each as the commit a page row is made of: its name,
+ * then the fields a log record has, with raw dates and the identities as git
+ * recorded them (`--no-use-mailmap`), as the page's log reads them, because a
+ * stash is a row of the page beside them (E04-M01-S14). `git stash list` hands
+ * every option after `list` to `git log`, which git documents as its
+ * `<log-options>`.
+ */
 export function stashArgs(repositoryPath: string): string[] {
-  return [...baseArgs(repositoryPath), 'stash', 'list', '-z', `--format=${STASH_FORMAT}`];
+  return [
+    ...baseArgs(repositoryPath),
+    'stash',
+    'list',
+    '-z',
+    `--format=${STASH_FORMAT}`,
+    '--date=raw',
+    '--no-use-mailmap',
+  ];
 }
 
 /**

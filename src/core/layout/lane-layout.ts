@@ -1,5 +1,5 @@
 import { entryAt } from '../../contracts/column-read';
-import { RowFlag } from '../../contracts/index';
+import { RowFlag, UNCOMMITTED_COLOUR, UNKNOWN_INDEX } from '../../contracts/index';
 import type { CommitColumns, LayoutRows } from '../../contracts/index';
 
 import {
@@ -70,7 +70,7 @@ import type { SegmentBuffer } from './segment-buffer';
 const NO_LANE = -1;
 
 /**
- * The low bits of a lane index that fit `LayoutRows.colourIndex`.
+ * The palette index of every line born in `lane`, and of every vertex in it.
  *
  * The palette belongs to the renderer and is not named here: a colour value in
  * `core/` would be a rule leaking out of it. What this ring decides is only that
@@ -78,12 +78,15 @@ const NO_LANE = -1;
  * lines running side by side always differ, and the contract's `Uint8Array`
  * decides how many indices there can be. The renderer takes this index modulo
  * however many colours it has.
+ *
+ * The lane is taken modulo `UNCOMMITTED_COLOUR`, 255, so that index is the
+ * uncommitted row's alone. Until E04-M01-S14 it was the lane's low eight bits.
+ * The two differ only for a lane of 255 or more, and the column clips the
+ * graph at 320 pixels (`graphColumnWidth` of `src/ui/geometry.ts`), which is
+ * twenty-one lanes, so no such lane is ever drawn.
  */
-const COLOUR_INDEX_MASK = 0xff;
-
-/** The palette index of every line born in `lane`, and of every vertex in it. */
 export function colourOfLane(lane: number): number {
-  return lane & COLOUR_INDEX_MASK;
+  return lane % UNCOMMITTED_COLOUR;
 }
 
 /**
@@ -120,6 +123,11 @@ export interface LayoutCounters {
  */
 export interface LayoutState {
   lanes: OpenLanes;
+  /**
+   * The lane the uncommitted row's line descends in towards HEAD's row, or
+   * {@link NO_LANE} when no such line is open ({@link openUncommittedLine}).
+   */
+  uncommittedLane: number;
   /** Commits of the page laid out so far, and the first row of the next call. */
   rowsLaidOut: number;
   counters: LayoutCounters;
@@ -129,9 +137,41 @@ export interface LayoutState {
 export function createLayoutState(): LayoutState {
   return {
     lanes: createOpenLanes(),
+    uncommittedLane: NO_LANE,
     rowsLaidOut: 0,
     counters: { rows: 0, parentEdges: 0, laneVisits: 0, segments: 0 },
   };
+}
+
+/**
+ * Open the uncommitted row's line in lane 0, descending to `headRow`, before
+ * the first commit is laid out.
+ *
+ * The uncommitted row is not a commit, so this pass never lays it out; but its
+ * line is a line like any other until it reaches HEAD's dot. Holding lane 0 for
+ * it keeps every row between the two out of that lane, so the line passes beside
+ * them, as the reference extension was seen to draw it (E04-M01-S14), and a stash
+ * made on HEAD's commit sits in lane 1 and curves into HEAD's dot. Each row the
+ * line crosses carries a straight segment in lane 0 coloured
+ * `UNCOMMITTED_COLOUR`. HEAD's row carries `RowFlag.UncommittedAbove` instead of
+ * a segment arriving from it, because HEAD's own line, in its lane's colour,
+ * starts at its dot.
+ *
+ * Only a loaded row can be asked for: a HEAD whose commit is not loaded gets no
+ * line, and why is `uncommittedLineEnd`'s to say (`src/core/page/graph-page.ts`).
+ *
+ * @throws RangeError when a row has already been laid out or a line is already
+ *   open, or when `headRow` is `UNKNOWN_INDEX`
+ */
+export function openUncommittedLine(state: LayoutState, headRow: number): void {
+  if (state.rowsLaidOut !== 0 || state.lanes.limit !== 0) {
+    throw new RangeError('the uncommitted line is opened before any line or row is laid out');
+  }
+  if (headRow === UNKNOWN_INDEX) {
+    throw new RangeError("the uncommitted line is opened only to a loaded HEAD's row");
+  }
+  occupyLane(state.lanes, 0, headRow, 0);
+  state.uncommittedLane = 0;
 }
 
 /** The counters summed: one number for a gate to hold against a row count. */
@@ -220,15 +260,25 @@ function crossOpenLanes(state: LayoutState, row: number, segments: SegmentBuffer
       continue;
     }
     if (target !== row) {
-      pushSegment(segments, lane, lane, colourOfLane(lane));
+      pushSegment(segments, lane, lane, lineColour(state, lane));
       continue;
     }
     if (vertex === NO_LANE) {
       vertex = lane;
     }
-    pushSegment(segments, lane, vertex, colourOfLane(lane));
+    if (lane !== state.uncommittedLane) {
+      pushSegment(segments, lane, vertex, colourOfLane(lane));
+    }
   }
   return vertex;
+}
+
+/**
+ * The colour of the line passing straight through `lane`: the lane's own, or
+ * `UNCOMMITTED_COLOUR` for the uncommitted row's line.
+ */
+function lineColour(state: LayoutState, lane: number): number {
+  return lane === state.uncommittedLane ? UNCOMMITTED_COLOUR : colourOfLane(lane);
 }
 
 /** The leftmost free lane, counting the lanes the search looked at. */
@@ -324,27 +374,49 @@ function layoutRow(
   segments: SegmentBuffer,
 ): number {
   const vertex = arrival === NO_LANE ? claimLane(state) : arrival;
-  openDepartures(state, columns, row, vertex, arrival !== NO_LANE, segments);
+  openDepartures(state, columns, row, vertex, arrivesInLane(state, arrival), segments);
   closeArrivedLanes(state, row);
   return vertex;
 }
 
 /**
- * `RowFlag.ClipAboveVertex`, from what arrived at the row.
+ * Whether a commit's line arrived at the row in the vertex's own lane, which is
+ * the lane `crossOpenLanes` answered: any line there but the uncommitted row's,
+ * whose arrival it emits no segment for.
+ */
+function arrivesInLane(state: LayoutState, arrival: number): boolean {
+  return arrival !== NO_LANE && arrival !== state.uncommittedLane;
+}
+
+/**
+ * `RowFlag.ClipAboveVertex` and `RowFlag.UncommittedAbove`, from what arrived
+ * at the row in the vertex's lane.
  *
- * No line was descending towards this commit, so nothing above it — on this page
- * or on any page laid out before it — names it as a parent: every drawable
+ * When no line was descending towards this commit, nothing above it — on this
+ * page or on any page laid out before it — names it as a parent: every drawable
  * parent occupies a lane, a lane is only ever claimed while free, and a lane
  * aimed at a row is freed only once that row is reached, so an arrival exists
- * exactly when some earlier row named this one.
+ * exactly when some earlier row named this one. The vertex sits in the leftmost
+ * lane a line arrives in, so when one arrives, it arrives in the vertex's lane.
  *
- * The bit is **final** rather than provisional. Git emits children before
+ * The exception is HEAD's row under the uncommitted row's line, which holds
+ * lane 0 and so is always the leftmost: the vertex is in its lane, a commit
+ * above naming HEAD arrives in another lane and curves in, and `ClipAboveVertex`
+ * is set, because HEAD's own line starts at its dot. `UncommittedAbove` says
+ * what is above the dot instead.
+ *
+ * Both bits are **final** rather than provisional. Git emits children before
  * parents, so a commit whose children are all absent from the rows loaded so far
  * cannot acquire one from a page that arrives later, and no row's flags are ever
  * rewritten.
  */
-function clipAboveFlag(arrival: number): number {
-  return arrival === NO_LANE ? RowFlag.ClipAboveVertex : 0;
+function arrivalFlags(state: LayoutState, arrival: number): number {
+  if (arrivesInLane(state, arrival)) {
+    return 0;
+  }
+  return arrival === NO_LANE
+    ? RowFlag.ClipAboveVertex
+    : RowFlag.ClipAboveVertex | RowFlag.UncommittedAbove;
 }
 
 /**
@@ -377,9 +449,12 @@ function rowFlags(columns: CommitColumns, row: number): number {
  * this module to, array by array.
  *
  * Stash, head and uncommitted flags are not set here: this ring is not told
- * which commit `HEAD` resolves to, which rows are stash entries, or whether the
- * working tree is dirty. The caller that knows those sets them on the rows it
- * gets, and prepends the uncommitted row itself.
+ * which commit `HEAD` resolves to or which rows are stash entries. The caller
+ * that knows those sets them on the rows it gets, and prepends the uncommitted
+ * row itself. What this ring is told, since E04-M01-S14, is the uncommitted
+ * row's line, when the caller opens it before the first page
+ * ({@link openUncommittedLine}): it then keeps lane 0 for that line down to
+ * HEAD's row and sets `RowFlag.UncommittedAbove` there, and on no other row.
  *
  * @throws RangeError when the page does not continue the state
  */
@@ -403,7 +478,10 @@ export function layoutPage(
     const lane = layoutRow(state, columns, row, arrival, segments);
     laneIndex[at] = lane;
     colourIndex[at] = colourOfLane(lane);
-    flags[at] = rowFlags(columns, row) | clipAboveFlag(arrival);
+    flags[at] = rowFlags(columns, row) | arrivalFlags(state, arrival);
+    if (arrival === state.uncommittedLane) {
+      state.uncommittedLane = NO_LANE;
+    }
     segmentOffsets[at + 1] = segments.count;
     // A vertex is not always on a segment: a commit with no child above it and
     // no parent below it is a lone dot, and it can still be the widest lane the

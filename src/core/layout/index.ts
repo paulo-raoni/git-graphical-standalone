@@ -14,5 +14,6 @@ export {
   layoutPage,
   layoutStateByteLength,
   layoutWork,
+  openUncommittedLine,
 } from './lane-layout';
 export type { LayoutCounters, LayoutState } from './lane-layout';

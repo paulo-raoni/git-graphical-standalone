@@ -11,7 +11,6 @@ import {
   fieldTo,
   finishRecords,
   LINE_TERMINATOR,
-  NUL_TERMINATOR,
   pushRecords,
   splitFields,
   UNIT_MARK,
@@ -19,14 +18,15 @@ import {
 import type { RecordReader } from './records';
 
 /**
- * `git for-each-ref` and `git stash list`, read into one reference list.
+ * `git for-each-ref`, read into a reference list.
  *
- * They are one module because they produce one thing. A stash is a reference in
- * the contract's vocabulary — `RefKind.Stash` — and the only difference between
- * the two streams is which git command spells them and what each record's fields
- * mean.
+ * A stash is a reference in the contract's vocabulary too — `RefKind.Stash` —
+ * and until E04-M01-S14 this module read `git stash list` into the same list.
+ * Since then the stash list is read before the page's log, because the log needs
+ * it, and its entries join this list from `./stash-list.ts`
+ * (`addStashReferences`), pointing at each stash's own commit.
  *
- * Neither format needs an escape. A reference name may not contain an ASCII
+ * The format needs no escape. A reference name may not contain an ASCII
  * control character at all, which `git check-ref-format` enforces and this
  * relies on: the line feed that ends a `for-each-ref` record and the separators
  * inside it cannot occur in any field of it.
@@ -43,9 +43,6 @@ import type { RecordReader } from './records';
 export const REFERENCE_FORMAT =
   '%1e%(refname)%1f%(objecttype)%1f%(objectname)%1f%(*objectname)%1f%(symref)%1f%(HEAD)';
 
-/** The format asked of `git stash list`, whose records `-z` terminates. */
-export const STASH_FORMAT = '%x1e%gd%x1f%H%x1f%P';
-
 /** Fields {@link REFERENCE_FORMAT} asks for. */
 const REFERENCE_FIELDS = 6;
 
@@ -55,12 +52,6 @@ const OBJECT_NAME = 2;
 const DEREFERENCED_NAME = 3;
 const SYMREF = 4;
 const CHECKED_OUT = 5;
-
-/** Fields {@link STASH_FORMAT} asks for. */
-const STASH_FIELDS = 3;
-
-const STASH_NAME = 0;
-const STASH_PARENTS = 2;
 
 const LOCAL_PREFIX = 'refs/heads/';
 const REMOTE_PREFIX = 'refs/remotes/';
@@ -85,15 +76,6 @@ export function createReferenceParser(list: ReferenceList): ReferenceParser {
   return {
     reader: createRecordReader(LINE_TERMINATOR),
     bounds: new Uint32Array(REFERENCE_FIELDS * 2),
-    list,
-  };
-}
-
-/** A parser for `git stash list` output, filling the same `list`. */
-export function createStashParser(list: ReferenceList): ReferenceParser {
-  return {
-    reader: createRecordReader(NUL_TERMINATOR),
-    bounds: new Uint32Array(STASH_FIELDS * 2),
     list,
   };
 }
@@ -164,29 +146,6 @@ function flagsOf(parser: ReferenceParser, bytes: Uint8Array, annotated: boolean)
   return (checkedOut ? RefFlag.CheckedOut : 0) | (annotated ? RefFlag.AnnotatedTag : 0);
 }
 
-/**
- * Read one `stash list` record into the list.
- *
- * The object name kept is the stash's **first parent**, which is the commit the
- * stash was taken on and the commit the reference behaviour asks for. The stash
- * commit itself is not on the page: `git log` here is asked for branches, tags
- * and remotes, and not for `refs/stash`.
- */
-function readStash(parser: ReferenceParser, bytes: Uint8Array, from: number, to: number): void {
-  const found = splitFields(bytes, afterMark(bytes, from, to), to, UNIT_MARK, parser.bounds);
-  if (found !== STASH_FIELDS) {
-    throw new SyntaxError(
-      `a stash record has ${String(STASH_FIELDS)} fields, not ${String(found)}`,
-    );
-  }
-  const parents = fieldFrom(parser.bounds, STASH_PARENTS);
-  if (fieldTo(parser.bounds, STASH_PARENTS) === parents) {
-    return;
-  }
-  const name = text(parser, bytes, STASH_NAME);
-  addReference(parser.list, RefKind.Stash, name, 0, bytes, parents, parents + HEX_NAME_LENGTH);
-}
-
 /** Feed one chunk of `git for-each-ref` output. */
 export function pushReferences(parser: ReferenceParser, chunk: Uint8Array): void {
   pushRecords(parser.reader, chunk, (bytes, from, to) => {
@@ -198,19 +157,5 @@ export function pushReferences(parser: ReferenceParser, chunk: Uint8Array): void
 export function finishReferences(parser: ReferenceParser): void {
   finishRecords(parser.reader, (bytes, from, to) => {
     readReference(parser, bytes, from, to);
-  });
-}
-
-/** Feed one chunk of `git stash list` output. */
-export function pushStashes(parser: ReferenceParser, chunk: Uint8Array): void {
-  pushRecords(parser.reader, chunk, (bytes, from, to) => {
-    readStash(parser, bytes, from, to);
-  });
-}
-
-/** Read a last `stash list` record that arrived without its terminator. */
-export function finishStashes(parser: ReferenceParser): void {
-  finishRecords(parser.reader, (bytes, from, to) => {
-    readStash(parser, bytes, from, to);
   });
 }
