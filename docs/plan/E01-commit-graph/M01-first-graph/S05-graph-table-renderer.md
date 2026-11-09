@@ -25,6 +25,12 @@ canvas and the rows stayed in step, the partially visible row cut at the same li
 graph; nothing stuttered and no label jumped. That is an observation on this machine at this size, not a
 frame-time measurement — the 8 ms budget is S07's.
 
+*Corrected by E04-M01-S14, 2026-11-08:* the uncommitted row's line did not descend into the first commit. It
+stopped at its own row's bottom edge, short of the first commit's dot, because that row carried
+`ClipAboveVertex`; review round 06 of E04-M01 measured the gap (its finding C-25), and the slice document of
+E04-M01-S14 describes the line as it is drawn since: grey, from the uncommitted row's ring down lane 0 into
+HEAD's dot. The ring is grey too, and no longer lane 0's colour.
+
 Seven modules, none of which knows what a repository is:
 
 | module | what it is |
@@ -101,6 +107,10 @@ later layout cannot make this function silently paint nothing.
 
 Lines are painted per segment in the segment's own colour, with round caps at 1.6 pixels. The vertex is a
 filled dot of the row's colour, 3.5 pixels, or an outline on the uncommitted row.
+
+*Note of E04-M01-S14, 2026-11-08:* the uncommitted row's outline is grey since, with its inside cleared, and
+a stash row's vertex is a ring of its lane's colour with a small filled disc at its centre
+(`paintVertex` of `src/ui/graph-canvas.ts`).
 
 *Corrected by E04-M01-S08, 2026-11-07:* the ends in the table above still hold, and `segmentLines` still
 writes them, four numbers a line. What is drawn between them is no longer always a straight line. The last two
@@ -271,7 +281,10 @@ What S06 owns, and this slice does not:
   `RowFlag.Uncommitted` — and **prepending the uncommitted row itself**, which is not a commit and which the
   layout pass never sees. `test/e2e/graph-table.spec.ts` does that prepend in `withUncommittedRow`, and what
   it does there is what S06 has to do for real: shift every per-row column by one, give row 0 lane 0 with
-  one `(0, 0)` segment, and set `Uncommitted | ClipAboveVertex` on it.
+  one `(0, 0)` segment, and set `Uncommitted | ClipAboveVertex` on it. *Note of E04-M01-S14, 2026-11-08:*
+  since then the layout is told of the uncommitted row's line, keeps lane 0 for it down to HEAD's row and
+  sets `RowFlag.UncommittedAbove` there, and `src/core/page/` sets `RowFlag.Stash`; row 0 is in the grey
+  `UNCOMMITTED_COLOUR`, with `ClipBelowVertex` as well while HEAD's commit is not loaded.
 - **Holding one `LayoutState` for the life of the view** and passing it back on every page, which is S04's
   interface and not this one's.
 

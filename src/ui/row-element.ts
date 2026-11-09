@@ -1,5 +1,6 @@
 import { RefKind } from '../contracts/index';
 
+import { inboxIcon } from './inbox-icon';
 import { laneColour } from './palette';
 import type { RowLabel, RowView } from './row-model';
 
@@ -27,7 +28,7 @@ const LABEL_CLASS: Readonly<Record<RefKind, string>> = {
   [RefKind.RemoteBranch]: 'ref ref--remote',
   [RefKind.Tag]: 'ref ref--tag',
   [RefKind.RemoteSymbolicHead]: 'ref',
-  [RefKind.Stash]: 'ref',
+  [RefKind.Stash]: 'ref ref--stash',
 };
 
 /** The cells of one row, kept so that writing one does not have to find them. */
@@ -62,11 +63,26 @@ export function createRowElement(): RowElement {
   return { root, labels, subject, date, author, hash };
 }
 
+/**
+ * One label: the reference's name in a box of its lane's colour; for a stash, a
+ * box of two parts, a square of the lane's colour holding an inbox tray, then
+ * the name (E04-M01-S14).
+ */
 function labelElement(label: RowLabel, colour: string): HTMLElement {
   const element = document.createElement('span');
   element.className = LABEL_CLASS[label.kind];
   element.style.setProperty('--ref-colour', colour);
-  element.textContent = label.name;
+  if (label.kind !== RefKind.Stash) {
+    element.textContent = label.name;
+    return element;
+  }
+  const icon = document.createElement('span');
+  icon.className = 'ref__icon';
+  icon.append(inboxIcon());
+  const name = document.createElement('span');
+  name.className = 'ref__name';
+  name.textContent = label.name;
+  element.append(icon, name);
   return element;
 }
 

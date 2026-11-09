@@ -142,7 +142,7 @@ export type {
   UnkeptChoice,
 } from './ipc';
 
-export { RowFlag } from './layout';
+export { RowFlag, UNCOMMITTED_COLOUR } from './layout';
 export type { LayoutRows } from './layout';
 
 export type { PersonTable } from './people';

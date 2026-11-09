@@ -1,6 +1,6 @@
 import { entryAt } from '../../contracts/column-read';
-import { RowFlag } from '../../contracts/index';
-import type { LayoutRows } from '../../contracts/index';
+import { RefKind, RowFlag } from '../../contracts/index';
+import type { LayoutRows, Refs } from '../../contracts/index';
 
 /**
  * The rows of every page loaded so far, as one growing block.
@@ -45,6 +45,9 @@ const GROWTH_DENOMINATOR = 4;
 
 /** `block.headRow` when no loaded row is the commit HEAD resolves to. */
 export const NO_HEAD_ROW = -1;
+
+/** `block.uncommittedHead` when the block was laid out with no uncommitted row's line. */
+export const NO_UNCOMMITTED_LINE = -1;
 
 /**
  * The capacity to grow to so that `required` entries fit.
@@ -95,6 +98,13 @@ export interface RowBlock {
   maxLane: number;
   /** The row carrying {@link RowFlag.Head}, or {@link NO_HEAD_ROW}. */
   headRow: number;
+  /**
+   * The row the uncommitted row's line was laid out down to, which is HEAD's
+   * commit's, or {@link NO_UNCOMMITTED_LINE} when the rows were laid out with no
+   * such line (`layoutReading` of `./graph-page`). A reading that would lay the
+   * line out to another row does not continue the block.
+   */
+  uncommittedHead: number;
   laneIndex: Uint16Array;
   colourIndex: Uint8Array;
   flags: Uint8Array;
@@ -111,6 +121,7 @@ export function createRowBlock(): RowBlock {
     segmentCount: 0,
     maxLane: 0,
     headRow: NO_HEAD_ROW,
+    uncommittedHead: NO_UNCOMMITTED_LINE,
     laneIndex: new Uint16Array(0),
     colourIndex: new Uint8Array(0),
     flags: new Uint8Array(0),
@@ -193,5 +204,25 @@ export function markHeadRow(block: RowBlock, row: number): void {
   block.headRow = row >= 0 && row < block.rowCount ? row : NO_HEAD_ROW;
   if (block.headRow >= 0) {
     block.flags[block.headRow] = entryAt(block.flags, block.headRow) | RowFlag.Head;
+  }
+}
+
+/**
+ * Put {@link RowFlag.Stash} on every row a stash reference of `refs` points at.
+ *
+ * The page's stash rows are its `RefKind.Stash` references' rows, each the
+ * stash's own commit (`src/core/parse/stash-list.ts`), and the layout is not told
+ * which rows those are (E04-M01-S14). A reference whose commit is not loaded
+ * points at `UNKNOWN_INDEX`, which is past every row, and marks none. Rows marked
+ * on an earlier page are marked again with the same bit, which changes nothing:
+ * a block is only appended to while the readings it was laid out from begin with
+ * the same commits (`./continues-block`), so a stash row stays one.
+ */
+export function markStashRows(block: RowBlock, refs: Refs): void {
+  for (let ref = 0; ref < refs.count; ref += 1) {
+    const row = entryAt(refs.commitIndex, ref);
+    if (entryAt(refs.kind, ref) === RefKind.Stash && row < block.rowCount) {
+      block.flags[row] = entryAt(block.flags, row) | RowFlag.Stash;
+    }
   }
 }

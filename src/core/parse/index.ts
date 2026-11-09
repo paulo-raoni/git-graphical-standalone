@@ -24,15 +24,26 @@ export type { ReferenceList } from './reference-list';
 
 export {
   createReferenceParser,
-  createStashParser,
   finishReferences,
-  finishStashes,
   pushReferences,
-  pushStashes,
   REFERENCE_FORMAT,
-  STASH_FORMAT,
 } from './reference-records';
 export type { ReferenceParser } from './reference-records';
+
+export {
+  addStashReferences,
+  createStashListParser,
+  emptyStashList,
+  finishStashList,
+  interleaveStashes,
+  pushStashList,
+  STASH_FORMAT,
+  stashBaseNames,
+  isStashCommit,
+  thirdParentOf,
+  withUntrackedFiles,
+} from './stash-list';
+export type { StashEntry, StashList, StashListParser } from './stash-list';
 
 export { createChangedFilesParser, finishChangedFiles, pushChangedFiles } from './changed-files';
 export type { ChangedFilesParser } from './changed-files';

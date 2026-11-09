@@ -299,6 +299,21 @@ function remotes(workspace: Workspace, count: number): void {
  * it writes both into the history, and checking out a tree without them writes
  * them into no working tree. No clock is read, so `firstSecond` moves none of its
  * object names.
+ *
+ * The `stashes` repository is another (E04-M01-S14): the shape the reference
+ * extension was observed with, two stashes and an uncommitted change. Its stream
+ * writes `main`'s two commits, *commit 1* and *move main on*; *on gone*, a commit
+ * no branch reaches, which stands for a branch deleted after a stash was made on
+ * it; and each stash's commits as `git stash` makes them: the stash, whose first
+ * parent is the commit it was made on and whose second is a commit of the index
+ * on that commit, and for `stash@{0}` a third, a commit with no parent holding
+ * the untracked `untracked.txt`. `git stash store` then puts the two in the stash
+ * list, oldest first, so `stash@{0}` is the one on *move main on*. They are
+ * written rather than made with `git stash push` because a step reads no clock,
+ * and every commit here needs a second of its own for the rows to fall by date as
+ * they were observed: `stash@{0}`, *move main on*, `stash@{1}`, *on gone*,
+ * *commit 1*. `git stash store` refuses a commit that is not shaped like a stash
+ * (git 2.51.0, measured by E04-M01-S14), and these it took.
  */
 function scripted(steps: readonly FixtureStep[]): (workspace: Workspace, count: number) => void {
   return (workspace) => {

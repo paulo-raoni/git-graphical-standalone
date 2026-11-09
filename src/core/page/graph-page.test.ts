@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RefKind, RowFlag, UNKNOWN_INDEX } from '../../contracts/index';
+import { RefKind, RowFlag, UNCOMMITTED_COLOUR, UNKNOWN_INDEX } from '../../contracts/index';
 import type { CommitColumns, LayoutRows, Refs, WorkingTree } from '../../contracts/index';
 import type { RepositoryPage } from '../../ports/index';
 
@@ -97,6 +97,9 @@ function readingOf(count: number, dirty: boolean, head: number, hasMore = false)
   };
 }
 
+/** The flags of an uncommitted row with no line to draw: a ring alone. */
+const LINELESS = RowFlag.Uncommitted | RowFlag.ClipAboveVertex | RowFlag.ClipBelowVertex;
+
 /** Every invariant `src/contracts/layout.ts` states about a `LayoutRows`. */
 function expectWellFormed(rows: LayoutRows): void {
   expect(rows.laneIndex.length).toBe(rows.rowCount);
@@ -150,11 +153,11 @@ describe('the page a dirty working tree produces', () => {
     expectWellFormed(rows);
     expect(rows.rowCount).toBe(4);
     expect(rows.maxLane).toBe(1);
-    expect(rows.flags[0]).toBe(RowFlag.Uncommitted | RowFlag.ClipAboveVertex);
+    expect(rows.flags[0]).toBe(LINELESS);
     expect(rows.laneIndex[0]).toBe(0);
-    expect(rows.colourIndex[0]).toBe(0);
+    expect(rows.colourIndex[0]).toBe(UNCOMMITTED_COLOUR);
     expect([...rows.laneIndex]).toEqual([0, 0, 1, 0]);
-    expect([...rows.colourIndex]).toEqual([0, 0, 1, 0]);
+    expect([...rows.colourIndex]).toEqual([UNCOMMITTED_COLOUR, 0, 1, 0]);
     expect([...rows.flags].slice(1)).toEqual([
       RowFlag.Merge | RowFlag.ClipAboveVertex,
       0,
@@ -167,7 +170,7 @@ describe('the page a dirty working tree produces', () => {
     expect([...rows.segmentOffsets]).toEqual([0, 1, 3, 4, 4]);
     expect([...rows.segmentFromLane]).toEqual([0, 0, 0, 1]);
     expect([...rows.segmentToLane]).toEqual([0, 0, 1, 1]);
-    expect([...rows.segmentColour]).toEqual([0, 0, 1, 1]);
+    expect([...rows.segmentColour]).toEqual([UNCOMMITTED_COLOUR, 0, 1, 1]);
   });
 
   it('is one row and one segment when no commit has been loaded at all', () => {
@@ -176,7 +179,7 @@ describe('the page a dirty working tree produces', () => {
     expect(rows.rowCount).toBe(1);
     expect(rows.maxLane).toBe(0);
     expect([...rows.segmentOffsets]).toEqual([0, 1]);
-    expect(rows.flags[0]).toBe(RowFlag.Uncommitted | RowFlag.ClipAboveVertex);
+    expect(rows.flags[0]).toBe(LINELESS);
   });
 
   it('is no row at all when the tree is clean and nothing has been loaded', () => {
@@ -203,7 +206,7 @@ describe('the assembled page', () => {
     const page = graphPageOf(blockOfThreeRows(), read);
     expect(page.hasMore).toBe(false);
     expect(page.layout.rowCount).toBe(page.commits.count + 1);
-    expect(page.layout.flags[0]).toBe(RowFlag.Uncommitted | RowFlag.ClipAboveVertex);
+    expect(page.layout.flags[0]).toBe(LINELESS);
   });
 
   it('appends, marks HEAD and produces, in that order', () => {
@@ -222,7 +225,7 @@ describe('the assembled page', () => {
     expect(block.headRow).toBe(0);
     expect(second.layout.rowCount).toBe(7);
     expect([...second.layout.flags]).toEqual([
-      RowFlag.Uncommitted | RowFlag.ClipAboveVertex,
+      LINELESS,
       RowFlag.Merge | RowFlag.ClipAboveVertex | RowFlag.Head,
       0,
       RowFlag.ClipBelowVertex,

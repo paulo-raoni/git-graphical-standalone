@@ -1,8 +1,16 @@
 import { entryAt } from '../contracts/column-read';
-import { RowFlag } from '../contracts/index';
+import { RowFlag, UNCOMMITTED_COLOUR } from '../contracts/index';
 import type { GraphPage, LayoutRows } from '../contracts/index';
 
-import { laneCentreX, rowTopY, ROW_HEIGHT, segmentLines, VERTEX_RADIUS } from './geometry';
+import {
+  laneCentreX,
+  rowTopY,
+  ROW_HEIGHT,
+  segmentLines,
+  STASH_CENTRE_RADIUS,
+  uncommittedArrival,
+  VERTEX_RADIUS,
+} from './geometry';
 import { laneColour } from './palette';
 
 /**
@@ -137,12 +145,53 @@ function paintRow(
 }
 
 /**
+ * The half of the uncommitted row's line in the band of the row it ends at,
+ * HEAD's: straight down the vertex's lane from the top edge to the dot, in the
+ * uncommitted row's grey (`RowFlag.UncommittedAbove`, E04-M01-S14). A row that
+ * does not carry the bit paints nothing here.
+ */
+function paintUncommittedArrival(
+  context: CanvasRenderingContext2D,
+  rows: LayoutRows,
+  row: number,
+  top: number,
+): void {
+  if (!uncommittedArrival(scratch, rows, row, top)) {
+    return;
+  }
+  context.strokeStyle = laneColour(UNCOMMITTED_COLOUR);
+  context.beginPath();
+  context.moveTo(entryAt(scratch, 0), entryAt(scratch, 1));
+  context.lineTo(entryAt(scratch, 2), entryAt(scratch, 3));
+  context.stroke();
+}
+
+/**
+ * Clear the inside of a ring at `(x, y)`, so that the background shows there and
+ * no line drawn before it does: a line in the ring's own lane runs to its centre
+ * (`segmentLines`), and the reference extension was seen to draw a stash's line
+ * and the uncommitted row's from the ring's edge (E04-M01-S14). Every other
+ * line passes a row's centre height in its own lane, at least half a lane,
+ * 7 pixels, from the ring's centre, and the ring's radius is half of that.
+ */
+function clearInside(context: CanvasRenderingContext2D, x: number, y: number): void {
+  context.globalCompositeOperation = 'destination-out';
+  context.beginPath();
+  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  context.fill();
+  context.globalCompositeOperation = 'source-over';
+}
+
+/**
  * The commit's own dot.
  *
- * Filled for a commit and hollow for the uncommitted-changes row. The reference
- * behaviour this task carries says only that the uncommitted row sits above
- * every commit, so the distinction is this lane's: an outline reads as a place
- * where a commit is not yet, and it costs nothing a filled dot would not.
+ * Filled for a commit, and a ring for the uncommitted-changes row and for a
+ * stash, with the background showing inside. The uncommitted row's ring is grey
+ * and has nothing in it; a stash's is in its lane's colour with a small filled
+ * disc at its centre, a third of the ring's width across. Both rings and the
+ * grey are as the reference extension was seen to draw them (E04-M01-S14); until
+ * then the uncommitted row's outline was this project's own choice, in lane 0's
+ * colour.
  *
  * Which row that is comes from `workingTree.hasChanges`, not from
  * `RowFlag.Uncommitted`, for the reason `./row-model` gives: `hasChanges` is
@@ -165,13 +214,22 @@ function paintVertex(
   const colour = laneColour(entryAt(rows.colourIndex, row));
   const x = laneCentreX(entryAt(rows.laneIndex, row));
   const y = top + ROW_HEIGHT / 2;
-  context.beginPath();
-  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  const stash = (entryAt(rows.flags, row) & RowFlag.Stash) !== 0;
   context.strokeStyle = colour;
   context.fillStyle = colour;
-  if (uncommitted) {
+  if (uncommitted || stash) {
+    clearInside(context, x, y);
+  }
+  context.beginPath();
+  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  if (uncommitted || stash) {
     context.stroke();
   } else {
+    context.fill();
+  }
+  if (stash) {
+    context.beginPath();
+    context.arc(x, y, STASH_CENTRE_RADIUS, 0, Math.PI * 2);
     context.fill();
   }
   if ((entryAt(rows.flags, row) & RowFlag.Head) !== 0) {
@@ -217,6 +275,7 @@ export function paintGraph(
   for (let row = first; row < first + count; row += 1) {
     const top = rowTopY(row, scrollTop);
     paintRow(context, rows, row, top, false);
+    paintUncommittedArrival(context, rows, row, top);
     paintVertex(context, rows, row, top, row === 0 && page.workingTree.hasChanges);
   }
 }

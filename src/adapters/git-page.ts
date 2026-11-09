@@ -1,25 +1,28 @@
 import { FailureKind, HASH_BYTE_LENGTH, UNKNOWN_INDEX } from '../contracts/index';
 import type { CommitColumns, Result } from '../contracts/index';
 import {
+  addStashReferences,
   buildRefs,
   buildWorkingTree,
   createCommitLogParser,
   createReferenceList,
   createReferenceParser,
-  createStashParser,
+  createStashListParser,
   createStatusParser,
   finishCommitLog,
   finishReferences,
-  finishStashes,
+  finishStashList,
   finishStatus,
+  interleaveStashes,
   markDetachedFrom,
   pushCommitLog,
   pushReferences,
-  pushStashes,
+  pushStashList,
   pushStatus,
   resolveCommitRows,
+  stashBaseNames,
 } from '../core/parse/index';
-import type { ReferenceList, StatusFacts } from '../core/parse/index';
+import type { ReferenceList, StashList, StatusFacts } from '../core/parse/index';
 import { shownWorkingTree } from '../core/page/index';
 import { appendCommit, buildCommitColumns, createCommitStoreBuilder } from '../core/store/index';
 import type { PageRequest, RepositoryPage } from '../ports/index';
@@ -43,6 +46,14 @@ import { runGit } from './git-process';
  * point where they meet: a reference names an object, and the row that object
  * landed in is only known once the commits have been read.
  *
+ * **The stash list is read first**, before the log, since E04-M01-S14: the log
+ * needs it twice, for the commits the stashes were made on, which it is given as
+ * further tips on every branch, and for the stash rows, which are put into its
+ * stream (`interleaveStashes` of `src/core/parse/stash-list.ts`). The stashes'
+ * references join the reference listing after it, as they did when the listing
+ * read them itself, so the references keep their order. The invocations are the
+ * same five.
+ *
  * It does not lay out lanes and it does not build a `GraphPage`. Layout is S04's
  * and assembly is S06's.
  */
@@ -56,7 +67,7 @@ interface PagedCommits {
 /**
  * Read the commits, feeding each one to the store as its record completes.
  *
- * One more commit than the page is asked for, and the extra one is counted and
+ * One more commit than the page is asked for, and the extra row is counted and
  * dropped rather than stored: it is how "are there more" is answered without a
  * second walk of the history, and it is the only reason this function counts at
  * all.
@@ -64,25 +75,34 @@ interface PagedCommits {
  * A selection that names no branch to read runs no log at all and reads an empty
  * page, because a log given no revision walks HEAD (`selectsAnyRevision` in
  * `./git-commands.ts`).
+ *
+ * The rows counted are the log's commits with the stash rows put in among them
+ * (`interleaveStashes`), so a page of a repository with stashes holds as many
+ * rows as one without: the stash rows take the places of commits, which the next
+ * page reads.
  */
 async function readCommits(
   executable: string,
   request: PageRequest,
+  stashes: StashList,
 ): Promise<Result<PagedCommits>> {
   const builder = createCommitStoreBuilder(request.pageSize);
   let seen = 0;
   if (!selectsAnyRevision(request.selection)) {
     return { ok: true, value: { columns: buildCommitColumns(builder), hasMore: false } };
   }
-  const parser = createCommitLogParser((commit) => {
+  const everyBranch = (request.selection?.branches ?? null) === null;
+  const rows = interleaveStashes(stashes, everyBranch, (commit) => {
     seen += 1;
     if (seen <= request.pageSize) {
       appendCommit(builder, commit);
     }
   });
+  const parser = createCommitLogParser(rows);
+  const tips = everyBranch ? stashBaseNames(stashes) : [];
   const outcome = await runGit({
     executable,
-    args: commitLogArgs(request.repositoryPath, request.pageSize + 1, request.selection),
+    args: commitLogArgs(request.repositoryPath, request.pageSize + 1, request.selection, tips),
     onOutput: (chunk) => {
       pushCommitLog(parser, chunk);
     },
@@ -97,10 +117,27 @@ async function readCommits(
   };
 }
 
-/** Read the references and the stash entries into one list. */
+/** Read the stash entries, each into the commit of a stash row. */
+async function readStashes(executable: string, repositoryPath: string): Promise<Result<StashList>> {
+  const parser = createStashListParser();
+  const outcome = await runGit({
+    executable,
+    args: stashArgs(repositoryPath),
+    onOutput: (chunk) => {
+      pushStashList(parser, chunk);
+    },
+  });
+  if (!outcome.ok) {
+    return outcome;
+  }
+  return { ok: true, value: finishStashList(parser) };
+}
+
+/** Read the references, and put the stash entries after them in one list. */
 async function readReferences(
   executable: string,
   request: PageRequest,
+  stashList: StashList,
 ): Promise<Result<ReferenceList>> {
   const { repositoryPath } = request;
   const list = createReferenceList();
@@ -116,18 +153,7 @@ async function readReferences(
     return named;
   }
   finishReferences(references);
-  const stashes = createStashParser(list);
-  const stashed = await runGit({
-    executable,
-    args: stashArgs(repositoryPath),
-    onOutput: (chunk) => {
-      pushStashes(stashes, chunk);
-    },
-  });
-  if (!stashed.ok) {
-    return stashed;
-  }
-  finishStashes(stashes);
+  addStashReferences(list, stashList);
   return { ok: true, value: list };
 }
 
@@ -209,11 +235,15 @@ export async function readGitPage(
       ? probe
       : { ...probe, kind: FailureKind.NotARepository };
   }
-  const commits = await readCommits(executable, request);
+  const stashes = await readStashes(executable, request.repositoryPath);
+  if (!stashes.ok) {
+    return stashes;
+  }
+  const commits = await readCommits(executable, request, stashes.value);
   if (!commits.ok) {
     return commits;
   }
-  const references = await readReferences(executable, request);
+  const references = await readReferences(executable, request, stashes.value);
   if (!references.ok) {
     return references;
   }

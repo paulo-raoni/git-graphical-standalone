@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { CommitDetails, Result, UncommittedDetails } from '../contracts/index';
 
 import { fixtureAt, gitLines } from './fixtures.spec-support';
-import { commitDetailsArgs, statusArgs, uncommittedDiffArgs } from './git-commands';
+import { commitDetailsArgs, stashArgs, statusArgs, uncommittedDiffArgs } from './git-commands';
 import { createGitRepositoryReader } from './git-repository-reader';
 
 /**
@@ -120,6 +120,7 @@ describe('the details read, on the git the setup states', () => {
   it('passes only options git documents at or below 2.25', () => {
     const lists = [
       commitDetailsArgs('repository', '0'.repeat(40)),
+      stashArgs('repository'),
       statusArgs('repository'),
       uncommittedDiffArgs('repository', '0'.repeat(40)),
     ];

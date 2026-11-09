@@ -10,9 +10,15 @@ import type {
   Result,
   UncommittedDetails,
 } from '../contracts/index';
-import { createLayoutState, layoutPage } from '../core/layout/index';
+import { createLayoutState } from '../core/layout/index';
 import type { LayoutState } from '../core/layout/index';
-import { addPage, continuesBlock, createRowBlock, FIRST_PAGE_COMMITS } from '../core/page/index';
+import {
+  addPage,
+  continuesReading,
+  createRowBlock,
+  FIRST_PAGE_COMMITS,
+  layoutReading,
+} from '../core/page/index';
 import type { RowBlock } from '../core/page/index';
 import type { ReaderDescription, RepositoryPage } from '../ports/index';
 
@@ -62,12 +68,15 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * **Only if the repository has not changed**, and nothing but the reading can
  * say whether it has: a commit, a fetch, a new branch or a rebase between two
  * reads moves the log. So every reading a Load More applies is first put to
- * `continuesBlock`, against the object names the block was laid out from, which
+ * `continuesReading`, against the object names the block was laid out from, which
  * {@link OpenRepository.laidOutFrom} keeps; a reading that does not begin with
  * them is laid out whole, from a fresh block and a fresh layout state, exactly
  * as a Refresh lays out its own. The press then costs the layout of every row it
  * returns rather than of its new rows alone, once, and the page it answers is
- * the repository as it now is.
+ * the repository as it now is. Since E04-M01-S14 the same holds of the
+ * uncommitted row's line, which the layout keeps a lane for down to HEAD's row:
+ * a reading that would draw it to another row, or draw it where the block has
+ * none or none where the block has one, is laid out whole too.
  *
  * The figures are in
  * `docs/plan/E01-commit-graph/M01-first-graph/S06-open-a-repository.md`.
@@ -238,7 +247,7 @@ function failed(kind: FailureKind, message: string): Result<never> {
  * from, and produce the page.
  */
 function assemble(repository: OpenRepository, read: RepositoryPage): Result<GraphPage> {
-  const rows = layoutPage(repository.layout, read.commits, repository.block.rowCount);
+  const rows = layoutReading(repository.layout, repository.block, read);
   const page = addPage(repository.block, rows, read);
   repository.laidOutFrom = read.commits.hashes;
   return { ok: true, value: page };
@@ -308,7 +317,7 @@ async function openRepository(
  * The reading is asked for at the size the block would grow to, so either way
  * the page answered holds every commit read, which is at least as many as were
  * asked for while the repository has them. What decides between the two is
- * `continuesBlock` alone; see *How a further page is read* above.
+ * `continuesReading` alone; see *How a further page is read* above.
  */
 async function loadMore(count: number): Promise<Result<GraphPage>> {
   const repository = open;
@@ -323,7 +332,7 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
   if (!read.ok) {
     return read;
   }
-  if (!continuesBlock(repository.block, repository.laidOutFrom, read.value.commits)) {
+  if (!continuesReading(repository.block, repository.laidOutFrom, read.value)) {
     startOver(repository);
   }
   return assemble(repository, read.value);

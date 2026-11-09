@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 import { entryAt } from '../../src/contracts/column-read';
-import { HASH_BYTE_LENGTH, RowFlag } from '../../src/contracts/index';
+import { HASH_BYTE_LENGTH, RowFlag, UNCOMMITTED_COLOUR } from '../../src/contracts/index';
 import type { CommitColumns, LayoutRows } from '../../src/contracts/index';
-import { createLayoutState, layoutPage } from '../../src/core/layout/index';
+import { createLayoutState, layoutPage, openUncommittedLine } from '../../src/core/layout/index';
+import { appendRows, createRowBlock, layoutRowsOf } from '../../src/core/page/index';
 import {
   drawnRowCount,
   firstDrawnRow,
@@ -17,10 +18,11 @@ import {
   rowPoolSize,
   rowTopY,
   segmentLines,
+  uncommittedArrival,
   vertexRowAt,
   visibleRowCount,
 } from '../../src/ui/geometry';
-import { laneColour, LANE_COLOUR_COUNT } from '../../src/ui/palette';
+import { laneColour, LANE_COLOUR_COUNT, UNCOMMITTED_GREY } from '../../src/ui/palette';
 
 /**
  * The arithmetic the view is made of, with no window anywhere near it.
@@ -189,6 +191,11 @@ function sCurve(
  * fixtures the same way).
  */
 function laidOut(parents: readonly (readonly number[])[]): LayoutRows {
+  return layoutPage(createLayoutState(), columnsOf(parents), 0);
+}
+
+/** The commits of a page built from its parent lists alone. */
+function columnsOf(parents: readonly (readonly number[])[]): CommitColumns {
   const count = parents.length;
   const parentOffsets = new Uint32Array(count + 1);
   parents.forEach(
@@ -209,7 +216,7 @@ function laidOut(parents: readonly (readonly number[])[]): LayoutRows {
     subjects: '',
     people: { names: [], emails: [] },
   };
-  return layoutPage(createLayoutState(), columns, 0);
+  return columns;
 }
 
 test('a straight segment spans the band, and the vertex lane obeys the clip bits', () => {
@@ -308,4 +315,60 @@ test('the palette repeats past its end and never answers with nothing', () => {
     Array.from({ length: LANE_COLOUR_COUNT }, (_unused, at) => laneColour(at)),
   );
   expect(distinct.size).toBe(LANE_COLOUR_COUNT);
+});
+
+/**
+ * The page rows a dirty working tree gives: the uncommitted row on top of rows
+ * laid out under its line, opened to `head` (E04-M01-S14), assembled as
+ * `src/core/page/` assembles a page.
+ */
+function laidOutUnder(parents: readonly (readonly number[])[], head: number): LayoutRows {
+  const state = createLayoutState();
+  openUncommittedLine(state, head);
+  const block = createRowBlock();
+  appendRows(block, layoutPage(state, columnsOf(parents), 0));
+  block.uncommittedHead = head;
+  return layoutRowsOf(block, true);
+}
+
+test("the uncommitted row's line runs from its ring into HEAD's dot, past a stash beside it", () => {
+  // Row 1 is a stash made on row 2, HEAD's commit; row 3 is HEAD's parent.
+  const rows = laidOutUnder([[1], [2], []], 1);
+  expect([...rows.laneIndex]).toEqual([0, 1, 0, 0]);
+  const x = laneCentreX(0);
+  const lane0 = halvesOf(rows).filter(({ points }) => points[0] === x && points[6] === x);
+  // From the ring's centre, which the painter clears, down to the top of HEAD's row.
+  expect(lane0.filter(({ row }) => row < 2)).toEqual([
+    { row: 0, points: [x, 12, x, 18, x, 21, x, 24] },
+    { row: 1, points: [x, 24, x, 27, x, 30, x, 36] },
+    { row: 1, points: [x, 36, x, 42, x, 45, x, 48] },
+  ]);
+  // HEAD's row holds the rest, from its top edge to its dot, and no segment does.
+  const into = new Array<number>(4).fill(0);
+  expect(uncommittedArrival(into, rows, 2, rowTopY(2, 0))).toBe(true);
+  expect(into).toEqual([x, 48, x, 60]);
+  for (const row of [0, 1, 3]) {
+    expect(uncommittedArrival(into, rows, row, rowTopY(row, 0))).toBe(false);
+  }
+  expect(lane0.filter(({ row }) => row === 2)).toEqual([
+    { row: 2, points: [x, 60, x, 66, x, 69, x, 72] },
+  ]);
+  // The stash's line leaves its ring downwards, curves into HEAD's dot, and
+  // nothing is drawn above the ring.
+  expect(curvesOf(rows)).toEqual(sCurve(1, 1, 0));
+  const ring = laneCentreX(1);
+  const aboveRing = halvesOf(rows).filter(
+    ({ row, points }) => row === 1 && points[0] === ring && points[1] === 24,
+  );
+  expect(aboveRing).toEqual([]);
+});
+
+test("the uncommitted row's ring has no line below it while HEAD's commit is not loaded", () => {
+  const block = createRowBlock();
+  appendRows(block, laidOut([[1], []]));
+  const rows = layoutRowsOf(block, true);
+  expect(entryAt(rows.flags, 0) & RowFlag.ClipBelowVertex).toBe(RowFlag.ClipBelowVertex);
+  expect(halvesOf(rows).filter(({ row }) => row === 0)).toEqual([]);
+  expect(entryAt(rows.colourIndex, 0)).toBe(UNCOMMITTED_COLOUR);
+  expect(laneColour(UNCOMMITTED_COLOUR)).toBe(UNCOMMITTED_GREY);
 });

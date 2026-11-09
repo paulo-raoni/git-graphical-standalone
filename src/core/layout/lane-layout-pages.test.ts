@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { entryAt } from '../../contracts/column-read';
-import { HASH_BYTE_LENGTH, RowFlag, UNKNOWN_INDEX } from '../../contracts/index';
+import {
+  HASH_BYTE_LENGTH,
+  RowFlag,
+  UNCOMMITTED_COLOUR,
+  UNKNOWN_INDEX,
+} from '../../contracts/index';
 import type { CommitColumns, LayoutRows, PersonTable } from '../../contracts/index';
 
 import {
@@ -209,21 +214,25 @@ describe('laying a page out in more than one call', () => {
 });
 
 describe('the colour of a lane', () => {
-  it('is the lane itself, narrowed to what the contract can carry', () => {
+  it('is the lane itself, narrowed to seven bits, so never the uncommitted colour', () => {
     expect(colourOfLane(0)).toBe(0);
     expect(colourOfLane(7)).toBe(7);
-    expect(colourOfLane(255)).toBe(255);
-    expect(colourOfLane(256)).toBe(0);
+    expect(colourOfLane(127)).toBe(127);
+    expect(colourOfLane(128)).toBe(0);
+    expect(colourOfLane(255)).toBe(127);
     expect(colourOfLane(257)).toBe(1);
+    expect(UNCOMMITTED_COLOUR).toBe(255);
   });
 
   it('cycles once the graph is wider than the contract has indices', () => {
     const shape = Array.from({ length: 300 }, () => [999]);
     const rows = layoutPage(createLayoutState(), pageTo(shape, 300), 0);
     expect(rows.maxLane).toBe(299);
-    expect(entryAt(rows.laneIndex, 256)).toBe(256);
+    expect(entryAt(rows.laneIndex, 255)).toBe(255);
+    expect(entryAt(rows.colourIndex, 127)).toBe(127);
+    expect(entryAt(rows.colourIndex, 128)).toBe(0);
+    expect(entryAt(rows.colourIndex, 255)).toBe(127);
     expect(entryAt(rows.colourIndex, 256)).toBe(0);
-    expect(entryAt(rows.colourIndex, 257)).toBe(1);
   });
 });
 

@@ -5,7 +5,15 @@
 export const RowFlag = /* @__PURE__ */ Object.freeze({
   /** The row's commit has more than one parent. */
   Merge: 1,
-  /** The row is a stash entry rather than an ordinary commit. */
+  /**
+   * The row is a stash entry rather than an ordinary commit: the stash's own
+   * commit, whose one parent in the page is the commit it was made on.
+   *
+   * Set by the caller that knows which commits are stash entries
+   * (`src/core/page/`, from the page's `RefKind.Stash` references, since
+   * E04-M01-S14), never by the layout pass, which lays a stash out as it lays
+   * out any commit with one parent.
+   */
   Stash: 2,
   /** The row's commit is what HEAD resolves to. */
   Head: 4,
@@ -15,10 +23,18 @@ export const RowFlag = /* @__PURE__ */ Object.freeze({
    * Paint nothing in the half band **above this row's vertex**, in the vertex's
    * own lane: the line starts here.
    *
-   * Set when **no loaded row above this one names this commit as a parent**, so
-   * the segment this row carries in the vertex's lane is the commit's departing
-   * line and nothing arrives from above. A painter that draws that segment
-   * across the whole band puts a stub above the dot, where no line exists.
+   * Set when **no line from a loaded commit above arrives at this vertex in the
+   * vertex's own lane**, so the segment this row carries in the vertex's lane is
+   * the commit's departing line and nothing of it arrives from above. A painter
+   * that draws that segment across the whole band puts a stub above the dot,
+   * where no line exists.
+   *
+   * Until E04-M01-S14 this read "no loaded row above names this commit as a
+   * parent", and the two were the same, because the vertex sat in the leftmost
+   * lane a line arrived in. They differ on one row only: HEAD's, while the
+   * uncommitted row's line is laid out ({@link RowFlag.UncommittedAbove}). That
+   * line holds the vertex's lane, so a child above HEAD, such as a stash made on
+   * it, arrives in another lane and curves in, and the bit is still set.
    *
    * It is **final on any page**. Git emits children before parents, so a commit
    * whose children are all absent from the rows loaded so far can never acquire
@@ -44,9 +60,33 @@ export const RowFlag = /* @__PURE__ */ Object.freeze({
    * one of, and clearing it for a root draws a stub below every root.
    *
    * As with {@link RowFlag.ClipAboveVertex}, it is about the vertex's lane only.
+   *
+   * The uncommitted row carries it when it has no line to draw, which is when
+   * HEAD's commit is not a loaded row (E04-M01-S14).
    */
   ClipBelowVertex: 32,
+  /**
+   * The uncommitted row's line arrives at this row's vertex from above, in the
+   * vertex's own lane: paint the half band above the vertex in
+   * {@link UNCOMMITTED_COLOUR}.
+   *
+   * Set on HEAD's row, and on no other, when the page shows the uncommitted row
+   * and HEAD's commit is loaded (E04-M01-S14). The uncommitted row's line runs
+   * from its ring straight down lane 0, which the layout keeps for it, and every
+   * row between the two carries a straight segment in lane 0 in
+   * {@link UNCOMMITTED_COLOUR}. HEAD's own line, in its lane's colour, starts at
+   * its dot, which is why HEAD's row keeps {@link RowFlag.ClipAboveVertex} and
+   * this bit says what is above the dot instead.
+   */
+  UncommittedAbove: 64,
 } as const);
+
+/**
+ * The palette index of the uncommitted row's ring and of its line down to HEAD's
+ * dot, which the reference extension draws grey (E04-M01-S14). No lane's colour
+ * is this index: the layout takes a lane's colour from its low seven bits.
+ */
+export const UNCOMMITTED_COLOUR = 255;
 
 /** The value of one bit of a {@link LayoutRows.flags} entry. */
 export type RowFlag = (typeof RowFlag)[keyof typeof RowFlag];
@@ -91,19 +131,24 @@ export type RowFlag = (typeof RowFlag)[keyof typeof RowFlag];
  * - `maxLane` is the largest value appearing in `laneIndex` or in either segment
  *   lane array, so the column is exactly `maxLane + 1` lanes wide;
  * - row 0 is the uncommitted row when one is present, and it is the only row
- *   that may carry `RowFlag.Uncommitted`;
+ *   that may carry `RowFlag.Uncommitted`; its vertex and its one segment are in
+ *   lane 0 and in `UNCOMMITTED_COLOUR`, and while HEAD's commit is a loaded row
+ *   its line continues down lane 0 to HEAD's row, which carries
+ *   `RowFlag.UncommittedAbove` (E04-M01-S14);
  * - rows are index-aligned with the page's `CommitColumns` offset by that
  *   uncommitted row, which is what makes appending a page a pure append;
  * - **a row carries exactly one vertex**, in the lane `laneIndex` names, so the
  *   two clip bits are properties of the row and need no lane of their own;
- * - `RowFlag.ClipAboveVertex` is set when no loaded row above names this row's
- *   commit as a parent, and `RowFlag.ClipBelowVertex` when the commit has no
- *   parent entry at all. A parent entry of `UNKNOWN_INDEX` is a parent that
+ * - `RowFlag.ClipAboveVertex` is set when no line from a loaded commit above
+ *   arrives at this row's vertex in its own lane, and `RowFlag.ClipBelowVertex`
+ *   when the commit has no parent entry at all. A parent entry of `UNKNOWN_INDEX` is a parent that
  *   exists and is not loaded, and **does not** set `ClipBelowVertex`;
  * - **the painter is required to clip on them**: in the vertex's own lane it
  *   paints the upper half of the band only when `ClipAboveVertex` is clear and
  *   the lower half only when `ClipBelowVertex` is clear, and it paints every
- *   other lane's segment across the whole band regardless. Neither bit is
+ *   other lane's segment across the whole band regardless; where
+ *   `UncommittedAbove` is set it also paints the upper half of the vertex's
+ *   lane in `UNCOMMITTED_COLOUR`. Neither clip bit is
  *   advice: `core/` cannot draw, so a painter that ignores them draws a stub
  *   above every tip and below every root, and one that clips on the segments
  *   instead leaves a gap at the foot of every page.

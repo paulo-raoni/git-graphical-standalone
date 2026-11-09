@@ -64,18 +64,33 @@ function flagsOf(page: RepositoryPage, kind: RefKind, name: string): number {
   return -1;
 }
 
-/** What git itself says the commits of a repository are, in its own order. */
+/**
+ * What git itself says the rows of a repository are, in its own order: its log
+ * of every branch, every tag, every remote and HEAD, given each stash as a
+ * further tip, with the commits git makes for a stash's index and untracked
+ * files taken out. A page puts each stash in rather than walking it
+ * (`interleaveStashes` of `src/core/parse/stash-list.ts`), so this is the
+ * independent account of where git's own walk puts a stash.
+ */
 function gitCommits(repositoryPath: string): string[] {
+  const stashes = gitLines(repositoryPath, ['stash', 'list', '--format=%H']);
+  const helpers = new Set(
+    gitLines(repositoryPath, ['stash', 'list', '--format=%P']).flatMap((parents) =>
+      parents.split(' ').slice(1),
+    ),
+  );
   return gitLines(repositoryPath, [
     'log',
     '--format=%H',
+    '--date-order',
     '--branches',
     '--tags',
     '--remotes',
     '--ignore-missing',
     'HEAD',
+    ...stashes,
     '--',
-  ]);
+  ]).filter((hash) => !helpers.has(hash));
 }
 
 const SHAPES = [
@@ -84,6 +99,7 @@ const SHAPES = [
   'two-roots',
   'tags',
   'stash',
+  'stashes',
   'detached-head',
   'dirty-working-tree',
   'large',
@@ -178,13 +194,21 @@ describe('readPage, on the shapes that carry a decision', () => {
 });
 
 describe('readPage, on the working tree and what HEAD is', () => {
-  it('reads a stash as an entry on the commit it sits on', async () => {
+  it('reads a stash as a row of its own, above the commit it was made on', async () => {
     const page = await pageOf(fixtureAt('stash'));
     const references = referencesOf(page);
     expect(references.get(`${String(RefKind.Stash)}:stash@{0}`)).toBe(0);
-    const stashed = gitLines(fixtureAt('stash'), ['stash', 'list', '--format=%H']);
-    expect(stashed.length).toBe(1);
-    expect(hashesOf(page)).not.toContain(stashed[0]);
+    const [stashed = '', parents = ''] = gitLines(fixtureAt('stash'), [
+      'log',
+      '-1',
+      '--format=%H%n%P',
+      'refs/stash',
+    ]);
+    const [base, index] = parents.split(' ');
+    expect(hashesOf(page)).toEqual([stashed, base, expect.any(String)]);
+    expect(hashesOf(page)).not.toContain(index);
+    expect([...page.commits.parentOffsets.slice(0, 2)]).toEqual([0, 1]);
+    expect(page.commits.parentIndices[0]).toBe(1);
   });
 
   it('reads a detached HEAD as detached, and marks what it stands on', async () => {
