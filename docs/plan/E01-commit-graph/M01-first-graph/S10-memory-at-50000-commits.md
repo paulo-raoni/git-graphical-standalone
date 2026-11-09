@@ -33,6 +33,16 @@ budget; its figures are its own and were not re-measured for this document. By i
 goes on falling for about a minute after the rows are painted, so a reading taken ten seconds after the
 paint, as this document's readings of the process table were, is higher than the one the case now takes.
 
+**Note of 2026-11-09 (E04-M01-FIX-06), on when the case reads.** The case reads the sum once it has stopped
+falling, by the rule `SETTLE` in `test/e2e/budgets-memory.spec.ts` states. It used to fail when that rule was
+not met 180 s after the paint. E04-M01-FIX-05 met that on 2026-11-08 with an unchanged product: steps of 4.0
+and 2.3 MiB at 118.6 and 150.8 s, with the sum already under the limit. Since FIX-06 the case takes a reading
+past 180 s whether or not the sum has stopped falling, and says so. FIX-06 read eight curves of 490 s on
+2026-11-09. In four of them free memory fell under 0.8 GB after the paint's own steps, three times from a
+process FIX-06 ran to press for memory and once from something else, and each time the GPU process gave back
+1.0 MiB 6 to 10 s later, between 80 and 156 s after the paint. The rule was met 98 to 132 s after the paint in
+all eight. The comment on `SETTLE` holds the readings.
+
 ## How every figure here was taken
 
 Measured by this slice's executor on **2026-10-02**, between 19:41 and 20:05 local time, on the development
