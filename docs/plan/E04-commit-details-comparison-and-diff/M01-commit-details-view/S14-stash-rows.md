@@ -91,9 +91,14 @@ round 06's probe R2 showed that clearing the bit in the painter instead draws a 
   names this commit" to "no line from a commit above arrives in the vertex's own lane"; the two differ on HEAD's
   row only, when a child above HEAD arrives in another lane beside the uncommitted line (`src/contracts/layout.ts`
   says so).
-- **A colour index of its own.** `UNCOMMITTED_COLOUR` is 255, and `colourOfLane` now takes a lane modulo 255
-  rather than its low eight bits, so no lane shares it. The two differ for a lane of 255 or more only, past the
-  320-pixel column's twenty-one lanes.
+- **A colour index of its own.** `UNCOMMITTED_COLOUR` is 255, and `colourOfLane` now takes a lane's low seven
+  bits rather than its low eight, so no lane shares it. The two differ for a lane of 128 or more only, and the
+  320-pixel column draws no lane above 21 (12 + 21 × 14 is 306). The first version took the lane modulo 255, which
+  changed nothing below lane 255, and it slowed the layout: the timed layout benchmark
+  (`perf/layout.timed.perf.test.ts`) read 0.70, 0.81 and 0.72 microseconds a commit at this lane's head against
+  0.58, 0.586 and 0.619 at the base, interleaved on 2026-11-09 at 12 to 40 % load before each run; with the old eight-bit mask in a scratch copy it read 0.585 to 0.61. With the seven-bit mask, at
+  this lane's head, four runs interleaved with four at the base read 0.57 to 0.613 against 0.569 to 0.685, at 13 to
+  54 % load before each run.
 
 ## The drawing
 

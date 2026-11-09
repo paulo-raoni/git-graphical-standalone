@@ -69,6 +69,9 @@ import type { SegmentBuffer } from './segment-buffer';
 /** The answer of a search for a lane that found none. */
 const NO_LANE = -1;
 
+/** The bits of a lane that are its colour's palette index (`colourOfLane`). */
+const COLOUR_MASK = 0x7f;
+
 /**
  * The palette index of every line born in `lane`, and of every vertex in it.
  *
@@ -79,14 +82,19 @@ const NO_LANE = -1;
  * decides how many indices there can be. The renderer takes this index modulo
  * however many colours it has.
  *
- * The lane is taken modulo `UNCOMMITTED_COLOUR`, 255, so that index is the
- * uncommitted row's alone. Until E04-M01-S14 it was the lane's low eight bits.
- * The two differ only for a lane of 255 or more, and the column clips the
- * graph at 320 pixels (`graphColumnWidth` of `src/ui/geometry.ts`), which is
- * twenty-one lanes, so no such lane is ever drawn.
+ * The index is the lane's **low seven bits**, so it never reaches
+ * `UNCOMMITTED_COLOUR`, 255, which is the uncommitted row's alone. Until
+ * E04-M01-S14 it was the lane's low eight bits. The two differ only for a lane of
+ * 128 or more, and the column clips the graph at 320 pixels (`graphColumnWidth`
+ * of `src/ui/geometry.ts`), past which no lane above 21 is drawn: 12 + 21 × 14 is
+ * 306. A mask and not `lane % 255`, which kept every lane but 255 as it was:
+ * measured by E04-M01-S14, the modulo made the timed layout benchmark
+ * (`perf/layout.timed.perf.test.ts`) read 0.70 to 0.81 microseconds a commit
+ * against 0.58 to 0.62 at the base, and the mask 0.57 to 0.613 against 0.569 to
+ * 0.685 at the base (slice document, *One mechanism for a row the page adds*).
  */
 export function colourOfLane(lane: number): number {
-  return lane % UNCOMMITTED_COLOUR;
+  return lane & COLOUR_MASK;
 }
 
 /**

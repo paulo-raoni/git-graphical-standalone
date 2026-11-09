@@ -84,7 +84,7 @@ export const RowFlag = /* @__PURE__ */ Object.freeze({
 /**
  * The palette index of the uncommitted row's ring and of its line down to HEAD's
  * dot, which the reference extension draws grey (E04-M01-S14). No lane's colour
- * is this index: the layout takes a lane's colour modulo it.
+ * is this index: the layout takes a lane's colour from its low seven bits.
  */
 export const UNCOMMITTED_COLOUR = 255;
 

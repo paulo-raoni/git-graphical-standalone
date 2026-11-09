@@ -214,12 +214,13 @@ describe('laying a page out in more than one call', () => {
 });
 
 describe('the colour of a lane', () => {
-  it('is the lane itself, narrowed to what the contract can carry, short of the uncommitted colour', () => {
+  it('is the lane itself, narrowed to seven bits, so never the uncommitted colour', () => {
     expect(colourOfLane(0)).toBe(0);
     expect(colourOfLane(7)).toBe(7);
-    expect(colourOfLane(254)).toBe(254);
-    expect(colourOfLane(255)).toBe(0);
-    expect(colourOfLane(256)).toBe(1);
+    expect(colourOfLane(127)).toBe(127);
+    expect(colourOfLane(128)).toBe(0);
+    expect(colourOfLane(255)).toBe(127);
+    expect(colourOfLane(257)).toBe(1);
     expect(UNCOMMITTED_COLOUR).toBe(255);
   });
 
@@ -228,9 +229,10 @@ describe('the colour of a lane', () => {
     const rows = layoutPage(createLayoutState(), pageTo(shape, 300), 0);
     expect(rows.maxLane).toBe(299);
     expect(entryAt(rows.laneIndex, 255)).toBe(255);
-    expect(entryAt(rows.colourIndex, 254)).toBe(254);
-    expect(entryAt(rows.colourIndex, 255)).toBe(0);
-    expect(entryAt(rows.colourIndex, 256)).toBe(1);
+    expect(entryAt(rows.colourIndex, 127)).toBe(127);
+    expect(entryAt(rows.colourIndex, 128)).toBe(0);
+    expect(entryAt(rows.colourIndex, 255)).toBe(127);
+    expect(entryAt(rows.colourIndex, 256)).toBe(0);
   });
 });
 
