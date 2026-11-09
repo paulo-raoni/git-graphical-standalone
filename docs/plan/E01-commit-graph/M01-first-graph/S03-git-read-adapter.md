@@ -250,6 +250,13 @@ The floor this slice needs is **2.14.0**, and it is raised by `--no-optional-loc
 release. The next highest requirement is `git status --porcelain=v2`, from 2.11.0, and then `%(HEAD)` in
 `for-each-ref`, from 2.7.0. Nothing else used here is newer.
 
+*Correction of E04-M01-FIX-07, 2026-11-08:* the floor `--no-optional-locks` raises is **2.15.0**, not 2.14.0.
+`Documentation/git.txt` of git/git at the tag `v2.14.0` does not name the option, and at `v2.15.0` it does.
+E04-M01-S16 read both files first, review round 06 of E04-M01 read them again, and this fix read them a third time
+on 2026-11-08, raw from `raw.githubusercontent.com`: the `v2.14.0` file holds no `no-optional-locks`, and the
+`v2.15.0` file holds it once, as the heading of the option's entry. `docs/SETUP.md` states 2.15.0. The rest of
+this derivation was not read again.
+
 **That floor is derived from git's documented history of each option and was not measured.** No git older than
 2.51 is installed on this machine and installing one is a machine-level change outside this lane. The floor
 `docs/ADR-0001-stack.md` assumes — 2.25 — is therefore **not raised** by this slice, and is met with margin.
