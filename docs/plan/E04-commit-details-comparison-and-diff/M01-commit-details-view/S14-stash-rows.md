@@ -221,3 +221,38 @@ Against the reference behaviour's six items:
 
 `test/e2e/stash-rows.spec.ts` holds what of this only the window shows, by the DOM and by canvas pixels chosen from
 the ratio-1 reading.
+
+## Size
+
+`repository.cjs` measured 37475 production bytes at `4bdd677` against 34567 at the base `be5f305`, over its budget of
+35840, and its budget was reset once by the margin rule to 38912 (`comment-e04-m01-s14` of
+`scripts/gates/size-budget.json` has the measurement); `src/core/parse/stash-list.ts` (1466 bytes) and
+`src/ui/inbox-icon.ts` (462) were added to the module manifest. At `bc29a91` the gate read `repository.cjs` 37449
+and `renderer.js` 20995, inside 38912 and 21504.
+
+## Gates
+
+**The full tier, `npm run gates`,** exited 0 at `bc29a91` on 2026-11-09, 06:18 to 07:11 local: 560 unit and 226
+fixture-suite tests, 75 end-to-end cases, and a mutation run of 2090 mutants with 2053 killed by a failing
+assertion, 35 by a timeout and the 2 listed survivors left. The perf gate's layout readings were at their
+baselines: 18.747 units of layout work a row against 18.747, and 3.965 against 3.966 for 40000 rows over 10000.
+Two earlier runs are in the audit: one at `4bdd677` red at the mutation gate, and one green at `d273dd5`.
+
+**The budgets, `npm run gates:budgets`,** were read case by case at `bc29a91` on 2026-11-09, each read only when
+the machine was free by `AGENTS.md` §11's measure: the reading ran inside a job object, so its own processor time
+was counted with every process it started, exited ones included; the rest of the load was the processors' total
+less that, sampled about every two seconds, and a reading was kept only when it averaged under 40 % with no sample
+over 75 % and the minute before it averaged under 40 %. Every kept reading was green:
+
+| case | kept reading | others' load, mean and max |
+| --- | --- | --- |
+| parse, layout and store benchmarks | 14.492 µs a commit parsed, 0.572 µs laid out, 44.354 ms for ten thousand stored | 14.7 %, 67 % |
+| frames while scrolling | mean 4.881 ms, fifth-slowest 5.959 ms, longest 7.2 ms; reference 95th percentile 3.2 ms | 8 %, 20 % |
+| cold start, empty repository | 966 ms, fastest of ten | 30.8 %, 62 % |
+| cold start, first page of ten thousand commits | 1018 ms, fastest of ten, against a baseline of 1040 | 27 %, 64 % |
+| ten thousand commits, one load | 372.7 ms, fastest of ten | 25.6 %, 73 % |
+| the main process answering during a large load | 2643 round trips, worst 2 ms | 24.7 %, 38 % |
+| fifty thousand commits: memory and idle | 160555008 private bytes; 1.003 after five idle minutes; 0.094 % of a core idle; 0 bytes after closing | 18.8 %, 73 % |
+
+The first page's cold start is the reading `--date-order` could have moved, and it read 1018 ms. The readings
+discarded on the way, at `d273dd5` and at `bc29a91`, are in the audit with their loads.
