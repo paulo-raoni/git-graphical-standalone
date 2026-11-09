@@ -45,6 +45,15 @@
     "commitCount": 4,
     "commitDigest": "eeecb4059422e1015008af1876cb9b9801fb0437ef8e23e9da025f86c60b0f64"
   },
+  "stashes": {
+    "refs": [
+      "35ecd6cdfaedb94f56c86c114566286edec1a0c0 HEAD",
+      "35ecd6cdfaedb94f56c86c114566286edec1a0c0 refs/heads/main",
+      "2e6c3b87f2e7274a6a438e38780d705d54cd1dfb refs/stash"
+    ],
+    "commitCount": 8,
+    "commitDigest": "8d91b88eb8ed828584af32e62ca69aac0d268976160953effaec12bea86d8e1b"
+  },
   "detached-head": {
     "refs": [
       "1c6708775d3ad04e4dc3a11bc63c699bcb665381 HEAD",

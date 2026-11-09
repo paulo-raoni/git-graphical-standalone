@@ -45,7 +45,7 @@ describe('the fixture repositories', () => {
     expect(generated).toEqual(expected);
   });
 
-  it('include every shape wave three and E03-M01-S09 need', () => {
+  it('include every shape wave three, E03-M01-S09 and E04-M01-S14 need', () => {
     expect(Object.keys(generated).sort()).toEqual([
       'branch-and-merge',
       'detached-head',
@@ -55,6 +55,7 @@ describe('the fixture repositories', () => {
       'linear',
       'remotes',
       'stash',
+      'stashes',
       'tags',
       'two-roots',
     ]);
