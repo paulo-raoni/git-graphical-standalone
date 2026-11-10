@@ -664,6 +664,15 @@ is named:
 | heap bytes allocated laying out a row | 13.512, tolerance 1.01 | |
 | typed-array bytes allocated laying out a row | 130.491 | the layout's output and segment buffer |
 
+*Note, 2026-11-10 (E04-M01-FIX-09).* The order in the row *git processes to open a repository* is the order
+before E04-M01-S14. Since S14 the stash list is read before the log: after `git --version`, the commands are
+`rev-parse`, `stash`, `log`, `for-each-ref` and `status`. Review round 07 read that order in `readGitPage` at
+`c109749`. E04-M01-FIX-09 then read it from the `start` events of a `GIT_TRACE2_EVENT` file written while
+`readGitPage` read one small repository holding one stash. The count stays 6 and the `unit` text of
+`gitProcessesPerOpen` in `perf/baselines.json` names the new order. In that trace `git stash list` also started
+one `git log` child of its own, so a repository with a stash may start one more process than the gate counts on
+the `large` fixture; that is one reading of one repository, not a measured count for any other.
+
 **The two redraw counts are read once the page is quiet since E04-M01-S05**: after every timeout, animation
 frame and idle callback the page asked for has run, and through two rendering updates more, where they were read
 after fixed waits of 300 ms (that slice's document, *Fixed waits replaced*).

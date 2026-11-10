@@ -129,7 +129,7 @@
   },
   "gitProcessesPerOpen": {
     "baseline": 6,
-    "unit": "git processes started to open a repository named on the command line, counted by GIT_TRACE2_EVENT: finding git, then rev-parse, log, for-each-ref, stash and status"
+    "unit": "git processes started to open a repository named on the command line, counted by GIT_TRACE2_EVENT: finding git, then rev-parse, stash, log, for-each-ref and status"
   },
   "gitProcessesPerRefresh": {
     "baseline": 5,
