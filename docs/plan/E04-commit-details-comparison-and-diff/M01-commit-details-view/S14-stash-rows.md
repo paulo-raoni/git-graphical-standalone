@@ -21,6 +21,13 @@ it was made on.
   So a commit only a stash reaches, such as *on gone* on the fixture, is read and joined to its own parents like
   any commit. The names are forty hexadecimal digits written from git's own output, so none can be read as an
   option. A commit that is in the graph anyway is not read twice, because git walks it once.
+  *Note, 2026-11-10 (E04-M01-FIX-08):* the names are no longer arguments. On the command line each cost forty
+  characters and Windows refuses a process past 32 767, which review round 07 measured at about 800 stashes each
+  made on a commit of its own (`spawn` threw `ENAMETOOLONG`). The log now reads them from its standard input, one a
+  line, through `--stdin`, which git documents as reading revisions "in addition to" those on the command line
+  (`rev-list-options.txt` at tag v2.25.0, read on 2026-11-10); the commits read, their order and the rows are the
+  same. `src/adapters/git-stash-many.spec.ts` reads a repository of 1 200 such stashes. A `spawn` that throws is now
+  answered as a failure value by `runGit`.
 - **The stash itself is put into the log's stream**, by `interleaveStashes`. It is read from the stash list with
   the fields of a log record, with its first parent as its only parent, so the index commit and the
   untracked-files commit git makes for a stash are never read: they are never a row and never a line. A stash
