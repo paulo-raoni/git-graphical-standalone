@@ -162,7 +162,8 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * still returns the two commits it returned before, and the page holds three
  * rows, the stash among them (`git-page.spec.ts`). A name here is forty
  * hexadecimal digits read from git's own output, so it cannot be read as an
- * option. Under a selection none is given, and the slice document says what a
+ * option. With `viaStdin` they are the lines of git's standard input instead
+ * of arguments (see {@link commitLogArgs}). Under a selection none is given, and the slice document says what a
  * selection shows of a stash.
  *
  * **A selection** is read as the selected names alone, each a full reference
@@ -182,11 +183,19 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * revision` without `--ignore-missing` (measured by E03-M01-S09 on a scratch
  * repository; the fixture suite holds the first two on the `remotes` fixture).
  */
-function revisionArgs(selection: BranchSelection, stashBases: readonly string[]): string[] {
+function revisionArgs(
+  selection: BranchSelection,
+  stashBases: readonly string[],
+  viaStdin: boolean,
+): string[] {
   if (selection.branches === null) {
+    let tips = stashBases;
+    if (viaStdin) {
+      tips = stashBases.length > 0 ? ['--stdin'] : [];
+    }
     return selection.showRemoteBranches
-      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD', ...stashBases]
-      : ['--branches', '--tags', '--ignore-missing', 'HEAD', ...stashBases];
+      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD', ...tips]
+      : ['--branches', '--tags', '--ignore-missing', 'HEAD', ...tips];
   }
   return [
     '--ignore-missing',
@@ -219,6 +228,15 @@ export function selectsAnyRevision(selection: BranchSelection = EVERY_BRANCH): b
  * stashes were made on (`stashBaseNames` of `src/core/parse/stash-list.ts`),
  * given on every branch only.
  *
+ * **`viaStdin`** puts those names on git's standard input, one a line, and
+ * `--stdin` takes their place among the arguments when there are any. Git's
+ * documentation of `--stdin` (`rev-list-options.txt` at tag v2.25.0, read on
+ * 2026-11-10) says: "In addition to the <commit> listed on the command line,
+ * read them from the standard input." Each name is forty characters, and Windows
+ * refuses a process whose command line is past 32 767, which about 800 stashes
+ * each on a commit of its own reached (review round 07 of E04-M01). The caller
+ * writes the names as the run's `input` (`stashBaseInput`).
+ *
  * **`--date-order`, so no commit is listed before any of its children**
  * (E04-M01-S14, scope 10). Without an ordering option git's walk takes commits
  * by commit time, and two tips of one second can be taken parent first: on a
@@ -238,6 +256,7 @@ export function commitLogArgs(
   limit: number,
   selection: BranchSelection = EVERY_BRANCH,
   stashBases: readonly string[] = [],
+  viaStdin = false,
 ): string[] {
   return [
     ...baseArgs(repositoryPath),
@@ -248,7 +267,7 @@ export function commitLogArgs(
     '--no-use-mailmap',
     '--date-order',
     `--max-count=${String(limit)}`,
-    ...revisionArgs(selection, stashBases),
+    ...revisionArgs(selection, stashBases, viaStdin),
     '--',
   ];
 }
@@ -405,4 +424,9 @@ export function uncommittedDiffArgs(repositoryPath: string, base: string): strin
     base,
     '--',
   ];
+}
+
+/** The standard input that goes with `commitLogArgs(…, true)`: one name a line. */
+export function stashBaseInput(stashBases: readonly string[]): string | undefined {
+  return stashBases.length > 0 ? `${stashBases.join('\n')}\n` : undefined;
 }
