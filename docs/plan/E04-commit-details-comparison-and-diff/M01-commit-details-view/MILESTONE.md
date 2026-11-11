@@ -27,14 +27,23 @@ literal 16.7 ms frame check and the bound on a reading's reference time the owne
 | S06 | commit details read | 2 | The details of a commit and of the uncommitted changes, with every changed file, its status and its line counts, read from git on request and handed to the window. |
 | S07 | fixture store and gate messages | 3 | The fixture store's numbering held and its sentences true, and the licences and commits gates' messages and range held by checks. |
 | S08 | rounded lines | 3 | Every change of lane drawn as a smooth curve instead of a straight diagonal. |
-| S09 | the details panel | 6 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
-| S10 | the changed files | 7 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
-| S11 | keyboard navigation | 8 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
-| S12 | panel size, place and options | 9 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
+| S09 | the details panel | 7 | A click opens the details under the row, as observed in the reference extension, and a second click, the close button or another row closes it. |
+| S10 | the changed files | 8 | The changed files as a tree or a list, chosen per repository, with their status, counts, actions and context menu. |
+| S11 | keyboard navigation | 9 | Up, Down, Ctrl+Up and Ctrl+Down with and without Shift, and Escape, move between commits as the reference documents, with the opened row kept in view. |
+| S12 | panel size, place and options | 10 | The panel's height and divider dragged and remembered per repository, docked at the bottom when chosen, and its options chosen from the view. |
 | S13 | unkept choice said without blocking | 3 | A choice that cannot be kept is said by a notice inside the window that blocks nothing, in place of a message box. |
 | S14 | stash rows | 5 | Every stash a row of the graph, drawn as the reference draws one, whose details list its untracked files. |
 | S15 | curves as observed | 4 | Every change of lane one S-curve from row centre to row centre, placed and drawn as observed in the reference extension. |
 | S16 | details read on git 2.25 | 4 | The details read on the git the setup states, a trailing carriage return kept, a stale reply and a listed-only selection held. |
+| S17 | selection on standard input | 6 | A selection of any number of branches is read, its names given to git on standard input, and the input's error handler held by a check. |
+
+**Changed on 2026-11-11 by the orchestrator:** review round 08 (PASS at `c8f9f7d`) carried C-28. Its window
+measurement: in a repository of 800 branches with 45-character names, selecting them all ends in *Git could not
+read that repository* (`spawn ENAMETOOLONG`), because each selected name is an argument of the log. The review
+classed it carried, since the defect dates from E03-M01. It noted that the owner might pull it into this milestone,
+and that FIX-08's `--stdin` is the same repair. The orchestrator pulled it in as S17, in wave 6, with C-29 (the
+standard-input error handler held by no check), because this milestone is still in flight and v0.3.0 should not
+ship a failure a person can reach in two clicks. S09 to S12 move one wave later. The owner may overrule this.
 
 **Owner's rulings of 2026-11-02:** the stash rows of E01-M02 come into this milestone, because a stash's details
 need its row (S08 when ruled; S14 since the split of 2026-11-07); and every setting `docs/PLAN.md` §2 names
