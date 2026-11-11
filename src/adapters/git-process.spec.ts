@@ -104,6 +104,37 @@ describe('runGit', () => {
   });
 });
 
+describe('runGit given input that git never reads', () => {
+  it('settles with git’s own outcome and raises no error of its own', async () => {
+    // Vitest reports an uncaught error as a failed run, so its listeners are set
+    // aside for the case and this one counts the errors instead.
+    const others = process.listeners('uncaughtException');
+    process.removeAllListeners('uncaughtException');
+    const raised: Error[] = [];
+    const count = (error: Error): void => {
+      raised.push(error);
+    };
+    process.on('uncaughtException', count);
+    try {
+      for (const bytes of [1_048_576, 16_777_216]) {
+        const outcome = await runGit({
+          executable: git,
+          args: ['version'],
+          input: 'x'.repeat(bytes),
+        });
+        expect(outcome.ok).toBe(true);
+      }
+      await new Promise((done) => setTimeout(done, 200));
+    } finally {
+      process.off('uncaughtException', count);
+      for (const listener of others) {
+        process.on('uncaughtException', listener);
+      }
+    }
+    expect(raised.map((error) => error.message)).toEqual([]);
+  });
+});
+
 describe('runGit, when it does not succeed', () => {
   it('reports a non-zero exit as a value carrying git’s own words', async () => {
     const outcome = await runGit({
