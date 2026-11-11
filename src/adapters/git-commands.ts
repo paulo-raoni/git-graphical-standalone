@@ -172,6 +172,21 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * the tag and warns that it is ambiguous, and resolves `refs/heads/side` to the
  * branch (measured by E03-M01-S09 on a scratch repository).
  *
+ * **With `viaStdin`** the selected names are the lines of git's standard input
+ * instead of arguments, and `--stdin` takes their place. Windows refuses a
+ * process whose command line is past 32 767 characters, and one argument a name
+ * reached that: with 53-character names, 400 and 500 of them were read and 600
+ * and more answered `spawn ENAMETOOLONG` (review round 08 of E04-M01, git
+ * 2.51.0). Every name begins `refs/heads/` or `refs/remotes/`
+ * ({@link isReadBranch}), so no line begins with `-` and none can be read as an
+ * option, and none is `--`, which ends the revisions on standard input. Git's
+ * documentation at tag v2.25.0 (`rev-list-options.txt`, read on 2026-11-11)
+ * says `--stdin` reads the revisions "in addition to the '<commit>' listed on
+ * the command line", and that `--ignore-missing`, "upon seeing an invalid
+ * object name in the input", pretends "the bad input was not given". Git 2.51.0
+ * skipped a line that resolves to nothing silently (review round 08 of E04-M01,
+ * probe R1), and `git-selection.spec.ts` holds it.
+ *
  * `--ignore-missing` is what lets a name be given that resolves to nothing. On
  * every branch that name is `HEAD`: in a repository with no commits yet, HEAD
  * resolves to nothing and naming it would otherwise be a fatal error rather
@@ -197,10 +212,14 @@ function revisionArgs(
       ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD', ...tips]
       : ['--branches', '--tags', '--ignore-missing', 'HEAD', ...tips];
   }
-  return [
-    '--ignore-missing',
-    ...selection.branches.filter((name) => isReadBranch(name, selection.showRemoteBranches)),
-  ];
+  return viaStdin
+    ? ['--ignore-missing', '--stdin']
+    : ['--ignore-missing', ...readBranches(selection.branches, selection.showRemoteBranches)];
+}
+
+/** The selected names that are read (see {@link isReadBranch}), in the order given. */
+function readBranches(branches: readonly string[], showRemoteBranches: boolean): string[] {
+  return branches.filter((name) => isReadBranch(name, showRemoteBranches));
 }
 
 /**
@@ -228,14 +247,15 @@ export function selectsAnyRevision(selection: BranchSelection = EVERY_BRANCH): b
  * stashes were made on (`stashBaseNames` of `src/core/parse/stash-list.ts`),
  * given on every branch only.
  *
- * **`viaStdin`** puts those names on git's standard input, one a line, and
- * `--stdin` takes their place among the arguments when there are any. Git's
+ * **`viaStdin`** puts those names, or under a selection the selected names
+ * ({@link revisionArgs}), on git's standard input, one a line, and `--stdin`
+ * takes their place among the arguments when there are any. Git's
  * documentation of `--stdin` (`rev-list-options.txt` at tag v2.25.0, read on
  * 2026-11-10) says: "In addition to the <commit> listed on the command line,
  * read them from the standard input." Each name is forty characters, and Windows
  * refuses a process whose command line is past 32 767, which about 800 stashes
  * each on a commit of its own reached (review round 07 of E04-M01). The caller
- * writes the names as the run's `input` (`stashBaseInput`).
+ * writes the names as the run's `input` (`revisionInput`).
  *
  * **`--date-order`, so no commit is listed before any of its children**
  * (E04-M01-S14, scope 10). Without an ordering option git's walk takes commits
@@ -426,7 +446,18 @@ export function uncommittedDiffArgs(repositoryPath: string, base: string): strin
   ];
 }
 
-/** The standard input that goes with `commitLogArgs(…, true)`: one name a line. */
-export function stashBaseInput(stashBases: readonly string[]): string | undefined {
-  return stashBases.length > 0 ? `${stashBases.join('\n')}\n` : undefined;
+/**
+ * The standard input that goes with `commitLogArgs(…, true)`: one name a line,
+ * the stash bases on every branch and the selected names that are read under a
+ * selection, in the order the command line would have given them.
+ */
+export function revisionInput(
+  selection: BranchSelection,
+  stashBases: readonly string[],
+): string | undefined {
+  const names =
+    selection.branches === null
+      ? stashBases
+      : readBranches(selection.branches, selection.showRemoteBranches);
+  return names.length > 0 ? `${names.join('\n')}\n` : undefined;
 }

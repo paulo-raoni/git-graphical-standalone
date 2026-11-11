@@ -31,9 +31,9 @@ import {
   commitLogArgs,
   referenceArgs,
   repositoryProbeArgs,
+  revisionInput,
   selectsAnyRevision,
   stashArgs,
-  stashBaseInput,
   statusArgs,
 } from './git-commands';
 import { runGit } from './git-process';
@@ -110,7 +110,7 @@ async function readCommits(
       tips,
       true,
     ),
-    input: stashBaseInput(tips),
+    input: revisionInput(request.selection ?? { branches: null, showRemoteBranches: true }, tips),
     onOutput: (chunk) => {
       pushCommitLog(parser, chunk);
     },
