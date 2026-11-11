@@ -33,6 +33,7 @@ import {
   repositoryProbeArgs,
   selectsAnyRevision,
   stashArgs,
+  stashBaseInput,
   statusArgs,
 } from './git-commands';
 import { runGit } from './git-process';
@@ -102,7 +103,14 @@ async function readCommits(
   const tips = everyBranch ? stashBaseNames(stashes) : [];
   const outcome = await runGit({
     executable,
-    args: commitLogArgs(request.repositoryPath, request.pageSize + 1, request.selection, tips),
+    args: commitLogArgs(
+      request.repositoryPath,
+      request.pageSize + 1,
+      request.selection,
+      tips,
+      true,
+    ),
+    input: stashBaseInput(tips),
     onOutput: (chunk) => {
       pushCommitLog(parser, chunk);
     },

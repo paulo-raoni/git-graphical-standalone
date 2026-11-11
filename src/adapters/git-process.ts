@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { ChildProcess } from 'node:child_process';
+import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 
 import { FailureKind } from '../contracts/index';
 import type { Result } from '../contracts/index';
@@ -61,6 +61,12 @@ export interface GitRun {
   readonly args: readonly string[];
   /** Where each chunk of standard output goes, as it arrives. */
   readonly onOutput?: ((chunk: Uint8Array) => void) | undefined;
+  /**
+   * Text written to git's standard input, which is then closed. Given when what
+   * git is to read could outgrow a command line, which Windows refuses past
+   * 32 767 characters; omitted, nothing is written.
+   */
+  readonly input?: string | undefined;
 }
 
 /** What the run collected while it was in flight. */
@@ -147,15 +153,31 @@ function outcomeOf(run: GitRun, state: RunState, code: number | null): Result<vo
  * early termination that follows an output handler throwing. `close` is the
  * event that fires once the streams are done as well as the process, which is
  * what makes "awaited and cleaned up" true rather than likely.
+ *
+ * A `spawn` that throws, as it does with `ENAMETOOLONG` for a command line the
+ * system refuses, is answered as a failure value too, and never as a rejection.
  */
 export function runGit(run: GitRun): Promise<Result<void>> {
   return new Promise<Result<void>>((settle) => {
     const state: RunState = { errors: [], errorBytes: 0, broke: null, missing: false };
-    const child = spawn(run.executable, [...run.args], {
-      env: readingEnvironment(process.env),
-      windowsHide: true,
-      shell: false,
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child = spawn(run.executable, [...run.args], {
+        env: readingEnvironment(process.env),
+        windowsHide: true,
+        shell: false,
+      });
+    } catch (cause) {
+      const said = cause instanceof Error ? cause.message : String(cause);
+      settle(failedWith(`git could not be started: ${said}`, null));
+      return;
+    }
+    child.stdin.on('error', () => {
+      // git may exit before it has read its input; its exit status says why.
     });
+    if (run.input !== undefined) {
+      child.stdin.end(run.input);
+    }
     child.stdout.on('data', (chunk: Uint8Array) => {
       takeOutput(run, state, child, chunk);
     });
