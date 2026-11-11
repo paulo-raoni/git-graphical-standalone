@@ -157,6 +157,13 @@ default (git 2.51.0 there: *invalid path 'quote"mark.txt'*), so the stream is ru
 out only once neither name is in its tree. A tab, a control character other than a line feed and a name ending
 in a carriage return, which no Windows file system holds, are held by the unit tests instead.
 
+*Note, 2026-11-10 (E04-M01-FIX-09).* "Which no Windows file system holds" was written without a measurement.
+Review round 07 measured on 2026-11-09, on the development machine's NTFS volume, that .NET's
+`File.WriteAllText` refused to create a file named `cr-name` followed by a carriage return, by its plain path
+("invalid characters in the path") and with the `\\?\` prefix ("the file name, directory name or volume label
+syntax is incorrect"). That shows the Windows file API refuses the name on that volume. That no Windows file
+system can hold it is an inference, not measured here; the claim stands only as far as that measurement.
+
 **Why it is data.** `test/fixtures/generate.ts` stood at its lint limit of 300 lines of code, so the repository
 is spelt out as git steps in the specification and run by `scripted`, and the generator's two workspaces share
 `workspaceOf` and its two line lists `linesOf` to make room. Re-recording `expected-object-names.json` added
