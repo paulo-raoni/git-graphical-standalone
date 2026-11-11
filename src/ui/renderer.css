@@ -20,6 +20,8 @@
   --text-primary: light-dark(#1f1f1f, #e8e8e8);
   --text-secondary: light-dark(#5c5c5c, #a0a0a0);
   --line: light-dark(#e2e2e2, #333333);
+  --raised: light-dark(#f3f3f3, #262626);
+  --open-row: light-dark(#e8eef7, #2d3340);
 
   font-family:
     system-ui,
@@ -400,4 +402,65 @@ body {
 .graph__more {
   display: block;
   margin: 6px 8px 10px;
+}
+
+/* The details area (E04-M01-S09). */
+.row--open {
+  background: var(--open-row);
+}
+
+.details {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  height: var(--details-height);
+  border-bottom: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 12px;
+  grid-template-columns: var(--graph-width, 100px) minmax(0, 1fr) minmax(0, 1fr) 32px;
+}
+
+.details__info,
+.details__files {
+  overflow: auto;
+  padding: 6px 8px;
+  user-select: text;
+}
+
+.details__info {
+  grid-column: 2;
+}
+
+.details__label {
+  font-weight: 700;
+}
+
+.details__line,
+.details__file {
+  overflow-wrap: anywhere;
+}
+
+.details__message {
+  margin-top: 1em;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.details__controls {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.details__close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
 }

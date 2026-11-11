@@ -103,6 +103,8 @@
       "src/contracts/refs.ts",
       "src/contracts/result.ts",
       "src/ui/branch-control.ts",
+      "src/ui/details-area.ts",
+      "src/ui/details-panel.ts",
       "src/ui/geometry.ts",
       "src/ui/graph-canvas.ts",
       "src/ui/graph-table.ts",

@@ -1,11 +1,18 @@
 import { entryAt } from '../contracts/column-read';
-import type { GraphPage } from '../contracts/index';
+import type { DetailsTarget, GraphPage } from '../contracts/index';
 
+import { createDetailsArea } from './details-area';
+import type { DetailsArea } from './details-area';
+import { askDetails, closeDetails, keepDetails, placeArea, toggleDetails } from './details-panel';
+import type { DetailsListener } from './details-panel';
 import {
+  DETAILS_HEIGHT,
   drawnRowCount,
   firstDrawnRow,
   graphColumnWidth,
+  NO_ROW,
   rowInSlot,
+  rowOffsetY,
   rowPoolSize,
   ROW_HEIGHT,
 } from './geometry';
@@ -13,6 +20,8 @@ import { paintGraph, resizeCanvas } from './graph-canvas';
 import { createRowElement, writeRow } from './row-element';
 import type { RowElement } from './row-element';
 import { rowViewAt } from './row-model';
+
+export type { DetailsListener } from './details-panel';
 
 /**
  * The virtualised table: a fixed pool of row elements over a spacer, and one
@@ -36,6 +45,15 @@ import { rowViewAt } from './row-model';
  * 3. *Read, then write.* `paint` takes every measurement it needs from the DOM
  *    before it writes anything, and writes nothing it then reads back. The
  *    alternation is what turns a scroll handler into a forced layout per row.
+ *
+ * **The details area (E04-M01-S09) keeps all three.** At most one row has its
+ * details open, in the one element `./details-area` builds when the view is
+ * mounted, so the pool holds the elements it held (1), the area is opened and
+ * closed by a click or a call and by nothing on a timer (2), and `paint` still
+ * reads before it writes (3): the open row is state, not a measurement. Every row
+ * after the open one is placed `DETAILS_HEIGHT` lower by `rowOffsetY` and
+ * `rowTopY` of `./geometry`, which the DOM and the canvas both take their tops
+ * from.
  *
  * The functions below take their state as a parameter rather than closing over
  * it, so that each one is short enough to read whole; `mountGraphTable` is the
@@ -70,12 +88,15 @@ const HEADINGS = ['Graph', 'Description', 'Date', 'Author', 'Commit'];
  * asks for it to be drawn, and is told when the user wants more. The view
  * answers no question about a repository and reaches for nothing — it holds no
  * bridge, no channel and no loader — which is what lets this slice be judged on
- * what it draws.
+ * what it draws. The details of a row are the same: the view says what it wants
+ * read and is handed the reply.
  */
 export interface GraphTableView {
   /**
    * Draw this page, replacing whatever is on screen, at the scroll offset the
-   * table already has: a grown or re-read page of the same repository.
+   * table already has: a grown or re-read page of the same repository. Open
+   * details stay open on the same commit, or on the uncommitted changes, when the
+   * page still has its row, and close when it has not (E04-M01-S09).
    */
   readonly showPage: (page: GraphPage) => void;
   /**
@@ -84,6 +105,7 @@ export interface GraphTableView {
    * A second member rather than an argument to `showPage`, so that `showPage`
    * keeps the promise S05's slice document made of it — it does not touch
    * `scrollTop` — and the offset is reset by exactly one line of this module.
+   * Open details are closed: they belong to the repository and selection before.
    */
   readonly showOpenedPage: (page: GraphPage) => void;
   /** Register the listener the Load More Commits control calls. */
@@ -99,6 +121,18 @@ export interface GraphTableView {
    * a second place that knows how a row of this view is spelled.
    */
   readonly setLoadingMore: (loading: boolean) => void;
+  /** Register the listener that is asked to read the details of the row just opened. */
+  readonly onDetails: (listener: DetailsListener) => void;
+  /**
+   * Open the details of layout row `row` under it, or close them when they are
+   * that row's already: what a click on the row does, and what following a
+   * parent link does. Keys and the options of later slices call it too.
+   */
+  readonly toggleDetails: (row: number) => void;
+  /** Close the open details, if any. The view does not scroll back. */
+  readonly closeDetails: () => void;
+  /** Ask again for the open details if they are the uncommitted changes', which a Refresh may have changed. */
+  readonly rereadUncommitted: () => void;
 }
 
 /** The elements the view is made of, found once so that no frame looks them up. */
@@ -110,6 +144,7 @@ interface TableParts {
   readonly more: HTMLButtonElement;
   readonly canvas: HTMLCanvasElement;
   readonly context: CanvasRenderingContext2D;
+  readonly area: DetailsArea;
 }
 
 /** Everything that changes. */
@@ -121,6 +156,17 @@ interface TableState {
   /** The animation frame already requested, or `null`. */
   frame: number | null;
   listener: (() => void) | null;
+  /** Ask for a frame, once however often it is called before the frame runs. */
+  schedule: () => void;
+  /** Mark every pool slot as holding no row, so that the next frame writes them all. */
+  forget: () => void;
+  /** The layout row whose details are open, or `NO_ROW`. */
+  open: number;
+  /** What the open row's details are of, or `null` while none are open. */
+  target: DetailsTarget | null;
+  /** Which request the open area waits for: a reply to any other is stale. */
+  asked: number;
+  details: DetailsListener | null;
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -182,19 +228,22 @@ function buildParts(root: HTMLElement): TableParts {
   const spacer = element('div', 'graph__spacer');
   const more = element('button', 'graph__more');
   const canvas = element('canvas', 'graph__canvas');
+  const area = createDetailsArea();
   more.type = 'button';
   more.textContent = LOAD_MORE_LABEL;
   more.hidden = true;
+  spacer.append(area.root);
   scroll.append(buildHead(), spacer, more);
   view.append(scroll, canvas);
   view.hidden = true;
   view.style.setProperty('--row-height', `${String(ROW_HEIGHT)}px`);
+  view.style.setProperty('--details-height', `${String(DETAILS_HEIGHT)}px`);
   root.replaceChildren(empty, view);
   const context = canvas.getContext('2d');
   if (context === null) {
     throw new Error('This window has no 2D canvas context, so the graph cannot be drawn.');
   }
-  return { empty, view, scroll, spacer, more, canvas, context };
+  return { empty, view, scroll, spacer, more, canvas, context, area };
 }
 
 /**
@@ -256,7 +305,8 @@ function writeRows(state: TableState, page: GraphPage, first: number, count: num
     state.slotRows[slot] = row;
     made.root.hidden = row < 0;
     if (row >= 0) {
-      writeRow(made, rowViewAt(page, row), row * ROW_HEIGHT);
+      writeRow(made, rowViewAt(page, row), rowOffsetY(row, state.open));
+      made.root.classList.toggle('row--open', row === state.open);
     }
   }
 }
@@ -277,25 +327,42 @@ function paint(parts: TableParts, state: TableState): void {
   if (state.pool.length !== size) {
     resizePool(parts, state, size);
   }
-  const first = firstDrawnRow(scrollTop, height, rowCount);
+  const first = firstDrawnRow(scrollTop, height, rowCount, state.open);
   const count = drawnRowCount(first, height, rowCount);
   writeRows(state, page, first, count);
   resizeCanvas(parts.canvas, Math.round(width * ratio), Math.round(height * ratio));
-  paintGraph(parts.context, page, first, count, scrollTop, ratio);
+  paintGraph(parts.context, page, first, count, scrollTop, ratio, state.open);
+}
+
+/**
+ * A click on the table: on a row, outside a reference label and outside the
+ * area, toggles that row's details. A label does nothing (item 8 of the slice),
+ * and what is inside the area does its own work (the close control, a parent link).
+ */
+function clicked(parts: TableParts, state: TableState, event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element) || target.closest('.ref, .details') !== null) {
+    return;
+  }
+  const row = target.closest('.row');
+  const slot = state.pool.findIndex((made) => made.root === row);
+  if (slot >= 0) {
+    toggleDetails(parts, state, entryAt(state.slotRows, slot));
+  }
 }
 
 /** Show a page: size the spacer and the graph column, then ask for a frame. */
 function showPage(parts: TableParts, state: TableState, page: GraphPage): void {
   state.page = page;
+  keepDetails(state, page);
   parts.empty.hidden = true;
   parts.view.hidden = false;
   parts.view.style.setProperty(
     '--graph-width',
     `${String(graphColumnWidth(page.layout.maxLane))}px`,
   );
-  parts.spacer.style.height = `${String(page.layout.rowCount * ROW_HEIGHT)}px`;
   parts.more.hidden = !page.hasMore;
-  forgetRows(state);
+  placeArea(parts, state);
 }
 
 /**
@@ -317,6 +384,60 @@ function watchPixelRatio(schedule: () => void): void {
   );
 }
 
+/** Register every listener of the view: each one asks for a frame or hands an intent on. */
+function listen(parts: TableParts, state: TableState): void {
+  parts.scroll.addEventListener('scroll', state.schedule, { passive: true });
+  parts.more.addEventListener('click', () => state.listener?.());
+  parts.spacer.addEventListener('click', (event) => {
+    clicked(parts, state, event);
+  });
+  parts.area.close.addEventListener('click', () => {
+    closeDetails(parts, state);
+  });
+  new ResizeObserver(state.schedule).observe(parts.view);
+  watchPixelRatio(state.schedule);
+}
+
+/** What the view hands its caller, over the parts and the state. */
+function viewOf(parts: TableParts, state: TableState): GraphTableView {
+  return {
+    showPage: (page: GraphPage): void => {
+      showPage(parts, state, page);
+      state.schedule();
+    },
+    showOpenedPage: (page: GraphPage): void => {
+      state.target = null;
+      showPage(parts, state, page);
+      // After the spacer is sized for the new page. The scroll event this may
+      // fire calls `schedule` too, which asks for one frame however often it is
+      // called before that frame runs (invariant 2).
+      parts.scroll.scrollTop = 0;
+      state.schedule();
+    },
+    onLoadMore: (listener: () => void): void => {
+      state.listener = listener;
+    },
+    setLoadingMore: (loading: boolean): void => {
+      parts.more.disabled = loading;
+      parts.more.textContent = loading ? LOADING_LABEL : LOAD_MORE_LABEL;
+    },
+    onDetails: (listener: DetailsListener): void => {
+      state.details = listener;
+    },
+    toggleDetails: (row: number): void => {
+      toggleDetails(parts, state, row);
+    },
+    closeDetails: (): void => {
+      closeDetails(parts, state);
+    },
+    rereadUncommitted: (): void => {
+      if (state.target?.kind === 'uncommitted') {
+        askDetails(parts, state, true);
+      }
+    },
+  };
+}
+
 /** Mount the view into `root` and return what S06 drives it with. */
 export function mountGraphTable(root: HTMLElement): GraphTableView {
   const parts = buildParts(root);
@@ -326,35 +447,20 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     slotRows: new Int32Array(0),
     frame: null,
     listener: null,
+    schedule: () => undefined,
+    forget: () => {
+      forgetRows(state);
+    },
+    open: NO_ROW,
+    target: null,
+    asked: 0,
+    details: null,
   };
-  const schedule = (): void => {
+  state.schedule = (): void => {
     state.frame ??= requestAnimationFrame(() => {
       paint(parts, state);
     });
   };
-  parts.scroll.addEventListener('scroll', schedule, { passive: true });
-  parts.more.addEventListener('click', () => state.listener?.());
-  new ResizeObserver(schedule).observe(parts.view);
-  watchPixelRatio(schedule);
-  return {
-    showPage: (page: GraphPage): void => {
-      showPage(parts, state, page);
-      schedule();
-    },
-    showOpenedPage: (page: GraphPage): void => {
-      showPage(parts, state, page);
-      // After the spacer is sized for the new page. The scroll event this may
-      // fire calls `schedule` too, which asks for one frame however often it is
-      // called before that frame runs (invariant 2).
-      parts.scroll.scrollTop = 0;
-      schedule();
-    },
-    onLoadMore: (listener: () => void): void => {
-      state.listener = listener;
-    },
-    setLoadingMore: (loading: boolean): void => {
-      parts.more.disabled = loading;
-      parts.more.textContent = loading ? LOADING_LABEL : LOAD_MORE_LABEL;
-    },
-  };
+  listen(parts, state);
+  return viewOf(parts, state);
 }

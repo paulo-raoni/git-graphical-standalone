@@ -2,6 +2,7 @@ import { entryAt } from '../contracts/column-read';
 import {
   authorOf,
   hexHashOf,
+  HASH_BYTE_LENGTH,
   refCommitOf,
   refCount,
   refKindOf,
@@ -9,7 +10,7 @@ import {
   RefKind,
   subjectOf,
 } from '../contracts/index';
-import type { GraphPage } from '../contracts/index';
+import type { DetailsTarget, GraphPage } from '../contracts/index';
 
 /**
  * What one row shows, computed for one row index on demand.
@@ -170,4 +171,35 @@ export function rowViewAt(page: GraphPage, row: number): RowView {
     labels: labelsOn(page, commitRow),
     colourIndex,
   };
+}
+
+/** What to ask for to see the details of row `row`: the uncommitted changes or its commit. */
+export function detailsTargetAt(page: GraphPage, row: number): DetailsTarget {
+  const commitRow = commitRowOf(page, row);
+  return commitRow < 0
+    ? { kind: 'uncommitted' }
+    : { kind: 'commit', hash: hexHashOf(page.commits, commitRow) };
+}
+
+/**
+ * The row of `page` that shows `target`, or `-1` when the page has none.
+ *
+ * One pass over the loaded commits that spells an object name only for a commit
+ * whose first byte is the wanted one, about one in 256, so it builds almost no
+ * string. It is called once per reply and once per page that arrives with an area
+ * open, never per frame (E04-M01-S09).
+ */
+export function rowOfTarget(page: GraphPage, target: DetailsTarget): number {
+  const shift = page.workingTree.hasChanges ? 1 : 0;
+  if (target.kind === 'uncommitted') {
+    return shift - 1;
+  }
+  const first = Number.parseInt(target.hash.slice(0, 2), 16);
+  for (let commit = 0; commit < page.commits.count; commit += 1) {
+    const found = entryAt(page.commits.hashes, commit * HASH_BYTE_LENGTH) === first;
+    if (found && hexHashOf(page.commits, commit) === target.hash) {
+      return commit + shift;
+    }
+  }
+  return -1;
 }
