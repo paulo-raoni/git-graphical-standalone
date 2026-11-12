@@ -45,8 +45,13 @@ const git = (repository: string, ...args: string[]): string[] =>
 const subjectOf = (page: Page, text: string): Locator =>
   page.locator('.row', { hasText: text }).locator('.row__subject');
 
-/** The top of every row shown, by its subject. */
+/**
+ * The top of every row shown, by its subject, read once a row is shown. Closing or moving the area hides
+ * the whole pool and the next animation frame writes it back (F-10 of review round 10), so a read straight
+ * after the click can find none.
+ */
 async function tops(page: Page): Promise<Record<string, number>> {
+  await expect(page.locator('.row:not([hidden])').first()).toBeVisible();
   const found: Record<string, number> = {};
   for (const row of await page.locator('.row:not([hidden])').all()) {
     found[(await row.locator('.row__subject').textContent()) ?? ''] =
