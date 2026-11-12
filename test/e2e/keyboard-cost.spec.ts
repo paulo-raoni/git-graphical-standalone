@@ -195,6 +195,8 @@ test('a move on a page of ten thousand rows: the longest walk, and Down in the m
         await page.evaluate(scrollListTo, (row - 5) * ROW_HEIGHT);
         await clickRow(page, row);
         const { milliseconds, open } = await page.evaluate(timedPress, { key, ctrl });
+        // The open row's class is written by the next frame, so wait for it to leave `row`.
+        await expect.poll(() => openRowOf(page), { message: name }).not.toBe(row);
         const moved = await openRowOf(page);
         expect(moved, name).toBeLessThan(under < 0 ? row : rows);
         if (under > 0) expect(moved).toBe(row + 1);

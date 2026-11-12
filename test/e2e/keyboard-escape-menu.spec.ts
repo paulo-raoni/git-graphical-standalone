@@ -43,6 +43,20 @@ async function openFiles(page: Page): Promise<void> {
 
 /** Right-click `added.txt` and wait for the menu. */
 async function openMenu(page: Page): Promise<void> {
+  // Let the pane finish drawing its rows, so the click lands on the row it was aimed at.
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const { requestAnimationFrame: frame } = globalThis as unknown as {
+          requestAnimationFrame: (call: () => void) => void;
+        };
+        frame(() => {
+          frame(() => {
+            done();
+          });
+        });
+      }),
+  );
   await page
     .locator('.files__row:not([hidden])', { hasText: 'added.txt' })
     .click({ button: 'right' });
