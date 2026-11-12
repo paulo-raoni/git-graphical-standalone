@@ -83,6 +83,14 @@ export function repositoryProbeArgs(repositoryPath: string): string[] {
   return [...baseArgs(repositoryPath), 'rev-parse', '--git-dir'];
 }
 
+/**
+ * Ask git for the repository's top level: the directory the working tree is
+ * rooted at, which a path of a changed file is relative to (E04-M01-S10).
+ */
+export function topLevelArgs(repositoryPath: string): string[] {
+  return [...baseArgs(repositoryPath), 'rev-parse', '--show-toplevel'];
+}
+
 /** What a page shows when nothing was chosen: every branch, remote-tracking ones included. */
 const EVERY_BRANCH: BranchSelection = { branches: null, showRemoteBranches: true };
 

@@ -1,7 +1,16 @@
-import { app, dialog, ipcMain } from 'electron';
+import { stat } from 'node:fs/promises';
+
+import { app, clipboard, dialog, ipcMain, shell } from 'electron';
 import type { BrowserWindow } from 'electron';
 
-import { CHANNELS, FailureKind, keptSelection, openingSelection } from '../contracts/index';
+import {
+  absolutePathIn,
+  CHANNELS,
+  FailureKind,
+  fileActionRequestOf,
+  keptSelection,
+  openingSelection,
+} from '../contracts/index';
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
@@ -11,6 +20,8 @@ import type {
   DetailsRequest,
   DetailsResponse,
   DetailsTarget,
+  FileActionRequest,
+  FileActionResponse,
   GraphPage,
   LoadMoreCommitsRequest,
   OpenRepositoryRequest,
@@ -21,7 +32,7 @@ import type {
   ThemeChoiceResponse,
   UncommittedDetails,
 } from '../contracts/index';
-import type { ReaderDescription } from '../ports/index';
+import type { FilePlace, ReaderDescription } from '../ports/index';
 
 import type { RepositoryClient } from './repository-client';
 import type { SelectionStore } from './selections';
@@ -31,8 +42,10 @@ import type { ThemeStore } from './theme';
  * Every channel of `src/contracts/ipc.ts`, answered.
  *
  * This is the whole of what the main process does with a repository: it
- * forwards. Five of the nine channels are a message to the utility process and
- * its answer handed back unchanged, a commit's details among them; one is a
+ * forwards. Five of the ten channels are a message to the utility process and
+ * its answer handed back unchanged, a commit's details among them; a sixth, the
+ * file action, is such a message and then a write to the clipboard or a call to
+ * the file manager, which only this process may make (`fileAction` below); one is a
  * folder dialog, which only a process that owns a window can show; one is a
  * string read off the command line at startup; and two read and set the colour
  * scheme, which is the application's and not a repository's (`./theme.ts`). A
@@ -130,6 +143,74 @@ async function applicationInfo(context: HandlerContext): Promise<ApplicationInfo
   };
 }
 
+/** What a request for a file action is told when it is not one. */
+const NOT_A_FILE_ACTION =
+  'The request names neither one of the three file actions on a file of a commit or of the uncommitted changes.';
+
+/** The separator the platform's paths are written with. */
+const SEPARATOR = process.platform === 'win32' ? '\\' : '/';
+
+/** A failure the window shows in the files pane. */
+function refused(message: string): FileActionResponse {
+  return { ok: false, kind: FailureKind.GitFailed, message };
+}
+
+/** Whether a file or a folder exists at `path`. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Do one thing with one changed file (E04-M01-S10).
+ *
+ * The request came from the page and is checked once, here, before anything of it
+ * reaches git, the file system or the clipboard (`fileActionRequestOf`). A
+ * relative copy starts no git process. An absolute copy and an `Open File` ask the
+ * utility process for the repository's top level, and `Open File` of a commit's
+ * file for where the working tree has the file now. Opening **shows the file in
+ * the system's file manager and runs nothing**: the system's default program
+ * for a script or an executable in a repository would run it.
+ */
+async function fileAction(context: HandlerContext, value: unknown): Promise<FileActionResponse> {
+  const request: FileActionRequest | null = fileActionRequestOf(value);
+  if (request === null) {
+    return refused(NOT_A_FILE_ACTION);
+  }
+  if (request.action === 'copy-relative-path') {
+    await clipboard.writeText(request.path);
+    return { ok: true, value: { path: request.path } };
+  }
+  const opening = request.action === 'open-file';
+  const place = await context.client.ask<FilePlace>({
+    kind: 'file-place',
+    target: request.target,
+    path: request.path,
+    follow: opening,
+  });
+  if (!place.ok) {
+    return place;
+  }
+  const relative = place.value.path;
+  const absolute = relative === null ? null : absolutePathIn(place.value.top, relative, SEPARATOR);
+  if (!opening) {
+    if (absolute === null) {
+      return refused(`\`${request.path}\` has no absolute path below the repository.`);
+    }
+    await clipboard.writeText(absolute);
+    return { ok: true, value: { path: absolute } };
+  }
+  if (absolute === null || !(await exists(absolute))) {
+    return refused(`\`${request.path}\` is not in the working tree.`);
+  }
+  shell.showItemInFolder(absolute);
+  return { ok: true, value: { path: absolute } };
+}
+
 /** Register the channels that open and read a repository. */
 function registerRepositoryHandlers(context: HandlerContext): void {
   /**
@@ -170,6 +251,12 @@ function registerRepositoryHandlers(context: HandlerContext): void {
         // Forwarded unchecked, because it came from the page and the reader checks it.
         target: request?.target as DetailsTarget,
       }),
+  );
+
+  ipcMain.handle(
+    CHANNELS.fileAction,
+    (_event: unknown, request: unknown): Promise<FileActionResponse> =>
+      fileAction(context, request),
   );
 
   ipcMain.handle(

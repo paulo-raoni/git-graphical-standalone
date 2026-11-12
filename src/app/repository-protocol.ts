@@ -66,6 +66,17 @@ export type RepositoryQuestion =
        */
       readonly kind: 'details';
       readonly target: DetailsTarget;
+    }
+  | {
+      /**
+       * Where a changed file is: the repository's top level and, with `follow`,
+       * the path the working tree has it at now (E04-M01-S10). The main process
+       * checked the request before it asked; the reader checks the target again.
+       */
+      readonly kind: 'file-place';
+      readonly target: DetailsTarget;
+      readonly path: string;
+      readonly follow: boolean;
     };
 
 /**
@@ -81,7 +92,7 @@ export type RepositoryRequest = RepositoryQuestion & { readonly id: number };
  *
  * The value's shape is decided by the request the `id` names — a `GraphPage` for
  * the first three, a `ReaderDescription` for `describe`, a `CommitDetails` or an
- * `UncommittedDetails` for `details` — so it is `unknown` here
+ * `UncommittedDetails` for `details`, a `FilePlace` for `file-place` — so it is `unknown` here
  * and is narrowed at the one place that knows which question it asked. A tagged
  * union would carry the tag over the wire and still be narrowed by a cast on
  * arrival, because nothing type-checks a structured clone.
