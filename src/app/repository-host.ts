@@ -21,6 +21,7 @@ import {
 } from '../core/page/index';
 import type { RowBlock } from '../core/page/index';
 import type { ReaderDescription, RepositoryPage } from '../ports/index';
+import type { FilePlace } from '../ports/repository-reader';
 
 import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
 
@@ -429,10 +430,39 @@ async function details(target: DetailsTarget): Promise<Result<CommitDetails | Un
   return read;
 }
 
+/**
+ * Where a changed file is in the open repository, on request and never
+ * otherwise (E04-M01-S10). Dropped like details if another repository was
+ * opened while it was read.
+ */
+async function filePlace(
+  target: DetailsTarget,
+  path: string,
+  follow: boolean,
+): Promise<Result<FilePlace>> {
+  const repository = open;
+  if (repository === null) {
+    return failed(FailureKind.Cancelled, 'No repository is open, so there is no file to find.');
+  }
+  const read = await reader.readFilePlace({
+    repositoryPath: repository.path,
+    target,
+    path,
+    follow,
+  });
+  if (open?.ticket !== repository.ticket) {
+    return failed(
+      FailureKind.Cancelled,
+      'Another repository was opened while this file was being found, so this reply was dropped.',
+    );
+  }
+  return read;
+}
+
 /** The answer to one request, as a value; nothing here throws at the caller. */
 async function answer(
   request: RepositoryRequest,
-): Promise<Result<GraphPage | ReaderDescription | CommitDetails | UncommittedDetails>> {
+): Promise<Result<GraphPage | ReaderDescription | CommitDetails | UncommittedDetails | FilePlace>> {
   switch (request.kind) {
     case 'open':
       return openRepository(request.path, request.selection);
@@ -444,6 +474,8 @@ async function answer(
       return reader.describe();
     case 'details':
       return details(request.target);
+    case 'file-place':
+      return filePlace(request.target, request.path, request.follow);
   }
 }
 

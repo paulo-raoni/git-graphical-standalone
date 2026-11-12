@@ -264,6 +264,7 @@ async function open(
     const { selection, refs } = opened.value;
     const shown = survivingSelection(selection, refs);
     session.path = path;
+    view.setRepository(path);
     session.menu = menuOf(shown);
     session.showRemoteBranches = shown.showRemoteBranches;
     if (!sameSelection(shown, selection)) {
@@ -366,6 +367,7 @@ function connectBranches(shell: Shell, view: GraphTableView, session: Session): 
  * view decides whether the reply is still wanted (E04-M01-S09).
  */
 function connectDetails(shell: Shell, view: GraphTableView): void {
+  view.onFileAction((request) => window.gitGraphical.fileAction(request));
   view.onDetails((target, answer) => {
     run(
       shell,

@@ -16,6 +16,8 @@ import {
   rowPoolSize,
   ROW_HEIGHT,
 } from './geometry';
+import type { ActionListener } from './file-pane';
+import type { OptionGroup } from './file-menu';
 import { paintGraph, resizeCanvas } from './graph-canvas';
 import { createRowElement, writeRow } from './row-element';
 import type { RowElement } from './row-element';
@@ -36,7 +38,10 @@ export type { DetailsListener } from './details-panel';
  *    forty-odd elements as scrolling a page of twenty.
  * 2. *One redraw per frame at most.* Every trigger calls the view's `schedule`,
  *    which requests an animation frame only when one is not already pending, so
- *    two scroll events in a frame paint once. The half that matters more is the
+ *    two scroll events in a frame paint once. (Closing the details area draws at
+ *    once and cancels the pending frame, E04-M01-S10, so it is one redraw as well
+ *    and the pool is never left hidden between a click and its frame.) The half
+ *    that matters more is the
  *    other one: **nothing schedules anything when nothing happens.** There is no
  *    interval, no polling and no animation loop, so an idle window does no work
  *    at all, which is a budget of
@@ -133,6 +138,12 @@ export interface GraphTableView {
   readonly closeDetails: () => void;
   /** Ask again for the open details if they are the uncommitted changes', which a Refresh may have changed. */
   readonly rereadUncommitted: () => void;
+  /** Register what a file action of the files pane is done with (E04-M01-S10). */
+  readonly onFileAction: (listener: ActionListener) => void;
+  /** Say which repository is open, the key the files pane's view is kept by. */
+  readonly setRepository: (path: string | null) => void;
+  /** Add an option and its values to the files pane's options menu. */
+  readonly addFileOptions: (group: OptionGroup) => void;
 }
 
 /** The elements the view is made of, found once so that no frame looks them up. */
@@ -160,6 +171,8 @@ interface TableState {
   schedule: () => void;
   /** Mark every pool slot as holding no row, so that the next frame writes them all. */
   forget: () => void;
+  /** Draw now in place of the pending frame, which is cancelled. */
+  flush: () => void;
   /** The layout row whose details are open, or `NO_ROW`. */
   open: number;
   /** What the open row's details are of, or `null` while none are open. */
@@ -234,7 +247,7 @@ function buildParts(root: HTMLElement): TableParts {
   more.hidden = true;
   spacer.append(area.root);
   scroll.append(buildHead(), spacer, more);
-  view.append(scroll, canvas);
+  view.append(scroll, canvas, area.menu);
   view.hidden = true;
   view.style.setProperty('--row-height', `${String(ROW_HEIGHT)}px`);
   view.style.setProperty('--details-height', `${String(DETAILS_HEIGHT)}px`);
@@ -435,6 +448,15 @@ function viewOf(parts: TableParts, state: TableState): GraphTableView {
         askDetails(parts, state, true);
       }
     },
+    onFileAction: (listener: ActionListener): void => {
+      parts.area.pane.onAction(listener);
+    },
+    setRepository: (path: string | null): void => {
+      parts.area.pane.setRepository(path);
+    },
+    addFileOptions: (group: OptionGroup): void => {
+      parts.area.pane.addOptions(group);
+    },
   };
 }
 
@@ -451,6 +473,7 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     forget: () => {
       forgetRows(state);
     },
+    flush: () => undefined,
     open: NO_ROW,
     target: null,
     asked: 0,
@@ -460,6 +483,12 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     state.frame ??= requestAnimationFrame(() => {
       paint(parts, state);
     });
+  };
+  state.flush = (): void => {
+    if (state.frame !== null) {
+      cancelAnimationFrame(state.frame);
+    }
+    paint(parts, state);
   };
   listen(parts, state);
   return viewOf(parts, state);

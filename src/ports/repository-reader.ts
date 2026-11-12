@@ -73,6 +73,34 @@ export interface DetailsQuery {
   readonly target: DetailsTarget;
 }
 
+/** Where to find a changed file. */
+export interface FilePlaceQuery {
+  /** A path inside the repository, as a page was read from. */
+  readonly repositoryPath: string;
+  /** The details the file was listed in. Checked by the reader, because it came from the page. */
+  readonly target: DetailsTarget;
+  /** The file's path as the details reply carries it. Checked before the call. */
+  readonly path: string;
+  /**
+   * Whether to follow the file to where the working tree has it now. A commit's
+   * file is followed by one more git process; the uncommitted changes' path is
+   * the working tree's already.
+   */
+  readonly follow: boolean;
+}
+
+/** Where a changed file is. */
+export interface FilePlace {
+  /** The repository's top level, as git prints it. */
+  readonly top: string;
+  /**
+   * The file's path, relative to {@link FilePlace.top}, where the working tree has
+   * it: the path asked for, or the one a rename since the commit gave it. `null`
+   * when the working tree deleted it. Without `follow`, the path asked for.
+   */
+  readonly path: string | null;
+}
+
 /** Where the program that reads repositories was found, and which one it is. */
 export interface ReaderDescription {
   /** The absolute path the reader is running. */
@@ -100,4 +128,6 @@ export interface RepositoryReader {
    * repository, is a failure.
    */
   readDetails(query: DetailsQuery): Promise<Result<CommitDetails | UncommittedDetails>>;
+  /** The repository's top level and, if asked, the current place of one changed file. */
+  readFilePlace(query: FilePlaceQuery): Promise<Result<FilePlace>>;
 }

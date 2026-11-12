@@ -97,6 +97,29 @@ export { keptSelection, openingSelection, survivingSelection } from './kept-sele
  * reaches a command line.
  */
 export { detailsTargetOf, isObjectName } from './commit-details';
+
+/**
+ * What a person can do with a changed file, the check a request for it passes
+ * before anything of it reaches git or the file system, and the rows of the
+ * pane that lists the files (E04-M01-S10).
+ */
+export { absolutePathIn, fileActionRequestOf, isRelativeFilePath, liesInside } from './file-action';
+export type {
+  FileAction,
+  FileActionDone,
+  FileActionRequest,
+  FileActionResponse,
+} from './file-action';
+export { actionsOf, CHAIN_SEPARATOR, fileRowsOf, letterOf, toneOf } from './file-tree';
+export type {
+  FileCounts,
+  FileRow,
+  FileTone,
+  FileTreeRow,
+  FileView,
+  FileViewOptions,
+  FolderRow,
+} from './file-tree';
 export type {
   ChangedFile,
   CommitDetails,

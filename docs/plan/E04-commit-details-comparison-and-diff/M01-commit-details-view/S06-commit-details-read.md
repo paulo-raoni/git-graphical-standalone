@@ -137,6 +137,11 @@ The adapter runs git and streams every chunk to a parser; `src/app/` only forwar
 path git writes as bytes that are not valid UTF-8 is carried with each ill-formed sequence replaced by U+FFFD:
 `bad` `0xFF` `0xC3` `.txt` arrives as `bad��.txt` (unit test of `changed-files.ts`). Such a path cannot be
 named back to git from the reply, which a later slice that acts on a file will have to meet.
+*Note, 2026-11-12 (E04-M01-S10):* S10 is that slice. An action on such a path does not name it back to git: the
+rename rule compares paths read from git, in the same reply form, with the same decoder, so a path holding U+FFFD
+compares equal to itself, and `Open File` checks the file on disk at the joined path, which fails for a name that
+is not valid UTF-8 and ends in *not in the working tree*. Copying the relative or the absolute path writes the
+reply's path, U+FFFD included. See `S10-changed-files.md`.
 
 ## The fixture
 

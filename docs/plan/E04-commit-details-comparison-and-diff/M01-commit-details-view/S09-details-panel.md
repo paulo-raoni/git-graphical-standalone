@@ -142,6 +142,9 @@ after the area where it moves to, and with the window made 200 pixels tall and s
   of thousands. What is known is read from code: the pane is rewritten once per reply, in one `replaceChildren`,
   never per frame, so a commit of many files costs one burst of element creation per open and nothing while it is
   open. Raised for S10, which owns this pane.
+  *Note, 2026-11-12 (E04-M01-S10):* the pane this paragraph describes, one line a file in the reply's order, is gone.
+  S10 replaced it with the tree and the list (`src/ui/file-pane.ts`), drawn from a fixed pool of rows, and measured the
+  cost this paragraph raised: see `S10-changed-files.md`, *The cost*. The sentences above are what was true of S09's head.
 
 ## When a page arrives under an open area
 

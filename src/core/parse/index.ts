@@ -72,3 +72,5 @@ export {
   pushStatus,
 } from './working-tree-status';
 export type { StatusFacts, StatusParser } from './working-tree-status';
+
+export { currentPathOf } from './current-path';

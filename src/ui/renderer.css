@@ -22,6 +22,9 @@
   --line: light-dark(#e2e2e2, #333333);
   --raised: light-dark(#f3f3f3, #262626);
   --open-row: light-dark(#e8eef7, #2d3340);
+  --added: light-dark(#1a7f37, #56d364);
+  --deleted: light-dark(#cf222e, #ff7b72);
+  --tool-active: light-dark(#ffffff, #3a3a3a);
 
   font-family:
     system-ui,
@@ -420,13 +423,24 @@ body {
   background: var(--raised);
   font-size: 12px;
   grid-template-columns: var(--graph-width, 100px) minmax(0, 1fr) minmax(0, 1fr) 32px;
+  grid-template-rows: minmax(0, 1fr);
 }
 
-.details__info,
-.details__files {
+.details__info {
   overflow: auto;
   padding: 6px 8px;
   user-select: text;
+}
+
+.details__files {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.files {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
 }
 
 .details__info {
@@ -437,8 +451,7 @@ body {
   font-weight: 700;
 }
 
-.details__line,
-.details__file {
+.details__line {
   overflow-wrap: anywhere;
 }
 
@@ -450,7 +463,9 @@ body {
 
 .details__controls {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 2px;
   padding-top: 4px;
 }
 
@@ -463,4 +478,158 @@ body {
   color: var(--text-secondary);
   font-size: 16px;
   line-height: 1;
+}
+
+/* The changed files (E04-M01-S10): the view and options buttons, the pane, its menu. */
+.details__tool {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-secondary);
+}
+
+.details__tool svg,
+.files__act svg,
+.files__row svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.details__tool--active {
+  background: var(--tool-active);
+  color: var(--text-primary);
+}
+
+.files__error {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--deleted);
+}
+
+.files__scroll {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.files__spacer {
+  position: relative;
+}
+
+.files__row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+.files__row--folder {
+  cursor: pointer;
+}
+
+.files__row--added {
+  color: var(--added);
+}
+
+.files__row--deleted {
+  color: var(--deleted);
+}
+
+.files__letter {
+  font-weight: 700;
+}
+
+.files__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.files__counts {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.files__plus {
+  color: var(--added);
+}
+
+.files__minus {
+  color: var(--deleted);
+}
+
+.files__acts {
+  display: none;
+  margin-left: auto;
+  flex: none;
+  gap: 2px;
+}
+
+.files__row--file:hover .files__acts {
+  display: flex;
+}
+
+.files__act {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+}
+
+.files__menu {
+  position: fixed;
+  z-index: 10;
+  min-width: 160px;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: 0 2px 8px light-dark(#0003, #0009);
+  font-size: 12px;
+}
+
+.files__menu-heading {
+  padding: 4px 12px 2px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.files__menu-item {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  padding: 3px 12px;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.files__menu-item:hover {
+  background: var(--open-row);
+}
+
+.files__menu-mark {
+  width: 8px;
+  flex: none;
 }

@@ -6,8 +6,10 @@ import type {
   RepositoryPage,
   RepositoryReader,
 } from '../ports/index';
+import type { FilePlace, FilePlaceQuery } from '../ports/repository-reader';
 
 import { readGitDetails } from './git-details';
+import { readGitFilePlace } from './git-file-place';
 import { discoverGit } from './git-executable';
 import type { DiscoveryOptions, GitExecutable } from './git-executable';
 import { readGitPage } from './git-page';
@@ -78,6 +80,13 @@ export function createGitRepositoryReader(options: GitReaderOptions = {}): Repos
         return found;
       }
       return readGitDetails(found.value.path, query);
+    },
+    readFilePlace: async (query: FilePlaceQuery): Promise<Result<FilePlace>> => {
+      const found = await locate();
+      if (!found.ok) {
+        return found;
+      }
+      return readGitFilePlace(found.value.path, query);
     },
   };
 }

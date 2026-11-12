@@ -9,6 +9,8 @@ import type {
   ChooseThemeResponse,
   DetailsRequest,
   DetailsResponse,
+  FileActionRequest,
+  FileActionResponse,
   GitGraphicalBridge,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
@@ -47,6 +49,8 @@ const bridge: GitGraphicalBridge = {
     request<RefreshResponse>(CHANNELS.refresh, refreshRequest),
   commitDetails: (detailsRequest: DetailsRequest): Promise<DetailsResponse> =>
     request<DetailsResponse>(CHANNELS.commitDetails, detailsRequest),
+  fileAction: (actionRequest: FileActionRequest): Promise<FileActionResponse> =>
+    request<FileActionResponse>(CHANNELS.fileAction, actionRequest),
   applicationInfo: (): Promise<ApplicationInfoResponse> =>
     request<ApplicationInfoResponse>(CHANNELS.applicationInfo),
   themeChoice: (): Promise<ThemeChoiceResponse> =>
