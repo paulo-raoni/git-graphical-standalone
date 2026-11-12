@@ -6,7 +6,7 @@ import {
   finishChangedFiles,
   pushChangedFiles,
 } from '../core/parse/index';
-import type { FilePlace, FilePlaceQuery } from '../ports/index';
+import type { FilePlace, FilePlaceQuery } from '../ports/repository-reader';
 
 import { topLevelArguments, uncommittedDiffArgs } from './git-commands';
 import { runGit } from './git-process';

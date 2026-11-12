@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { FailureKind } from '../contracts/index';
 import type { DetailsTarget, Result } from '../contracts/index';
-import type { FilePlace } from '../ports/index';
+import type { FilePlace } from '../ports/repository-reader';
 
 import { PARSING_CONFIGURATION, topLevelArguments } from './git-commands';
 import { createGitRepositoryReader } from './git-repository-reader';

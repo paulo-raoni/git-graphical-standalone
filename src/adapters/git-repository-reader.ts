@@ -1,13 +1,12 @@
 import type { CommitDetails, Result, UncommittedDetails } from '../contracts/index';
 import type {
   DetailsQuery,
-  FilePlace,
-  FilePlaceQuery,
   PageRequest,
   ReaderDescription,
   RepositoryPage,
   RepositoryReader,
 } from '../ports/index';
+import type { FilePlace, FilePlaceQuery } from '../ports/repository-reader';
 
 import { readGitDetails } from './git-details';
 import { readGitFilePlace } from './git-file-place';

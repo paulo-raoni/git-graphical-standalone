@@ -20,7 +20,8 @@ import {
   layoutReading,
 } from '../core/page/index';
 import type { RowBlock } from '../core/page/index';
-import type { FilePlace, ReaderDescription, RepositoryPage } from '../ports/index';
+import type { ReaderDescription, RepositoryPage } from '../ports/index';
+import type { FilePlace } from '../ports/repository-reader';
 
 import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
 

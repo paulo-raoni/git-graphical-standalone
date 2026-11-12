@@ -7,8 +7,6 @@
  */
 export type {
   DetailsQuery,
-  FilePlace,
-  FilePlaceQuery,
   PageRequest,
   ReaderDescription,
   RepositoryPage,

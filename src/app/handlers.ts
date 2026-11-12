@@ -32,7 +32,8 @@ import type {
   ThemeChoiceResponse,
   UncommittedDetails,
 } from '../contracts/index';
-import type { FilePlace, ReaderDescription } from '../ports/index';
+import type { ReaderDescription } from '../ports/index';
+import type { FilePlace } from '../ports/repository-reader';
 
 import type { RepositoryClient } from './repository-client';
 import type { SelectionStore } from './selections';
