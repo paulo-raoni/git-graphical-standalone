@@ -197,17 +197,39 @@ file is written into the repository shows the file in an open uncommitted area; 
   | case | tries | kept | what was read in the kept try (others' load: mean, maximum) |
   | --- | --- | --- | --- |
   | timed benchmarks (parse, layout, build) | 4 | 1 (try 4) | 15.2 microseconds a parsed commit, 0.664 a laid-out commit, 62.5 ms to build 10 000 commits; 3 of 3 passed (29.8, 42) |
-  | main-thread work per frame while scrolling | 15 | 0 | every try discarded by its own reference bound (the 95th percentile of the 2 400 reference timings over 4 ms), the lowest-loaded at 24.8 and 31.3 mean with 4.6 and over 4 ms |
-  | cold start, empty repository | 7 | 0 | discarded for load (mean 41.7 to 68.8) |
-  | cold start, first page of 10 000 | 7 | 0 | discarded for load (mean 41.2 to 71.4) |
+  | main-thread work per frame while scrolling | 15 | 0 | every try discarded by its own reference bound (the 95th percentile of the 2 400 reference timings over 4 ms), the lowest-loaded at 24.8 and 31.3 mean with 4.6 and over 4 ms; read in the third session, below |
+  | cold start, empty repository | 7 | 0 | discarded for load (mean 41.7 to 68.8); read in the third session, below |
+  | cold start, first page of 10 000 | 7 | 0 | discarded for load (mean 41.2 to 71.4); read in the third session, below |
   | ten thousand commits, one load | 6 | 1 (try 6) | fastest of ten Refreshes 522.1 ms, range 522 to 563; passed (24.8, 49) |
   | the main process keeps answering | 1 | 1 | a 641 ms load answered 3 726 main-process round trips, worst 2 ms; passed (28.8, 49) |
-  | fifty thousand commits: memory, five idle minutes | 7 | 0 | discarded: 4 samples over 75 (81 to 87) in the last seconds of the idle window in try 6 (mean 22.8) and try 7 (mean 26.3); both passed every assertion, and neither counts |
+  | fifty thousand commits: memory, five idle minutes | 7 | 0 | discarded: 4 samples over 75 (81 to 87) in the last seconds of the idle window in try 6 (mean 22.8) and try 7 (mean 26.3); both passed every assertion, and neither counts; read in the third session, below |
 
   **Reds.** Some discarded tries read red (the cold-start cases and the benchmarks, at others' loads of 46 to 71 per
   cent). A red on a machine that was not free is not a verdict, and none is claimed as one; no try on a free machine
-  read red. **Owed:** the frames, both cold-start and memory readings on a free machine. They were not given up: the
-  six hours ended with them still waiting for a machine that the other projects kept busy.
+  read red. The frames, both cold-start and memory readings were still owed when that session ended; the third
+  session read them, below.
+
+- **The four owed wall-clock readings, third session, 2026-11-12, 07:22 to 08:00.** Same sampler and same rule as above
+  (`budgets-job.ps1`, copied to a new scratch folder; not changed). **Measured.** The machine was quieter this time
+  (others' mean 10.7 to 29.7 per cent over each kept reading), and all four were kept:
+
+  | case | tries | kept | read (others' load: mean, maximum) |
+  | --- | --- | --- | --- |
+  | main-thread work per frame while scrolling | 8 (four pairs, below) | 1 (pair 2, at this lane's head) | 4.529 ms mean a frame, 6.1 ms fifth-slowest per reference, 7.6 ms longest as timed; reference 95th percentile 3.9 ms against the bound of 4; passed (21.4, 43) |
+  | cold start, empty repository | 3 | 1 (try 3) | fastest of ten 1 142 ms; passed (29.7, 42) |
+  | cold start, first page of 10 000 | 1 | 1 | fastest of ten 1 184 ms; passed (27.6, 52) |
+  | fifty thousand commits: memory, five idle minutes | 1 | 1 | 162 242 560 private bytes, resident 1.003 times after five idle minutes, 0.193 per cent of a core idle, 0 callbacks, 0 redraws, 0 bytes after closing; passed (10.7, 38) |
+
+  **Frames, in pairs.** The second session discarded all 15 frames tries at this lane's head by the reference bound.
+  To see whether the lane moves the reference timings, the third session read the frames case alternately at Base
+  (`808cb6c`, extracted with `git archive` into scratch and built there) and at the head, four pairs, each reading
+  started on a minute under 40 per cent. The 95th percentile of the 2 400 reference timings in milliseconds, with the
+  others' mean load in brackets: pair 1 Base 3.6 (20.0), head 4.8 (24.8); pair 2 head 3.9 (21.4), Base 6.0 (41.0);
+  pair 3 Base 6.2 (43.1), head 7.3 (47.4); pair 4 head 6.6 (51.7), Base 4.0 (18.2). The head is over the bound with
+  Base under it in pairs 1 and 4, under it with Base over in pair 2, and both are over together in pair 3. The two
+  readings of a pair never ran under the same load (pair 4's head had 51.7 against Base's 18.2), so the pairs
+  **show no consistent defect of this lane on the paint path and do not establish its absence**. They are a
+  diagnosis, not a reading: the kept reading above is the head's own.
 
 - **Bundle size.** renderer.js 26 543 bytes against 20 995 at the base, renderer.css 8 170 against 7 117. Both budgets
   were reset once by the margin rule (`comment-e04-m01-s09` in `scripts/gates/size-budget.json`, with the per-module
