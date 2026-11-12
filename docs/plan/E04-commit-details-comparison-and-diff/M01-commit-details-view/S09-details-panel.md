@@ -166,29 +166,48 @@ file is written into the repository shows the file in an open uncommitted area; 
   in `details-lines.spec.ts`, which reads `loadMoreAndShow` and the probes of `support/budgets-page.ts` instead of the
   helpers local to `graph-table.spec.ts`.
 - **How long a click takes** (click to the left pane holding the reply, five readings each, milliseconds, in the order
-  taken; `details-panel.spec.ts`, last case, printed and not held). Five runs, each five readings, all with other
-  projects running.
+  taken; `details-panel.spec.ts`, last case, printed and not held). **Measured 2026-11-12** in one run of the case,
+  inside the job wrapper that samples the whole machine's busy share every second and subtracts the run's own process
+  tree (`budgets-job.ps1`, a Windows job object): the others' load over the 10 seconds of the run was a mean of
+  46.5 per cent, maximum 64, no sample over 75; the minute before it averaged 38.5.
 
-  | run (2026-11-11, load not sampled) | `details`, HEAD's commit | `details`, the uncommitted changes | `large`, HEAD's commit |
+  | run (2026-11-12) | `details`, HEAD's commit | `details`, the uncommitted changes | `large`, HEAD's commit |
   | --- | --- | --- | --- |
-  | 1 | 389, 360, 319, 386, 305 | 493, 627, 525, 489, 496 | 283, 233, 232, 223, 386 |
-  | 2 | 250, 241, 243, 237, 280 | 476, 417, 461, 456, 433 | 278, 248, 272, 284, 440 |
-  | 3 | 289, 227, 228, 222, 202 | 510, 598, 790, 549, 577 | 285, 232, 195, 243, 244 |
-  | 4 (machine visibly busy) | 478, 559, 372, 466, 424 | 1104, 1156, 980, 972, 799 | 469, 371, 361, 407, 472 |
-  | 5 (machine visibly busy) | 525, 328, 341, 352, 448 | 1112, 1014, 761, 921, 1041 | 1074, 1866, 898, 530, 415 |
+  | 1 | 144, 121, 111, 101, 102 | 199, 213, 197, 216, 204 | 136, 111, 112, 138, 135 |
 
-  **What these are, and are not.** They are **measured** (the page's `performance.now()` from the click to the
-  left pane holding the reply, `details-panel.spec.ts`, last case), and **not** readings under the free-machine rule
-  of `AGENTS.md` §11: this lane did not sample the load during any of them. The machine was shared with other
-  projects' runs throughout, which the spread between runs (a median from 232 to 1 074 ms for the same click) shows
-  but does not measure. The reference of the task's scope 9 asks for the load beside each reading; **that is owed**
-  (see the audit's *Status*). What the readings do say: the commit's details cost about a quarter to a half of a
-  second here and the uncommitted changes' about twice that, as S06's request readings did, and the click adds no
-  visible cost on top of the request (S06's readings of the bare request were 464 to 715 ms for HEAD's commit under
-  load, which they exceed in no run above by more than the machine's own spread; an inference, not a series).
+  **What this is, and is not.** It is one run, **measured under a load above `AGENTS.md` §11's 40 per cent mean**, so it
+  is not a reading of a free machine and sets no budget. The first session's five runs of 2026-11-11 (202 to 1 866 ms for
+  the same clicks) carried no load sample and are replaced by this one: they were taken while the machine was visibly
+  busier. What the reading says: the commit's details cost about a tenth of a second here and the uncommitted changes'
+  about twice that, as S06's request readings had the ratio, and the click adds no visible cost on top of the request.
+  The comparison with S06's bare-request readings (464 to 715 ms under a heavier load) is an inference, not a series.
 
   Whether a budget should exist for it is a plan decision, not this lane's: `ADR-0002` decision 6 names none.
   Raised in the audit.
+
+- **The wall-clock budgets (`npm run gates:budgets`), second session, 2026-11-12, 01:30 to 07:16.** Each case was run
+  alone inside `budgets-job.ps1` (a job object that samples the whole machine's busy share every second and subtracts
+  the run's own process tree), started once the minute before read under 40 per cent, and judged afterwards on the
+  load of everything outside the run during it: **kept** when the mean is under 40 per cent and no sample is over
+  75, and, for the frames case, when it is also inside its reference bound; otherwise **discarded**, whatever it read
+  (`AGENTS.md` §11). **Measured**; the sampler's files for every try are in the lane's scratch folder, not committed.
+  The machine was never free for more than a few minutes at a time: another project's mutation run and the WSL virtual
+  machine held it at 80 to 100 per cent for most of the six hours.
+
+  | case | tries | kept | what was read in the kept try (others' load: mean, maximum) |
+  | --- | --- | --- | --- |
+  | timed benchmarks (parse, layout, build) | 4 | 1 (try 4) | 15.2 microseconds a parsed commit, 0.664 a laid-out commit, 62.5 ms to build 10 000 commits; 3 of 3 passed (29.8, 42) |
+  | main-thread work per frame while scrolling | 15 | 0 | every try discarded by its own reference bound (the 95th percentile of the 2 400 reference timings over 4 ms), the lowest-loaded at 24.8 and 31.3 mean with 4.6 and over 4 ms |
+  | cold start, empty repository | 7 | 0 | discarded for load (mean 41.7 to 68.8) |
+  | cold start, first page of 10 000 | 7 | 0 | discarded for load (mean 41.2 to 71.4) |
+  | ten thousand commits, one load | 6 | 1 (try 6) | fastest of ten Refreshes 522.1 ms, range 522 to 563; passed (24.8, 49) |
+  | the main process keeps answering | 1 | 1 | a 641 ms load answered 3 726 main-process round trips, worst 2 ms; passed (28.8, 49) |
+  | fifty thousand commits: memory, five idle minutes | 7 | 0 | discarded: 4 samples over 75 (81 to 87) in the last seconds of the idle window in try 6 (mean 22.8) and try 7 (mean 26.3); both passed every assertion, and neither counts |
+
+  **Reds.** Some discarded tries read red (the cold-start cases and the benchmarks, at others' loads of 46 to 71 per
+  cent). A red on a machine that was not free is not a verdict, and none is claimed as one; no try on a free machine
+  read red. **Owed:** the frames, both cold-start and memory readings on a free machine. They were not given up: the
+  six hours ended with them still waiting for a machine that the other projects kept busy.
 
 - **Bundle size.** renderer.js 26 543 bytes against 20 995 at the base, renderer.css 8 170 against 7 117. Both budgets
   were reset once by the margin rule (`comment-e04-m01-s09` in `scripts/gates/size-budget.json`, with the per-module
