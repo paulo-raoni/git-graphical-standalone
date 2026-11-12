@@ -322,3 +322,11 @@ rules S08 needed for `contracts/` — a `pathNot: TEST_FILES` on `ui-only-contra
 `ui-tests-only-the-runner` beside it — and this slice's lane raised it rather than made it here. E01-M01-S06
 then added that pair, and moving the two suites home is an item of `docs/PLAN.md`'s table *Gate work deferred
 past the first milestone*.
+
+## Note, 2026-11-11 (E04-M01-S09): row positions and the spacer with details open
+
+The arithmetic above, `row x ROW_HEIGHT - scrollTop`, holds while no row's details are open. With the details
+of row `r` open, every row after `r` is `DETAILS_HEIGHT` (250 pixels) lower, the spacer and the scroll range are
+that much taller, and `rowOffsetY` / `rowTopY` in `src/ui/geometry.ts` carry the extra term for the DOM and the
+canvas alike. The details area is one more child of the spacer, not a row of the pool: the pool holds the
+elements it held. See `S09-details-panel.md` of E04-M01.

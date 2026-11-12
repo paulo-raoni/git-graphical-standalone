@@ -295,3 +295,13 @@ does load a cold start, but not always enough to discard it.
 - `docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S08-rounded-lines.md` and
   `docs/plan/E01-commit-graph/M01-first-graph/S05-graph-table-renderer.md`: a dated note under each sentence this
   lane made false.
+
+## Note, 2026-11-11 (E04-M01-S09): with a details area open
+
+Two sentences above are true of a closed graph only. **Where a curve sits:** with the details of a row open
+under it, a curve in the gap the area fills is not split between the two rows. It stays one row tall and is fixed
+to one dot: below the upper row's dot when the line leaves its lane there, above the lower row's dot when it joins
+the lower row's lane there, and the rest of the line crosses the area straight (`gapLines` and the `side`
+argument of `segmentLines`, `src/ui/geometry.ts`; the rule and the readings are in `S09-details-panel.md`).
+**What a paint reads:** one more thing than the drawn rows and their two neighbours, namely the open row and the
+row after it, wherever they are, when any of the area is on screen.
