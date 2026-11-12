@@ -76,6 +76,9 @@ test('Escape closes the menu, then the area, one thing a press, and the Branches
     await page.locator('.row', { hasText: TWO_PEOPLE }).locator('.row__subject').click();
     await page.getByRole('button', { name: /^Branches:/ }).click();
     await expect(page.locator('.branches__popup')).toBeVisible();
+    // The focus moves from the filter box to an option, which is not a field: the list's own Escape
+    // is what keeps the area open.
+    await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Escape');
     await expect(page.locator('.branches__popup')).toBeHidden();
     await expect(page.locator(OPEN_ROW)).toHaveText(TWO_PEOPLE);

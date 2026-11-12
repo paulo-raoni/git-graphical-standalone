@@ -8,7 +8,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
 
 import { withBudgeted } from './support/budgets';
-import { loadMoreAndShow, readProbe, scrollListTo, wakeupsSettled } from './support/budgets-page';
+import { loadMoreAndShow, readProbe, scrollListTo } from './support/budgets-page';
 import { fixture } from './support/fixtures';
 
 /**
@@ -81,6 +81,19 @@ async function clickRow(page: Page, row: number): Promise<void> {
   await expect(page.locator(INFO)).not.toHaveText('Loading…');
 }
 
+/** Wait until the page has run two frames, so that whatever a key scheduled has been drawn. */
+const settle = (page: Page): Promise<unknown> =>
+  page.evaluate(() => {
+    const { requestAnimationFrame: frame } = globalThis as unknown as {
+      requestAnimationFrame: (call: () => void) => void;
+    };
+    return new Promise<void>((done) => {
+      frame(() => {
+        frame(done);
+      });
+    });
+  });
+
 const frames = async (page: Page): Promise<number[]> => {
   const probe = await page.evaluate(readProbe);
   return [
@@ -95,7 +108,10 @@ test('a move is one redraw, twenty presses in a task are one, and unhandled keys
   await withBudgeted({ open: fixture('large', 'large', 10_000) }, async ({ page }) => {
     await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
     await clickRow(page, 3);
-    const redraws = async (): Promise<number> => page.evaluate(wakeupsSettled, 20_000);
+    const redraws = async (): Promise<number> => {
+      await settle(page);
+      return (await page.evaluate(readProbe)).redraws;
+    };
     const base = await redraws();
     await page.keyboard.press('ArrowDown');
     await expect.poll(() => openRowOf(page)).toBe(4);
