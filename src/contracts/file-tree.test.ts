@@ -124,6 +124,21 @@ describe('the order of names', () => {
     expect(shape(rows)).toEqual(['_', 'A', 'a', 'B', 'b', 'Z', 'z', 'é']);
   });
 
+  it('puts the upper-case spelling first whichever order the reply lists the two', () => {
+    for (const names of [
+      ['a', 'A'],
+      ['A', 'a'],
+    ]) {
+      const rows = fileRowsOf(
+        names.map((name) => file(name)),
+        TREE,
+      );
+      expect(shape(rows)).toEqual(['A', 'a']);
+    }
+  });
+});
+
+describe('names that differ in case or in kind', () => {
   it('orders folders the same way and keeps names that differ only in case apart', () => {
     const rows = fileRowsOf([file('b/x'), file('B/y'), file('a/z')], TREE);
     expect(shape(rows)).toEqual(['[a]', '  z', '[B]', '  y', '[b]', '  x']);

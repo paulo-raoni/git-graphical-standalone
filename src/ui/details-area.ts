@@ -1,9 +1,4 @@
-import type {
-  ChangedFile,
-  CommitDetails,
-  DetailsPerson,
-  UncommittedDetails,
-} from '../contracts/index';
+import type { CommitDetails, DetailsPerson, UncommittedDetails } from '../contracts/index';
 
 /**
  * The area that opens under a row, and what it says (E04-M01-S09).
@@ -17,6 +12,9 @@ import type {
  * It holds no rule about where it sits or when it opens: `./graph-table` places
  * it, and this module writes into it.
  */
+
+import { createFilePane } from './file-pane';
+import type { FilePane } from './file-pane';
 
 /** What the left pane says while the reply is awaited. */
 export const LOADING_NOTE = 'Loading…';
@@ -36,6 +34,10 @@ export interface DetailsArea {
   readonly info: HTMLElement;
   readonly files: HTMLElement;
   readonly close: HTMLButtonElement;
+  /** The changed files, as a tree or a list (E04-M01-S10). */
+  readonly pane: FilePane;
+  /** The pane's one menu element, which the view places where `position: fixed` is the window's. */
+  readonly menu: HTMLElement;
 }
 
 function make<K extends keyof HTMLElementTagNameMap>(
@@ -58,10 +60,12 @@ export function createDetailsArea(): DetailsArea {
   close.textContent = '×';
   close.title = 'Close';
   close.ariaLabel = 'Close';
-  controls.append(close);
+  const pane = createFilePane();
+  files.append(pane.root);
+  controls.append(close, ...pane.controls);
   root.append(info, files, controls);
   root.hidden = true;
-  return { root, info, files, close };
+  return { root, info, files, close, pane, menu: pane.menu };
 }
 
 function pad(value: number): string {
@@ -170,19 +174,10 @@ function commitLines(
   ];
 }
 
-/** One line of the files pane per changed file: its path, as plain text. */
-function fileLines(files: readonly ChangedFile[]): HTMLElement[] {
-  return files.map((file) => {
-    const line = make('div', 'details__file');
-    line.textContent = file.path;
-    return line;
-  });
-}
-
 /** Say `text` in the left pane and nothing in the files pane. */
 export function writeNote(area: DetailsArea, text: string): void {
   area.info.textContent = text;
-  area.files.replaceChildren();
+  area.pane.clear();
 }
 
 /**
@@ -199,8 +194,9 @@ export function writeDetails(
 ): void {
   if ('hash' in details) {
     area.info.replaceChildren(...commitLines(details, isRow, follow));
+    area.pane.show(details.files, { kind: 'commit', hash: details.hash });
   } else {
     area.info.textContent = UNCOMMITTED_NOTE;
+    area.pane.show(details.files, { kind: 'uncommitted' });
   }
-  area.files.replaceChildren(...fileLines(details.files));
 }

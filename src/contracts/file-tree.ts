@@ -82,57 +82,39 @@ export type FileTreeRow = FolderRow | FileRow;
 /** What joins the names of a compacted chain of folders. */
 export const CHAIN_SEPARATOR = ' / ';
 
-/** The tone of a status: a copy makes a new path and a change of type changes the file. */
+/** The tone and the letter of each status: a copy makes a new path and a change of type changes the file. */
+const STATUS: Readonly<Record<FileStatus, readonly [FileTone, string]>> = {
+  added: ['added', 'A'],
+  copied: ['added', 'A'],
+  untracked: ['added', 'U'],
+  deleted: ['deleted', 'D'],
+  modified: ['plain', 'M'],
+  'type-changed': ['plain', 'M'],
+  renamed: ['plain', 'R'],
+};
+
+/** The tone of a status. */
 export function toneOf(status: FileStatus): FileTone {
-  switch (status) {
-    case 'added':
-    case 'untracked':
-    case 'copied':
-      return 'added';
-    case 'deleted':
-      return 'deleted';
-    case 'modified':
-    case 'renamed':
-    case 'type-changed':
-      return 'plain';
-  }
+  return STATUS[status][0];
 }
 
 /** The letter of a status. A copy and a change of type take the letter of their tone. */
 export function letterOf(status: FileStatus): string {
-  switch (status) {
-    case 'added':
-    case 'copied':
-      return 'A';
-    case 'modified':
-    case 'type-changed':
-      return 'M';
-    case 'deleted':
-      return 'D';
-    case 'renamed':
-      return 'R';
-    case 'untracked':
-      return 'U';
-  }
+  return STATUS[status][1];
 }
 
 /** The status spelt out for the tooltip. */
 function statusText(file: ChangedFile): string {
+  const from = `(${file.oldPath ?? ''} → ${file.path})`;
   switch (file.status) {
-    case 'added':
-      return 'Added';
-    case 'modified':
-      return 'Modified';
-    case 'deleted':
-      return 'Deleted';
     case 'renamed':
-      return `Renamed (${file.oldPath ?? ''} → ${file.path})`;
+      return `Renamed ${from}`;
     case 'copied':
-      return `Copied (${file.oldPath ?? ''} → ${file.path})`;
+      return `Copied ${from}`;
     case 'type-changed':
       return 'Type Changed';
-    case 'untracked':
-      return 'Untracked';
+    default:
+      return file.status.charAt(0).toUpperCase() + file.status.slice(1);
   }
 }
 
@@ -189,12 +171,19 @@ function compareNames(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
+/** One file of the tree being built: its name in its folder and its place in the reply. */
+interface Leaf {
+  readonly name: string;
+  readonly index: number;
+  readonly file: ChangedFile;
+}
+
 /** A folder of the tree being built. */
 interface Folder {
   readonly name: string;
   readonly path: string;
   readonly folders: Map<string, Folder>;
-  readonly files: { readonly name: string; readonly index: number }[];
+  readonly files: Leaf[];
 }
 
 function newFolder(name: string, path: string): Folder {
@@ -205,10 +194,9 @@ function newFolder(name: string, path: string): Folder {
 function treeOf(files: readonly ChangedFile[]): Folder {
   const root = newFolder('', '');
   for (const [index, file] of files.entries()) {
-    const parts = file.path.split('/');
-    const name = parts.pop() ?? '';
+    const slash = file.path.lastIndexOf('/');
     let folder = root;
-    for (const part of parts) {
+    for (const part of slash < 0 ? [] : file.path.slice(0, slash).split('/')) {
       let next = folder.folders.get(part);
       if (next === undefined) {
         next = newFolder(part, folder.path === '' ? part : `${folder.path}/${part}`);
@@ -216,7 +204,7 @@ function treeOf(files: readonly ChangedFile[]): Folder {
       }
       folder = next;
     }
-    folder.files.push({ name, index });
+    folder.files.push({ name: file.path.slice(slash + 1), index, file });
   }
   return root;
 }
@@ -225,59 +213,48 @@ function sortedFolders(folder: Folder): Folder[] {
   return [...folder.folders.values()].sort((a, b) => compareNames(a.name, b.name));
 }
 
-function sortedFiles(folder: Folder): { readonly name: string; readonly index: number }[] {
+function sortedFiles(folder: Folder): Leaf[] {
   return [...folder.files].sort((a, b) => compareNames(a.name, b.name) || a.index - b.index);
 }
 
+/** The only child of a folder that holds nothing else, which compaction joins to it. */
+function loneFolder(folder: Folder): Folder | null {
+  if (folder.files.length > 0 || folder.folders.size !== 1) {
+    return null;
+  }
+  return [...folder.folders.values()][0] as Folder;
+}
+
 /** Walk `folder`'s children, folders first, appending rows. */
-function walk(
-  folder: Folder,
-  depth: number,
-  files: readonly ChangedFile[],
-  options: FileViewOptions,
-  rows: FileTreeRow[],
-): void {
+function walk(folder: Folder, depth: number, options: FileViewOptions, rows: FileTreeRow[]): void {
   for (const child of sortedFolders(folder)) {
     let deepest = child;
     let label = child.name;
-    while (options.compact && deepest.files.length === 0 && deepest.folders.size === 1) {
-      const [only] = deepest.folders.values();
-      if (only === undefined) {
-        break;
-      }
-      deepest = only;
-      label += CHAIN_SEPARATOR + only.name;
+    for (let next = options.compact ? loneFolder(deepest) : null; next !== null;) {
+      deepest = next;
+      label += CHAIN_SEPARATOR + next.name;
+      next = loneFolder(deepest);
     }
     const collapsed = options.collapsed.has(deepest.path);
     rows.push({ kind: 'folder', key: deepest.path, label, depth, collapsed });
     if (!collapsed) {
-      walk(deepest, depth + 1, files, options, rows);
+      walk(deepest, depth + 1, options, rows);
     }
   }
-  for (const { name, index } of sortedFiles(folder)) {
-    const file = files[index];
-    if (file !== undefined) {
-      rows.push(fileRow(file, index, depth, name, options.letters));
-    }
+  for (const { name, index, file } of sortedFiles(folder)) {
+    rows.push(fileRow(file, index, depth, name, options.letters));
   }
 }
 
 /** The list's rows: the tree's order, flattened, every folder expanded, each with its full path. */
-function listOf(
-  folder: Folder,
-  files: readonly ChangedFile[],
-  options: FileViewOptions,
-): FileRow[] {
+function listOf(folder: Folder, options: FileViewOptions): FileRow[] {
   const rows: FileRow[] = [];
   const visit = (at: Folder): void => {
     for (const child of sortedFolders(at)) {
       visit(child);
     }
-    for (const { index } of sortedFiles(at)) {
-      const file = files[index];
-      if (file !== undefined) {
-        rows.push(fileRow(file, index, 0, file.path, options.letters));
-      }
+    for (const { index, file } of sortedFiles(at)) {
+      rows.push(fileRow(file, index, 0, file.path, options.letters));
     }
   };
   visit(folder);
@@ -296,9 +273,9 @@ export function fileRowsOf(
 ): readonly FileTreeRow[] {
   const root = treeOf(files);
   if (options.view === 'list') {
-    return listOf(root, files, options);
+    return listOf(root, options);
   }
   const rows: FileTreeRow[] = [];
-  walk(root, 0, files, options, rows);
+  walk(root, 0, options, rows);
   return rows;
 }

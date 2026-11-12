@@ -16,6 +16,8 @@ import {
   rowPoolSize,
   ROW_HEIGHT,
 } from './geometry';
+import type { ActionListener } from './file-pane';
+import type { OptionGroup } from './file-menu';
 import { paintGraph, resizeCanvas } from './graph-canvas';
 import { createRowElement, writeRow } from './row-element';
 import type { RowElement } from './row-element';
@@ -133,6 +135,12 @@ export interface GraphTableView {
   readonly closeDetails: () => void;
   /** Ask again for the open details if they are the uncommitted changes', which a Refresh may have changed. */
   readonly rereadUncommitted: () => void;
+  /** Register what a file action of the files pane is done with (E04-M01-S10). */
+  readonly onFileAction: (listener: ActionListener) => void;
+  /** Say which repository is open, the key the files pane's view is kept by. */
+  readonly setRepository: (path: string | null) => void;
+  /** Add an option and its values to the files pane's options menu. */
+  readonly addFileOptions: (group: OptionGroup) => void;
 }
 
 /** The elements the view is made of, found once so that no frame looks them up. */
@@ -234,7 +242,7 @@ function buildParts(root: HTMLElement): TableParts {
   more.hidden = true;
   spacer.append(area.root);
   scroll.append(buildHead(), spacer, more);
-  view.append(scroll, canvas);
+  view.append(scroll, canvas, area.menu);
   view.hidden = true;
   view.style.setProperty('--row-height', `${String(ROW_HEIGHT)}px`);
   view.style.setProperty('--details-height', `${String(DETAILS_HEIGHT)}px`);
@@ -434,6 +442,15 @@ function viewOf(parts: TableParts, state: TableState): GraphTableView {
       if (state.target?.kind === 'uncommitted') {
         askDetails(parts, state, true);
       }
+    },
+    onFileAction: (listener: ActionListener): void => {
+      parts.area.pane.onAction(listener);
+    },
+    setRepository: (path: string | null): void => {
+      parts.area.pane.setRepository(path);
+    },
+    addFileOptions: (group: OptionGroup): void => {
+      parts.area.pane.addOptions(group);
     },
   };
 }

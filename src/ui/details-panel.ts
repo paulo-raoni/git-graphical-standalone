@@ -74,6 +74,7 @@ export function closeDetails(parts: PanelParts, state: PanelState): void {
   state.open = NO_ROW;
   state.target = null;
   state.asked += 1;
+  parts.area.pane.closeMenu();
   placeArea(parts, state);
   state.schedule();
 }

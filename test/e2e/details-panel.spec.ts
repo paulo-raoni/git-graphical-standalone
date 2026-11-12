@@ -57,7 +57,14 @@ async function tops(page: Page): Promise<Record<string, number>> {
 
 const linesOf = (page: Page): Promise<string[]> =>
   page.locator('.details__info > .details__line').allInnerTexts();
-const filesOf = (page: Page): Promise<string[]> => page.locator('.details__file').allTextContents();
+const NAMES = '.files__row:not([hidden]) .files__name';
+
+/** The files of the pane, each by its full path, in the list view (E04-M01-S10): the list is chosen first. */
+async function filesOf(page: Page): Promise<string[]> {
+  await page.locator('.details:not([hidden]) button[title="File List View"]').click();
+  await expect(page.locator('.files__row--folder:not([hidden])')).toHaveCount(0);
+  return page.locator(NAMES).allTextContents();
+}
 const messageOf = (page: Page): Promise<string | null> =>
   page.locator('.details__message').textContent();
 
@@ -114,7 +121,7 @@ test('a merge and a commit by two people show their fields, message and files', 
       '\n\n    a line indented by four spaces\n\ta line indented by a tab\n\nafter a blank line';
     expect(await messageOf(page)).toBe(TWO_PEOPLE + body);
     expect((await filesOf(page)).join(' | ')).toBe(
-      'added.txt | binary.dat | deep/er/still/leaf.txt | delete-me.txt | hash#percent%.txt | naïve café 日本.txt | question?.txt | quote"mark.txt | renamed.txt',
+      'deep/er/still/leaf.txt | added.txt | binary.dat | delete-me.txt | hash#percent%.txt | naïve café 日本.txt | question?.txt | quote"mark.txt | renamed.txt',
     );
   });
 });
@@ -190,7 +197,7 @@ test('a Refresh asks again for the uncommitted changes, and a new selection clos
       await show(page, 'Uncommitted changes');
       writeFileSync(join(own, 'fresh.txt'), 'new\n');
       await page.locator('.bar__refresh').click();
-      await expect(page.locator('.details__file', { hasText: 'fresh.txt' })).toBeVisible();
+      await expect(page.locator(NAMES, { hasText: 'fresh.txt' })).toBeVisible();
     });
   } finally {
     removeOwnFixtures();
@@ -286,7 +293,7 @@ test('the area opens at once saying it is loading, and a stale reply is never dr
     await expect(page.locator(INFO)).toHaveText('Loading…');
     expect(await filesOf(page)).toEqual([]);
     await answer(page, 1, detailsOf('b'.repeat(40), 'fresh.txt'));
-    await expect(page.locator('.details__file')).toHaveText(['fresh.txt']);
+    await expect(page.locator(NAMES)).toHaveText(['fresh.txt']);
     await subjectOf(page, REMOVE).click();
     await answer(page, 2, { ok: false, kind: 'git-failed', message: 'git said no' });
     await expect(page.locator(INFO)).toHaveText('git said no');
