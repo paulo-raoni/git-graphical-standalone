@@ -80,6 +80,12 @@ export {
 export type { BranchEntry, BranchMenu } from './branch-menu';
 
 /**
+ * Which row a key goes to when the details of a row are open (E04-M01-S11).
+ */
+export { NO_MOVE, rowAfterMove } from './row-moves';
+export type { RowMove } from './row-moves';
+
+/**
  * The rules of the branch selection kept per repository: which stored value is a
  * selection, which one an open reads under, and which kept branches survive the
  * repository's references.

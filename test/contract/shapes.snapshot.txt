@@ -204,6 +204,8 @@ interface LoadMoreCommitsRequest {
 
 type LoadMoreCommitsResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
 
+value NO_MOVE: -1
+
 interface OpenRepositoryRequest {
     readonly path: string
     readonly showRemoteBranches?: boolean
@@ -255,6 +257,8 @@ type Result<TValue> = import("./result").Failure | import("./result").Success<TV
 
 type RowFlag = 1 | 2 | 4 | 8 | 16 | 32 | 64
 value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; readonly UncommittedAbove: 64; }
+
+type RowMove = "up" | "down" | "child" | "parent" | "other-child" | "other-parent"
 
 value SHOW_ALL: BranchMenu
 
@@ -355,6 +359,8 @@ value refFlagsOf: (refs: Refs, ref: number) => number
 value refKindOf: (refs: Refs, ref: number) => RefKind
 
 value refNameOf: (refs: Refs, ref: number) => string
+
+value rowAfterMove: (page: GraphPage, row: number, move: RowMove) => number
 
 value sameEntries: (a: readonly BranchEntry[], b: readonly BranchEntry[]) => boolean
 
