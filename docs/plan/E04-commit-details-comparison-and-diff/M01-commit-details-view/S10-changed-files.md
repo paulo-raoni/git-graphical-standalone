@@ -239,14 +239,43 @@ processors, so most attempts were discarded, and a reading that was discarded is
 | first | 3 | 13:58:52-13:59:23 | 49.1 % | 64 % | 0 of 29 | vmmemWSL x26, MsMpEng x3 | green | discarded |
 | first | 4 | 14:00:27-14:00:57 | 49.4 % | 65 % | 0 of 29 | vmmemWSL x28, MsMpEng x1 | green | discarded |
 
-- **Kept:** bench, frames, git, cost, click, load, answer. **Owed at the deadline (2026-11-12, six hours from the start of the session):**
+- **First session:** kept bench, frames, git, cost, click, load, answer. **Owed at the first session's deadline (2026-11-12, six hours from the start of the session):**
   empty, first, memory (the memory case never ran: it needs a free minute and then eight). Not one red was read on a free machine.
 - **Two of my own runners overlapped** from about 13:03 to 13:08: the first series was still alive when I started the
   second (found from the process list and stopped). The rows of the first series from 13:03 (`empty`, tries 7 to 9) and the
   second series' `git`, `cost` and `click` at 13:03 to 13:07 and `first` try 1 are therefore not clean readings of the
   machine; `git`, `cost` and `click` were read again alone in the fourth series, at the end of the table, and those
   are the ones quoted here.
-- **The cold-start cases read the same load every time.** In the 25 attempts of `empty` and `first` that were not
+
+### Second session (2026-11-12): the readings that were owed
+
+The start-empty, start-first-page and memory cases were read again by the same runner, extended to list, for each try, the
+three processes outside the run's tree that used the most processor time, summed over the run (processes that started and
+ended between two one-second samples are not counted; ids and start times key each process). Tries 1 to 8 of `empty` were
+not free and one case went red in each, on a machine that was not free; they are discarded, not read as red.
+
+| case | try | window | others, mean | others, max | samples over 75 % | three busiest outside the run, share of all processors | verdict | reading |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+
+
+- **Kept now:** empty (try 9, others' mean 39.3 %, the narrowest margin of the series), first (try 1), memory (try 7). All three green. Not one red was read on a machine that was free.
+- **What the cold-start load was** (measured, then read from the other side): during tries 1 to 8 of `empty` the busiest process
+  outside the run was `vmmemWSL` at 22 to 24.2 % of all processors, then the antivirus engine (`MsMpEng`) at 8.5 to 11.3 %, then
+  `svchost` or `System`. At 14:05 the Linux side of that virtual machine was read with `top`: a speech-transcription process
+  (`whisper`, niced to 19) of another project's work held 172 % of one core, 2.0 GiB resident. Its `ni` share was 24.7 % of the
+  machine's processors in that `top` sample. At 15:26, `empty` try 9 read no `vmmemWSL` among the three and a mean of 39.3 %; at
+  15:27 `first` read 32.0 %; a `top` on the Linux side at about 15:38 showed no such process. That is a correlation of two
+  observations, not an isolation: I did not stop the process and did not read the virtual machine's use between 14:05 and 15:38.
+- **Is the antivirus part of it?** It is a part, and it is outside the tree, so it counts. `MsMpEng` held 8.5 to 11.3 % of all
+  processors during every try of `empty` and `first` (and 1.6 % in the memory case, which launches the application once for
+  seven minutes). Its share stayed at 9 to 10 % in tries 9 and `first` 1, the two that were kept, so it does not by itself
+  take a start case over the 40 % bound on this machine; the discarded tries were discarded by the virtual machine's 22 to 24 %.
+  Whether it scans this run's own launches was not tested (no exclusion was set: that is a system setting).
+- **The memory case needs seven minutes with no sample over 75 %**: tries 1 to 6 had 2 to 18 samples over it at means of 16.5 to
+  36.2 %; try 7 had none. No cause for the spikes was read.
+
+- **The cold-start cases read the same load every time (first session).** In the 25 attempts of `empty` and `first` that were not
   overlapped, the load outside the run's own tree was 47.6 to 61.2 %, the busiest process `vmmemWSL` each time; `load` and
   `answer`, read in between, read 37 to 44 %. I did not establish whether the steady half of the processors in the
   start cases is the other project's virtual machine or a process of the case that the sampler counts outside its tree.
