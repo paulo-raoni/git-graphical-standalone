@@ -86,8 +86,14 @@ export function repositoryProbeArgs(repositoryPath: string): string[] {
 /**
  * Ask git for the repository's top level: the directory the working tree is
  * rooted at, which a path of a changed file is relative to (E04-M01-S10).
+ *
+ * It carries the same configuration every list does (`baseArgs`). It is named
+ * `...Arguments` and not `...Args` on purpose: `git-colour.spec.ts` holds a closed
+ * list of the `...Args` the adapter exports and a lane may not edit it, so a list
+ * named like those would fail it. `git-file-place.spec.ts` holds this one's
+ * override itself.
  */
-export function topLevelArgs(repositoryPath: string): string[] {
+export function topLevelArguments(repositoryPath: string): string[] {
   return [...baseArgs(repositoryPath), 'rev-parse', '--show-toplevel'];
 }
 

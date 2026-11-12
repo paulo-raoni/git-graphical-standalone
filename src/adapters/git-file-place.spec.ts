@@ -9,6 +9,7 @@ import { FailureKind } from '../contracts/index';
 import type { DetailsTarget, Result } from '../contracts/index';
 import type { FilePlace } from '../ports/index';
 
+import { PARSING_CONFIGURATION, topLevelArguments } from './git-commands';
 import { createGitRepositoryReader } from './git-repository-reader';
 
 /**
@@ -101,6 +102,15 @@ async function ask(
 }
 
 describe('the top level', () => {
+  it('is asked with the whole configuration ahead of its git command, as every list of the adapter is', () => {
+    const args = topLevelArguments('repository');
+    const at = args.findIndex((_, place) =>
+      PARSING_CONFIGURATION.every((word, offset) => args[place + offset] === word),
+    );
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(at + PARSING_CONFIGURATION.length).toBeLessThanOrEqual(args.indexOf('rev-parse'));
+  });
+
   it('is the one git prints, for the root and for a folder inside it', async () => {
     const top = git('rev-parse', '--show-toplevel');
     const root = await ask('keep.txt', false);

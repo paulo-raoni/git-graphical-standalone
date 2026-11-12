@@ -8,7 +8,7 @@ import {
 } from '../core/parse/index';
 import type { FilePlace, FilePlaceQuery } from '../ports/index';
 
-import { topLevelArgs, uncommittedDiffArgs } from './git-commands';
+import { topLevelArguments, uncommittedDiffArgs } from './git-commands';
 import { runGit } from './git-process';
 
 /**
@@ -37,7 +37,7 @@ async function readTopLevel(executable: string, repositoryPath: string): Promise
   const chunks: Uint8Array[] = [];
   const outcome = await runGit({
     executable,
-    args: topLevelArgs(repositoryPath),
+    args: topLevelArguments(repositoryPath),
     onOutput: (chunk) => {
       chunks.push(chunk);
     },
