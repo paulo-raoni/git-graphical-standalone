@@ -361,6 +361,21 @@ function connectBranches(shell: Shell, view: GraphTableView, session: Session): 
   });
 }
 
+/**
+ * Read the details of a row when the view asks, and hand the view the reply. The
+ * view decides whether the reply is still wanted (E04-M01-S09).
+ */
+function connectDetails(shell: Shell, view: GraphTableView): void {
+  view.onDetails((target, answer) => {
+    run(
+      shell,
+      (async (): Promise<void> => {
+        answer(await window.gitGraphical.commitDetails({ target }));
+      })(),
+    );
+  });
+}
+
 /** Wire every control to the bridge. Nothing here runs until something happens. */
 function connect(shell: Shell, view: GraphTableView, session: Session): void {
   shell.open.addEventListener('click', () => {
@@ -381,7 +396,12 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
     run(
       shell,
       whileBusy(session, shell.refresh, REFRESH_LABELS, async () => {
-        receive(shell, view, session, await window.gitGraphical.refresh({}));
+        const reply = await window.gitGraphical.refresh({});
+        receive(shell, view, session, reply);
+        // The uncommitted changes may have changed; a commit's details cannot.
+        if (reply.ok) {
+          view.rereadUncommitted();
+        }
       }),
     );
   });
@@ -391,6 +411,7 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
   });
 
   connectBranches(shell, view, session);
+  connectDetails(shell, view);
 
   window.gitGraphical.unkeptChoice(shell.showUnkept);
 

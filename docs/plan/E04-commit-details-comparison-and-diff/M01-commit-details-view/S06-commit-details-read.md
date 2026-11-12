@@ -213,6 +213,16 @@ lane did not get. They are consistent with a commit's details not growing with t
 which is what one `git log -1` of one hash predicts (an inference from two fixtures, not a series), and with
 the uncommitted changes costing about twice a commit's, two processes one after the other. The budget of a request belongs to S09, which draws it.
 
+*Note, 2026-11-12 (E04-M01-S09, second session; replaces the note of 2026-11-11):* S09 draws the request and measured
+the click that makes it, from the click to the area's left pane holding the reply, five readings each
+(`S09-details-panel.md`, *Costs*), with the processor load of everything outside the run sampled every second beside
+them: HEAD's commit on `details` 101 to 144 ms, the uncommitted changes' 197 to 216 ms, HEAD's commit on `large` 111 to
+138 ms, with the others' load at a mean of 46.5 per cent (maximum 64) over the 10 seconds it took. That is **above the
+40 per cent of `AGENTS.md` §11's free-machine rule**, so these are measured under load and not readings of a free
+machine, and they set no budget. They are far under the earlier, unsampled readings of 2026-11-11 (202 to 1 866 ms),
+which were taken while the machine was busier still. Whether a request should have a budget is a plan decision, raised in
+S09's audit.
+
 ## Bundle size
 
 The details add 5195 production bytes to `repository.cjs`: 28903 at Base, 34098 here (`npm run gates:size` over
