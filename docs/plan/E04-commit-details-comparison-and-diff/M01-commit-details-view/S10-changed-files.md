@@ -176,6 +176,96 @@ reference.
   reads positions from the layout instead, after its first form read `-1` for rows past a million pixels); that
   layout itself is unaffected.
 
+## Evidence: the wall-clock readings and the pane's timings
+
+Every reading of `npm run gates:budgets` was taken by its own run of one case, judged on the minute before it and on the
+reading itself, by the runner of S09's third session (`budgets-job.ps1`, copied to this lane's scratch folder and not
+written in place; the case table is its `retry.ps1` with the cases of this lane's worktree and the cost case added).
+Machine free: the processor load of everything outside the reading's own tree averaged under 40 % over the minute before
+and during it, with no sample over 75 %. **The other projects' agents kept the machine busy**: the busiest process outside
+the reading was `vmmemWSL` (a WSL virtual machine, not this project's) in nearly every attempt, at about half the
+processors, so most attempts were discarded, and a reading that was discarded is recorded, not hidden.
+
+| case | try | window | others, mean | others, max | samples over 75 % | busiest process outside the run | verdict | reading |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench | 1 | 12:20:27-12:20:48 | 29.8 % | 92 % | 4 of 20 | claude x16, MsMpEng x3 | green | discarded |
+| bench | 2 | 12:28:25-12:28:43 | 20.5 % | 51 % | 0 of 18 | claude x14, svchost x2 | green | kept |
+| frames | 1 | 12:36:18-12:37:35 | 13.2 % | 49 % | 0 of 74 | claude x50, dwm x6 | green | kept |
+| empty | 1 | 12:44:26-12:45:07 | 51.7 % | 80 % | 1 of 39 | vmmemWSL x36, MsMpEng x3 | green | discarded |
+| empty | 2 | 12:52:53-12:53:25 | 61.2 % | 79 % | 2 of 31 | vmmemWSL x31 | green | discarded |
+| empty | 3 | 12:54:29-12:55:05 | 60.7 % | 77 % | 1 of 34 | vmmemWSL x33, MsMpEng x1 | a case went red | discarded |
+| empty | 4 | 12:56:20-12:56:50 | 50.7 % | 68 % | 0 of 28 | vmmemWSL x28 | green | discarded |
+| empty | 5 | 12:59:38-13:00:08 | 53.8 % | 71 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| 13:00:43 empty try 6 never ran |
+| empty | 7 | 13:03:17-13:03:50 | 62.7 % | 86 % | 4 of 31 | vmmemWSL x24, MsMpEng x7 | green | discarded |
+| empty | 8 | 13:04:54-13:05:35 | 70.3 % | 87 % | 10 of 38 | vmmemWSL x35, MsMpEng x3 | a case went red | discarded |
+| empty | 9 | 13:06:49-13:07:22 | 61.8 % | 84 % | 5 of 32 | vmmemWSL x28, MsMpEng x4 | green | discarded |
+| git | 1 | 13:03:17-13:03:31 | 63.6 % | 81 % | 3 of 13 | vmmemWSL x10, MsMpEng x3 | green | kept |
+| cost | 1 | 13:04:44-13:05:08 | 65.5 % | 95 % | 6 of 22 | vmmemWSL x20, MsMpEng x2 | green | kept |
+| click | 1 | 13:06:48-13:07:01 | 65.0 % | 81 % | 4 of 12 | vmmemWSL x10, MsMpEng x2 | green | kept |
+| first | 1 | 13:08:16-13:08:53 | 62.8 % | 80 % | 1 of 34 | vmmemWSL x31, MsMpEng x2 | a case went red | discarded |
+| first | 2 | 13:10:27-13:10:58 | 48.5 % | 63 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| first | 3 | 13:14:14-13:14:48 | 59.9 % | 79 % | 2 of 32 | vmmemWSL x31, MsMpEng x1 | green | discarded |
+| first | 4 | 13:15:52-13:16:22 | 49.1 % | 64 % | 0 of 29 | vmmemWSL x27, MsMpEng x2 | green | discarded |
+| first | 5 | 13:17:26-13:17:57 | 49.2 % | 64 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| first | 6 | 13:19:01-13:19:32 | 49.6 % | 61 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| first | 7 | 13:20:36-13:21:06 | 50.1 % | 65 % | 0 of 29 | vmmemWSL x28, MsMpEng x1 | green | discarded |
+| first | 8 | 13:22:10-13:22:40 | 49.6 % | 64 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| first | 9 | 13:23:44-13:24:15 | 49.8 % | 65 % | 0 of 29 | vmmemWSL x28, MsMpEng x1 | green | discarded |
+| first | 10 | 13:25:19-13:25:49 | 50.2 % | 66 % | 0 of 29 | vmmemWSL x28, MsMpEng x1 | green | discarded |
+| first | 11 | 13:26:53-13:27:24 | 49.9 % | 62 % | 0 of 29 | vmmemWSL x28, MsMpEng x1 | green | discarded |
+| load | 1 | 13:29:00-13:29:26 | 37.0 % | 54 % | 0 of 25 | vmmemWSL x25 | green | kept |
+| answer | 1 | 13:30:30-13:30:38 | 40.9 % | 52 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 2 | 13:31:42-13:31:49 | 44.4 % | 60 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 3 | 13:32:53-13:33:01 | 44.3 % | 61 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 4 | 13:34:05-13:34:13 | 40.4 % | 55 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 5 | 13:35:16-13:35:24 | 40.3 % | 52 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 6 | 13:36:28-13:36:36 | 42.7 % | 62 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 7 | 13:37:40-13:37:48 | 43.1 % | 63 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 8 | 13:38:51-13:38:59 | 41.7 % | 60 % | 0 of 7 | vmmemWSL x7 | green | discarded |
+| answer | 9 | 13:40:03-13:40:11 | 39.4 % | 50 % | 0 of 7 | vmmemWSL x7 | green | kept |
+| empty | 1 | 13:41:15-13:41:44 | 49.0 % | 64 % | 0 of 28 | vmmemWSL x26, MsMpEng x2 | green | discarded |
+| empty | 2 | 13:42:48-13:43:18 | 50.7 % | 64 % | 0 of 28 | vmmemWSL x28 | green | discarded |
+| empty | 3 | 13:44:22-13:44:51 | 50.9 % | 65 % | 0 of 28 | vmmemWSL x28 | green | discarded |
+| empty | 4 | 13:45:55-13:46:26 | 55.7 % | 77 % | 1 of 29 | vmmemWSL x24, MsMpEng x5 | green | discarded |
+| empty | 5 | 13:47:30-13:48:23 | 47.6 % | 73 % | 0 of 51 | vmmemWSL x50, MsMpEng x1 | green | discarded |
+| empty | 6 | 13:49:28-13:49:56 | 50.1 % | 61 % | 0 of 27 | vmmemWSL x27 | green | discarded |
+| cost | 1 | 13:51:37-13:51:58 | 37.4 % | 59 % | 0 of 20 | vmmemWSL x20 | green | kept |
+| git | 1 | 13:53:03-13:53:14 | 37.7 % | 50 % | 0 of 11 | vmmemWSL x11 | green | kept |
+| click | 1 | 13:54:18-13:54:30 | 41.9 % | 56 % | 0 of 11 | vmmemWSL x11 | green | kept |
+| 13:54:30 series ended |
+| first | 1 | 13:55:44-13:56:14 | 50.1 % | 64 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| first | 2 | 13:57:18-13:57:48 | 49.7 % | 60 % | 0 of 29 | vmmemWSL x29 | green | discarded |
+| first | 3 | 13:58:52-13:59:23 | 49.1 % | 64 % | 0 of 29 | vmmemWSL x26, MsMpEng x3 | green | discarded |
+| first | 4 | 14:00:27-14:00:57 | 49.4 % | 65 % | 0 of 29 | vmmemWSL x28, MsMpEng x1 | green | discarded |
+
+- **Kept:** bench, frames, git, cost, click, load, answer. **Owed at the deadline (2026-11-12, six hours from the start of the session):**
+  empty, first, memory (the memory case never ran: it needs a free minute and then eight). Not one red was read on a free machine.
+- **Two of my own runners overlapped** from about 13:03 to 13:08: the first series was still alive when I started the
+  second (found from the process list and stopped). The rows of the first series from 13:03 (`empty`, tries 7 to 9) and the
+  second series' `git`, `cost` and `click` at 13:03 to 13:07 and `first` try 1 are therefore not clean readings of the
+  machine; `git`, `cost` and `click` were read again alone in the fourth series, at the end of the table, and those
+  are the ones quoted here.
+- **The cold-start cases read the same load every time.** In the 25 attempts of `empty` and `first` that were not
+  overlapped, the load outside the run's own tree was 47.6 to 61.2 %, the busiest process `vmmemWSL` each time; `load` and
+  `answer`, read in between, read 37 to 44 %. I did not establish whether the steady half of the processors in the
+  start cases is the other project's virtual machine or a process of the case that the sampler counts outside its tree.
+  It is unexplained, and the two cases are owed on that account as well as on the load.
+- **The pane's timings,** from the reply handed to the pane drawn (two frames included, about 33 ms at 60 Hz), five readings each,
+  `changed-files-cost.spec.ts` on the machine at a kept reading (others 37 % mean, none over 75 %), printed and held to
+  no budget (`ADR-0002` decision 6 names none for the pane):
+  - nested folders: 1 000 files 32, 20, 26, 24, 21 ms; 10 000 files 25, 24, 23, 23, 27 ms; 50 000 files 70, 76, 75, 70, 69 ms
+  - flat: 1 000 files 31, 23, 22, 21, 18 ms; 10 000 files 26, 20, 21, 26, 22 ms; 50 000 files 36, 55, 30, 50, 37 ms
+  - a burst of 25 scroll events: 1 frame registered and 1 run; both cases of the file passed in 5.6 s
+- **S09's click timing,** printed and not held, at its kept run:
+  details: HEAD 134, 103, 109, 126, 108 ms; uncommitted 223, 200, 197, 199, 201 ms
+  large: HEAD 153, 111, 102, 112, 110 ms
+- **Mutation gate** (read at `80195d8`, the last head under the mutated folders): 2390 mutants, 2352 killed, 36 timed out, 2
+  survived, 0 without coverage; score 99.92; 38 of 2388 detections rest on a clock (1.6 %, cap 25 %); the survivors list has 2
+  entries and the run has 2 survivors, both on the list and in `src/core/store/hash-index.ts`, none in this lane's modules.
+  An earlier run at the head before the repairs found 13 survivors in `file-tree.ts` and `file-action.ts`; each
+  of the three modules of this lane re-run alone reads 100.00 with no survivor.
+
 ## Not in this slice
 
 A click on a file opening its diff, *View Diff*, *View File at this Revision*, *View Diff with Working File* and the eye
