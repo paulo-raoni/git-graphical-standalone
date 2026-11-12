@@ -1,4 +1,5 @@
 import type { DetailsRequest, DetailsResponse } from './commit-details';
+import type { FileActionRequest, FileActionResponse } from './file-action';
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
@@ -49,6 +50,12 @@ export interface GitGraphicalBridge {
    * object name, or of its uncommitted changes, from git, at each call.
    */
   readonly commitDetails: (request: DetailsRequest) => Promise<DetailsResponse>;
+  /**
+   * Open one changed file in the file manager, or copy its absolute or relative
+   * path to the clipboard (E04-M01-S10). The request is checked once, in the main
+   * process, before anything of it reaches git or the file system.
+   */
+  readonly fileAction: (request: FileActionRequest) => Promise<FileActionResponse>;
   /** Report the application's own versions. */
   readonly applicationInfo: () => Promise<ApplicationInfoResponse>;
   /** Report the colour scheme in force. */

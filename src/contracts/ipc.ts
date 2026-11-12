@@ -23,6 +23,8 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   refresh: 'repository:refresh',
   /** Read one commit's details, or the uncommitted changes', from the open repository. */
   commitDetails: 'repository:commit-details',
+  /** Do one thing with one changed file: open it, or copy its path. */
+  fileAction: 'repository:file-action',
   /** Report the application's own versions. Reads no repository. */
   applicationInfo: 'application:info',
   /** Report the colour scheme in force. Reads no repository. */
