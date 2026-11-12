@@ -38,7 +38,10 @@ export type { DetailsListener } from './details-panel';
  *    forty-odd elements as scrolling a page of twenty.
  * 2. *One redraw per frame at most.* Every trigger calls the view's `schedule`,
  *    which requests an animation frame only when one is not already pending, so
- *    two scroll events in a frame paint once. The half that matters more is the
+ *    two scroll events in a frame paint once. (Closing the details area draws at
+ *    once and cancels the pending frame, E04-M01-S10, so it is one redraw as well
+ *    and the pool is never left hidden between a click and its frame.) The half
+ *    that matters more is the
  *    other one: **nothing schedules anything when nothing happens.** There is no
  *    interval, no polling and no animation loop, so an idle window does no work
  *    at all, which is a budget of
@@ -168,6 +171,8 @@ interface TableState {
   schedule: () => void;
   /** Mark every pool slot as holding no row, so that the next frame writes them all. */
   forget: () => void;
+  /** Draw now in place of the pending frame, which is cancelled. */
+  flush: () => void;
   /** The layout row whose details are open, or `NO_ROW`. */
   open: number;
   /** What the open row's details are of, or `null` while none are open. */
@@ -468,6 +473,7 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     forget: () => {
       forgetRows(state);
     },
+    flush: () => undefined,
     open: NO_ROW,
     target: null,
     asked: 0,
@@ -477,6 +483,12 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     state.frame ??= requestAnimationFrame(() => {
       paint(parts, state);
     });
+  };
+  state.flush = (): void => {
+    if (state.frame !== null) {
+      cancelAnimationFrame(state.frame);
+    }
+    paint(parts, state);
   };
   listen(parts, state);
   return viewOf(parts, state);

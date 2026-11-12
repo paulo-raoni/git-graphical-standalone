@@ -48,6 +48,11 @@ export interface PanelState {
   schedule: () => void;
   /** Mark every pool slot as holding no row, so that the next frame writes them all. */
   forget: () => void;
+  /**
+   * Draw now, in place of the frame that is pending, which is cancelled: still one
+   * redraw, and the pool holds every row where it belongs when the task ends.
+   */
+  flush: () => void;
 }
 
 /**
@@ -76,7 +81,9 @@ export function closeDetails(parts: PanelParts, state: PanelState): void {
   state.asked += 1;
   parts.area.pane.closeMenu();
   placeArea(parts, state);
-  state.schedule();
+  // Drawn at once: `placeArea` hid the pool, and a closed area must not leave the
+  // rows hidden until a frame, for whoever reads the document in between.
+  state.flush();
 }
 
 /**

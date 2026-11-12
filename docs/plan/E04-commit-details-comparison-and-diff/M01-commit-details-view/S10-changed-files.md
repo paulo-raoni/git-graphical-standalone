@@ -127,6 +127,17 @@ files, nested (`dN/sM/fK.txt`, 50 by 20 folders) and flat.
   area's grid row is `minmax(0, 1fr)`). The rows themselves cost 50 to 80 ms for 50 000 files (**measured** in a
   Node process, nested, five runs: 79, 55, 51, 50, 50 ms) and the cost of one reply is now below that plus two frames.
 
+## A change to S09's close, and why
+
+Closing the area now draws the table at once and cancels the pending frame (`flush` of `src/ui/graph-table.ts`, called by
+`closeDetails`), where S09 only scheduled a frame. **Measured:** with S09's test *a label or the inside of the area
+opens nothing…* (`details-panel.spec.ts`, unchanged) the full end-to-end gate went red at that case in two runs in a row
+at this lane's head, and the case failed 4 of 16 runs alone at the head and 14 of 16 at the base commit, on a machine the
+other projects were using; with the change it passed 16 of 16 alone and in the full run. **Read from code:** the case reads
+the rows' tops the moment the area is hidden, and `placeArea` had hidden the pool until the next frame, so no frame ever
+drew the gap (S09 argued that); the case read it anyway. The redraw count is the same, one: the pending frame is
+cancelled, and the redraw tests of `graph-table.spec.ts` and `details-lines.spec.ts` pass unchanged. Opening is unchanged.
+
 ## What was seen, against items 1 to 12 of the reference (scope D1)
 
 Looked at in the built application on 2026-11-12, in the light and the dark theme, on `details`, `stashes` and an
