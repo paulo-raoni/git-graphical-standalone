@@ -26,7 +26,10 @@ files as they stand, checkable by reading them) or **inferred** (a judgement no 
 
 **What the renderer exposes** (for S11's keys and S12's place): `GraphTableView.toggleDetails(row)`,
 `closeDetails()`, `onDetails(listener)` and `rereadUncommitted()`. `toggleDetails` is what a click and a
-parent link call: it opens the row's details, or closes them when they are that row's already. The view holds no
+parent link call: it opens the row's details, or closes them when they are that row's already.
+*Note, 2026-11-12 (E04-M01-S11):* a key does not call it. `openDetails` of `src/ui/details-panel.ts`, which `toggleDetails`
+now calls for the opening, opens a row and never closes, and `src/ui/keys.ts` calls it; the keys are S11's
+(`S11-keyboard-navigation.md`). The view holds no
 bridge: `onDetails` is handed the target and a function to hand the reply to, and `renderer.ts` makes the call.
 
 ## Where the details open, and what moves
@@ -261,6 +264,7 @@ against the items of the reference:
 
 ## Not in this slice (as the task says)
 
-The files as a tree or a list, status colours and counts (S10); every key (S11); the height dragged, the docked place,
+The files as a tree or a list, status colours and counts (S10); every key (S11, built:
+`S11-keyboard-navigation.md`); the height dragged, the docked place,
 Auto Center off, the options control (S12); the Code Review button (E04-M04); links inside a message, e-mail links
 (E04-M05); a hover band.

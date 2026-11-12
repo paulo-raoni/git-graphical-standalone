@@ -21,6 +21,7 @@ import type { OptionGroup } from './file-menu';
 import { paintGraph, resizeCanvas } from './graph-canvas';
 import { createRowElement, writeRow } from './row-element';
 import type { RowElement } from './row-element';
+import { listenKeys } from './keys';
 import { rowViewAt } from './row-model';
 
 export type { DetailsListener } from './details-panel';
@@ -54,7 +55,7 @@ export type { DetailsListener } from './details-panel';
  * **The details area (E04-M01-S09) keeps all three.** At most one row has its
  * details open, in the one element `./details-area` builds when the view is
  * mounted, so the pool holds the elements it held (1), the area is opened and
- * closed by a click or a call and by nothing on a timer (2), and `paint` still
+ * closed by a click, a key or a call and by nothing on a timer (2), and `paint` still
  * reads before it writes (3): the open row is state, not a measurement. Every row
  * after the open one is placed `DETAILS_HEIGHT` lower by `rowOffsetY` and
  * `rowTopY` of `./geometry`, which the DOM and the canvas both take their tops
@@ -131,7 +132,8 @@ export interface GraphTableView {
   /**
    * Open the details of layout row `row` under it, or close them when they are
    * that row's already: what a click on the row does, and what following a
-   * parent link does. Keys and the options of later slices call it too.
+   * parent link does. A key does not call it: it opens a row with
+   * `openDetails` of `./details-panel` and never closes (`./keys`, E04-M01-S11).
    */
   readonly toggleDetails: (row: number) => void;
   /** Close the open details, if any. The view does not scroll back. */
@@ -407,6 +409,7 @@ function listen(parts: TableParts, state: TableState): void {
   parts.area.close.addEventListener('click', () => {
     closeDetails(parts, state);
   });
+  listenKeys(parts, state);
   new ResizeObserver(state.schedule).observe(parts.view);
   watchPixelRatio(state.schedule);
 }

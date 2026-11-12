@@ -54,6 +54,10 @@ export interface FilePane {
   readonly show: (files: readonly ChangedFile[], target: DetailsTarget) => void;
   /** Close the menu, if it is open: the area closing does, and leaves the files where they are. */
   readonly closeMenu: () => void;
+  /** Whether the menu is open. */
+  readonly menuOpen: () => boolean;
+  /** Move the menu's focus down (`1`) or up (`-1`) one entry (E04-M01-S11). */
+  readonly stepMenu: (delta: number) => void;
   /** Show no file, and close the menu. */
   readonly clear: () => void;
   /** Say which repository is open: the key its view is kept by. */
@@ -331,6 +335,8 @@ export function createFilePane(): FilePane {
     menu: parts.menu.root,
     show: reset,
     closeMenu: parts.menu.close,
+    menuOpen: parts.menu.isOpen,
+    stepMenu: parts.menu.step,
     clear: (): void => {
       reset([], null);
     },

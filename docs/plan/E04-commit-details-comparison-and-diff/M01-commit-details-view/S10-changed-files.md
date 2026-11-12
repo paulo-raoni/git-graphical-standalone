@@ -75,6 +75,8 @@ closes and is S12's to make take effect.
 - **The menu** is one element, built with the view and rewritten at each opening, placed with `position: fixed` and
   kept inside the window. It closes on a choice, on a click anywhere else, on any scroll, when the area closes and when
   the window loses focus (**measured** by one assertion each). Escape is S11's.
+  *Note, 2026-11-12 (E04-M01-S11):* Escape now closes the menu, one press, and the arrows, Enter and Space work in it
+  (`S11-keyboard-navigation.md`); moving through the changed files by key is not built.
 - **Open File runs nothing.** It shows the file selected in the system's file manager
   (`shell.showItemInFolder`), because the system's default program for a script or an executable in someone else's
   repository would run it. This is the orchestrator's choice and **the owner's to overrule** (task, *Gaps*, item 1).
