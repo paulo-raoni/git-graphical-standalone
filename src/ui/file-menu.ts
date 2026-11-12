@@ -11,7 +11,9 @@ import type { FileView } from '../contracts/index';
  * rule about what an entry does: the pane says, this module shows.
  *
  * It closes when an entry is chosen, on a click anywhere else, when anything
- * scrolls, when the window loses focus and when the pane asks. Escape is S11's.
+ * scrolls, when the window loses focus and when the pane asks. Escape and the
+ * arrows are the view's one key listener's (`./keys`, E04-M01-S11), which asks
+ * the pane to close the menu and to move its focus with `step`.
  */
 
 /** One line of the menu: a heading, or an entry that runs something when chosen. */
@@ -100,6 +102,12 @@ export interface FileMenu {
   readonly open: (entries: readonly MenuEntry[], x: number, y: number, event: Event) => void;
   readonly close: () => void;
   readonly isOpen: () => boolean;
+  /**
+   * Move the focus `delta` entries down (positive) or up, skipping headings and
+   * stopping at the first and the last. With no entry focused, the first Down
+   * focuses the first entry.
+   */
+  readonly step: (delta: number) => void;
 }
 
 /** Keep this far from the window's edge. */
@@ -163,5 +171,10 @@ export function createFileMenu(): FileMenu {
     },
     close,
     isOpen: (): boolean => !root.hidden,
+    step: (delta: number): void => {
+      const items = Array.from(root.querySelectorAll<HTMLElement>('.files__menu-item'));
+      const at = items.findIndex((item) => item === document.activeElement);
+      items[Math.min(items.length - 1, Math.max(0, at + delta))]?.focus({ preventScroll: true });
+    },
   };
 }

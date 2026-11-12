@@ -149,17 +149,21 @@ function centreBlock(parts: PanelParts, row: number): void {
 }
 
 /**
- * Open the details of `row` under it and ask for them, or close them when they
- * are `row`'s already. Any other row's are closed by opening this one: there is
- * only ever one area.
+ * Open the details of `row` under it and ask for them, and keep the row in view.
+ * Any other row's are closed by opening this one: there is only ever one area.
+ *
+ * **This is the one place a row's opening keeps it in view** (`centreBlock`), for
+ * a click, a followed parent link and a key alike (E04-M01-S11). When Auto Center
+ * gets an off value (E04-M01-S12) this is where it must scroll by the smallest
+ * amount that shows the block instead of centring it.
+ *
+ * It never closes: the row that is open already is left as it is. One call is one
+ * redraw, however often it is called before the frame: `placeArea` hides the pool
+ * for the length of the task and `schedule` asks for one frame.
  */
-export function toggleDetails(parts: PanelParts, state: PanelState, row: number): void {
+export function openDetails(parts: PanelParts, state: PanelState, row: number): void {
   const page = state.page;
-  if (page === null || row < 0 || row >= page.layout.rowCount) {
-    return;
-  }
-  if (row === state.open) {
-    closeDetails(parts, state);
+  if (page === null || row < 0 || row >= page.layout.rowCount || row === state.open) {
     return;
   }
   state.open = row;
@@ -168,6 +172,18 @@ export function toggleDetails(parts: PanelParts, state: PanelState, row: number)
   centreBlock(parts, row);
   askDetails(parts, state, false);
   state.schedule();
+}
+
+/**
+ * Open the details of `row` under it, or close them when they are `row`'s already:
+ * what a click on the row does.
+ */
+export function toggleDetails(parts: PanelParts, state: PanelState, row: number): void {
+  if (row === state.open) {
+    closeDetails(parts, state);
+    return;
+  }
+  openDetails(parts, state, row);
 }
 
 /**

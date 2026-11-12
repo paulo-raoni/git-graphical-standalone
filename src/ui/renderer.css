@@ -629,6 +629,12 @@ body {
   background: var(--open-row);
 }
 
+.files__menu-item:focus {
+  background: var(--open-row);
+  outline: 1px solid var(--text-secondary);
+  outline-offset: -1px;
+}
+
 .files__menu-mark {
   width: 8px;
   flex: none;
