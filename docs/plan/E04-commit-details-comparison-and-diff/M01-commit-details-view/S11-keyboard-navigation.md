@@ -129,19 +129,24 @@ E01-M03.
 ## What a move costs (scope C)
 
 **Measured, printed and not held** (`ADR-0002` decision 6 names no budget for a key). `keyboard-cost.spec.ts`, on the
-`large` fixture loaded to 9 700 further commits, 2026-11-12, **on a loaded machine**: other projects' agents were
-running, and the processor load sampled with `os.cpus()` over the case read 100 %. These are not wall-clock-gate
-readings and are not discarded or kept by the rule of `AGENTS.md` §11, which governs the gate.
+`large` fixture loaded to 9 700 further commits, 2026-11-12, in the one whole `npm run gates` run that is handed over,
+with the processor load over the case sampled by `os.cpus()` (all processors) beside it. These are not readings of the
+wall-clock gate and are not kept or discarded by the rule of `AGENTS.md` §11, which governs that gate.
 
 | reading | five readings, ms |
 | --- | --- |
-| the time from the key's dispatch to the area placed under its new row, layout read (before the reply): Ctrl+Up from the last row of ten thousand, the longest walk | 12.5, 7.2, 8.1, 7.0, 8.9 |
-| the same for Down from the middle row | 4.4, 3.8, 3.6, 3.2, 3.0 |
+| the time from the key's dispatch to the area placed under its new row, layout read (before the reply): Ctrl+Up from the last row of ten thousand, the longest walk | 3.8, 3.0, 2.8, 2.6, 3.0 |
+| the same for Down from the middle row | 1.4, 1.3, 1.4, 1.3, 1.4 |
 
-**A held key** (**measured**, one run on the same machine): twenty `ArrowDown` presses, each in a task of its own through
+The processor load over that case read 24 %. An earlier run of the same case, while other projects' agents were
+running and the load read 100 %, read 12.5, 7.2, 8.1, 7.0, 8.9 ms and 4.4, 3.8, 3.6, 3.2, 3.0 ms, so the cost of the
+walk is small against the machine's state.
+
+**A held key** (**measured**, the handed-over gates run: 655 ms to the last reply; the same case read 845, 995 and, on a loaded
+machine, 2 743 ms in earlier runs): twenty `ArrowDown` presses, each in a task of its own through
 a `MessageChannel`, as fast as the page takes them. The window asked for twenty reads; git started twenty processes
 (counted by `GIT_TRACE2_EVENT`, one `start` event each, so one process a read); one reply was drawn, and it was the
-last one, drawn 2 743 ms after the first press; the details it showed are those of the row reached by clicking that row.
+last one, drawn 655 ms after the first press; the details it showed are those of the row reached by clicking that row.
 No earlier reply was drawn after it. **Whether a burst should cancel or skip its earlier reads is a plan decision.**
 
 ## What was seen, against items 1 to 11 of the reference (scope D1)
