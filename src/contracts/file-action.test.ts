@@ -124,8 +124,10 @@ describe('liesInside', () => {
     expect(liesInside('/r/s', '/r/s/../t')).toBe(false);
     expect(liesInside('/r', '/r/a/../b')).toBe(true);
     expect(liesInside('/r', '/r/./a')).toBe(true);
+    expect(liesInside('/r/s', '/r/./s/a')).toBe(true);
     expect(liesInside('/r', '/../a')).toBe(false);
     expect(liesInside('r', '../a')).toBe(false);
+    expect(liesInside('r', '../r/a')).toBe(false);
     expect(liesInside('/r/./s', '/r/s/a')).toBe(false);
   });
 

@@ -65,6 +65,11 @@ describe('the tree', () => {
     expect(shape(rows)).toEqual(['[a]', '  [b]', '    c.txt', '  d.txt']);
   });
 
+  it('does not compact a folder holding two folders', () => {
+    const rows = fileRowsOf([file('a/b/x'), file('a/c/y')], TREE);
+    expect(shape(rows)).toEqual(['[a]', '  [b]', '    x', '  [c]', '    y']);
+  });
+
   it('compacts the chain below a folder that is not compacted', () => {
     const rows = fileRowsOf([file('a/b/c/d.txt'), file('a/e.txt')], TREE);
     expect(shape(rows)).toEqual(['[a]', '  [b / c]', '    d.txt', '  e.txt']);
@@ -255,6 +260,13 @@ describe('a file row', () => {
 });
 
 describe('the letter, counts and actions of a file row', () => {
+  it('spells a rename or a copy that names no old path with an empty one', () => {
+    const renamed = rowOf(file('f.txt', 'renamed', [0, 0]));
+    const copied = rowOf(file('f.txt', 'copied', [0, 0]));
+    expect(renamed).toMatchObject({ tooltip: 'f.txt\nRenamed ( → f.txt)' });
+    expect(copied).toMatchObject({ tooltip: 'f.txt\nCopied ( → f.txt)' });
+  });
+
   it('shows a letter only when the letters are on', () => {
     expect(rowOf(file('f.txt'), TREE)).toMatchObject({ letter: null });
     expect(rowOf(file('f.txt'), { ...TREE, letters: true })).toMatchObject({ letter: 'M' });

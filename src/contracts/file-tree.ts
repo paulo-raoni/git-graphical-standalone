@@ -161,14 +161,8 @@ function fileRow(
 
 /** Two names in the order of the pane: lower-cased, then as they are, in UTF-16 code units. */
 function compareNames(left: string, right: string): number {
-  const [a, b] = [left.toLowerCase(), right.toLowerCase()];
-  if (a !== b) {
-    return a < b ? -1 : 1;
-  }
-  if (left === right) {
-    return 0;
-  }
-  return left < right ? -1 : 1;
+  const order = (x: string, y: string): number => (x < y ? -1 : x > y ? 1 : 0);
+  return order(left.toLowerCase(), right.toLowerCase()) || order(left, right);
 }
 
 /** One file of the tree being built: its name in its folder and its place in the reply. */
@@ -178,12 +172,16 @@ interface Leaf {
   readonly file: ChangedFile;
 }
 
-/** A folder of the tree being built. */
-interface Folder {
-  readonly name: string;
-  readonly path: string;
+/** What holds folders and files: the root of the tree being built, or a folder of it. */
+interface Branch {
   readonly folders: Map<string, Folder>;
   readonly files: Leaf[];
+}
+
+/** A folder of the tree being built, with its path from the root. */
+interface Folder extends Branch {
+  readonly name: string;
+  readonly path: string;
 }
 
 function newFolder(name: string, path: string): Folder {
@@ -191,34 +189,38 @@ function newFolder(name: string, path: string): Folder {
 }
 
 /** The tree of `files`: every path split at its slashes. */
-function treeOf(files: readonly ChangedFile[]): Folder {
-  const root = newFolder('', '');
+function treeOf(files: readonly ChangedFile[]): Branch {
+  const root: Branch = { folders: new Map(), files: [] };
   for (const [index, file] of files.entries()) {
-    const slash = file.path.lastIndexOf('/');
-    let folder = root;
-    for (const part of slash < 0 ? [] : file.path.slice(0, slash).split('/')) {
+    const parts = file.path.split('/');
+    const name = parts.pop() as string;
+    let folder: Branch = root;
+    let path = '';
+    for (const part of parts) {
+      path = path === '' ? part : `${path}/${part}`;
       let next = folder.folders.get(part);
       if (next === undefined) {
-        next = newFolder(part, folder.path === '' ? part : `${folder.path}/${part}`);
+        next = newFolder(part, path);
         folder.folders.set(part, next);
       }
       folder = next;
     }
-    folder.files.push({ name: file.path.slice(slash + 1), index, file });
+    folder.files.push({ name, index, file });
   }
   return root;
 }
 
-function sortedFolders(folder: Folder): Folder[] {
+function sortedFolders(folder: Branch): Folder[] {
   return [...folder.folders.values()].sort((a, b) => compareNames(a.name, b.name));
 }
 
-function sortedFiles(folder: Folder): Leaf[] {
-  return [...folder.files].sort((a, b) => compareNames(a.name, b.name) || a.index - b.index);
+function sortedFiles(folder: Branch): Leaf[] {
+  // `sort` is stable, so two files of one name stay in the reply's order.
+  return [...folder.files].sort((a, b) => compareNames(a.name, b.name));
 }
 
 /** The only child of a folder that holds nothing else, which compaction joins to it. */
-function loneFolder(folder: Folder): Folder | null {
+function loneFolder(folder: Branch): Folder | null {
   if (folder.files.length > 0 || folder.folders.size !== 1) {
     return null;
   }
@@ -226,7 +228,7 @@ function loneFolder(folder: Folder): Folder | null {
 }
 
 /** Walk `folder`'s children, folders first, appending rows. */
-function walk(folder: Folder, depth: number, options: FileViewOptions, rows: FileTreeRow[]): void {
+function walk(folder: Branch, depth: number, options: FileViewOptions, rows: FileTreeRow[]): void {
   for (const child of sortedFolders(folder)) {
     let deepest = child;
     let label = child.name;
@@ -247,9 +249,9 @@ function walk(folder: Folder, depth: number, options: FileViewOptions, rows: Fil
 }
 
 /** The list's rows: the tree's order, flattened, every folder expanded, each with its full path. */
-function listOf(folder: Folder, options: FileViewOptions): FileRow[] {
+function listOf(folder: Branch, options: FileViewOptions): FileRow[] {
   const rows: FileRow[] = [];
-  const visit = (at: Folder): void => {
+  const visit = (at: Branch): void => {
     for (const child of sortedFolders(at)) {
       visit(child);
     }

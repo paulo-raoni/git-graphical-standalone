@@ -45,7 +45,7 @@ const ACTIONS: readonly string[] = ['open-file', 'copy-absolute-path', 'copy-rel
  * two.
  */
 export function isRelativeFilePath(path: unknown): path is string {
-  if (typeof path !== 'string' || path === '' || path.includes('\\') || path.includes('\0')) {
+  if (typeof path !== 'string' || path.includes('\\') || path.includes('\0')) {
     return false;
   }
   return path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
@@ -67,7 +67,7 @@ export function fileActionRequestOf(value: unknown): FileActionRequest | null {
     readonly path?: unknown;
   };
   const checked = detailsTargetOf(target);
-  if (typeof action !== 'string' || !ACTIONS.includes(action) || checked === null) {
+  if (!ACTIONS.includes(action as string) || checked === null) {
     return null;
   }
   if (!isRelativeFilePath(path)) {
