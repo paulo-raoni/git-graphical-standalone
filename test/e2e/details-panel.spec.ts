@@ -138,6 +138,8 @@ test('a root, the uncommitted changes and a stash show what they are', async () 
   const [stash, ...parents] = git(repository, 'rev-parse', ...revisions);
   const untracked = git(repository, 'ls-tree', '-r', '--name-only', 'stash@{0}^3');
   await withWindow(repository, async (page) => {
+    await page.locator('.ref--stash').first().click();
+    await expect(page.locator(DETAILS)).toBeHidden();
     await show(page, 'On main: stash with an untracked file');
     expect((await linesOf(page)).slice(0, 2)).toEqual([
       `Commit: ${stash ?? ''}`,
@@ -149,12 +151,8 @@ test('a root, the uncommitted changes and a stash show what they are', async () 
 });
 
 test('a label or the inside of the area opens nothing; the four ways of closing close one area', async () => {
-  const [repository, stashes] = [fixture('details', 'script', 6), fixture('stashes', 'script', 3)];
-  await withWindow(stashes, async (page) => {
-    await page.locator('.ref--stash').first().click();
-    await expect(page.locator(DETAILS)).toBeHidden();
-  });
-  await withWindow(repository, async (page) => {
+  test.setTimeout(SLOW_TEST_MS);
+  await withWindow(fixture('details', 'script', 6), async (page) => {
     const before = await tops(page);
     await page.locator('.ref', { hasText: 'main' }).first().click();
     await expect(page.locator(DETAILS)).toBeHidden();
