@@ -84,8 +84,8 @@ async function clickRow(page: Page, row: number): Promise<void> {
 const frames = async (page: Page): Promise<number[]> => {
   const probe = await page.evaluate(readProbe);
   return [
-    probe.registered.requestAnimationFrame ?? 0,
-    probe.registered.setTimeout ?? 0,
+    probe.registered['requestAnimationFrame'] ?? 0,
+    probe.registered['setTimeout'] ?? 0,
     probe.redraws,
   ];
 };
