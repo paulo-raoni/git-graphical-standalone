@@ -98,7 +98,7 @@ Filled in before promotion (`AGENTS.md` §8.5).
 | field | value |
 | --- | --- |
 | base tag | v0.2.0 |
-| reviewed commit | |
-| review rounds | |
-| tasks | |
-| tag created | |
+| reviewed commit | `6d15fa0` (review round 13, `PASS`, the final review of the whole sequence) |
+| review rounds | 13 |
+| tasks | S01 to S17; FIX-01 to FIX-12 |
+| tag created | v0.3.0 |

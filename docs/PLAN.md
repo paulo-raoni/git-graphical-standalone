@@ -639,6 +639,91 @@ From E03-M01's review round 07 (2026-11-01, at `02ec06a`):
     launcher; not reproduced). FIX-05 saw it once, at a load §11 discards; its rate on a free machine is unmeasured.
     The comment above it draws a conclusion the launcher does not support.
 
+### Carried past E04-M01 from its reviews
+
+Classed as **carried** under `AGENTS.md` §7 by E04-M01's review rounds 01 to 13; round 13, the final review of the
+whole sequence (at `6d15fa0`), listed every one still open. Each is an item of the next milestone the owner approves.
+The round that raised each is named; its review file held the measurement and is deleted at promotion (§4), so each
+line here keeps the finding's substance.
+
+From rounds 01 to 08:
+
+1. (C-06, round 01) End-to-end temporary homes are left in `%TEMP%`: round 13 counted 95
+   `git-graphical-standalone-*` folders there after its runs, 94 before them.
+2. (C-09, round 02) A discarded scrolled reading passes the budgets gate, and nothing asserts that a reading was kept.
+3. (C-11, round 02) `selection-kept.spec.ts`'s 180 s file timeout and `branches-dropdown.spec.ts`'s 30 s action wait
+   run out under saturated load.
+4. (C-15, second half, round 02) A details read refused for a reason git did not give is labelled a git failure; round
+   13 adds `details:keep-layout`, which refuses a request with `FailureKind.GitFailed`.
+5. (C-16, round 03) The theme suite's canvas case fails closed when a repaint is asked for through a timer.
+6. (C-17, round 04) A case that ran out can still leave its profile unremovable.
+7. (C-20, round 04) At the window's minimum size the bar's last control is clipped.
+8. (C-21, round 05) The mutation gate's re-measure verdict on `hash-index.ts` 120:7 still follows the machine's
+   memory through the outer clock.
+9. (C-22, round 05) The budgets reading's "a test failed" condition is held by no check.
+10. (C-23, round 06) What git 2.31 to 2.50 print for the details read of a merge is inferred from documentation, not
+    run.
+11. (C-24, round 06) No golden or other committed check has a curve crossing another lane's vertical.
+12. (C-26, round 07) A branch made on a stash's own commit puts the stash's index and untracked-files commits on the
+    page.
+13. (C-27, round 07) Commit `d494568`'s subject says "five new surviving mutants" and its body six.
+14. (C-30, round 08) Opening a repository that has a stash starts 7 git processes, not 6.
+15. (C-31, round 08) The frames reference bound and its printed figure disagree at the grid point.
+16. (C-32, round 08) The `unit` text of `gitProcessesPerOpen` is held by review only.
+17. (C-33, round 08) E04-M01-FIX-08's audit misstates its subjects' lengths and its record of each budgets case.
+18. (C-34, round 08) Commit `7c739c8`'s body breaks a sentence with a blank line.
+
+From rounds 09 to 12:
+
+19. (C-35, round 09) E04-M01-S17's sentences give round 08's git as 2.51.0; it ran 2.56.0.windows.4.
+20. (C-36, round 09) Under a branch selection, `--stdin` is given even when no name is read, and git then waits. No
+    path a person can take reaches it.
+21. (C-37, round 10) The comment at `src/contracts/layout.ts` lines 107 to 113 is untrue beside an open area.
+22. (C-38, round 10) Half of the "same moment" ordering rule is held by no case: no fixture has one moment at two
+    offsets.
+23. (C-39, round 10) Sentences about the unsampled click readings carry no measurement ("busier still").
+24. (C-40, round 10) E04-M01-S09's third session replaced its own commit without a task section allowing it. Whether
+    `AGENTS.md` should carry a standing allowance is the owner's decision.
+25. (C-41, round 11) E04-M01-S10 changed S09's `closeDetails` outside its scope; S09's guarantees were kept.
+26. (C-42, round 11) The name `topLevelArguments` escapes the closed list of `git-colour.spec.ts`.
+27. (C-43, round 11) Open File follows a junction in the working tree to a file outside the repository; it reveals the
+    file and runs nothing.
+28. (C-44, round 11) E04-M01-S10's slice document has an empty second-session table, which its audit contradicts.
+29. (C-45, round 11) Committed sentences that are untrue or carry no measurement, one task for the round.
+30. (C-46, round 11) A failed action's message can land on the pane of the next reply (read from code, not
+    reproduced).
+31. (C-47, round 12) `git-selection-many.spec.ts`'s 120 s setup timed out under saturated load; alone it passed in
+    12.6 s.
+32. (C-48, round 12) No case holds that an arrow at an edge, with the details open, leaves the list unscrolled.
+33. (C-49, round 12) Committed sentences without their measurement or left uncorrected, in the S10 and S11 slice
+    documents, one task for the round.
+
+From round 13, the final review:
+
+34. (C-50) `selection-kept.spec.ts:372`'s 10 s launch wait (`toBeEnabled`) went red once at about 100 % load; green in
+    round 13's whole run and 5 of 5 alone. That the wait ran out is an inference.
+35. (C-51) The idle case of `details-lines.spec.ts` read 15 frames against 14 at E04-M01-S12's second-session head;
+    green since. That FIX-12's cause explains it is an inference.
+36. (C-52) E04-M01-FIX-11's first session replaced its own commit with a different tree (`git reset --soft`) without a
+    task section allowing it; as item 24.
+37. (C-53) A grown inline details area can put its own drag handle below the window (round 13 measured a 730-pixel
+    area whose foot sat at 868 in an 820-pixel window); the handle is reached by scrolling. Whether to clamp from the
+    row's place is a plan decision.
+38. (C-54) Dragging the docked panel's top edge up lowers the one kept height when it is above the docked room (round
+    13 measured 730 kept, a 100-pixel upward drag docked, 682 kept afterwards). It follows from one height for both
+    places; a plan decision.
+39. (C-55) Four of E04-M01-S12's guarantees are held by no case: the docked height when the window shrinks; at most one
+    redraw a frame across a drag spanning frames; the docked, Auto Center On readings beyond the centred row; docked
+    rows equal to their closed tops.
+40. (C-56) The process-count case of `file-actions.spec.ts` can miss a process an action starts after it has answered
+    (round 13's probe read red 2 of 3).
+41. (C-57) E04-M01-FIX-12's wait names the loading note by a literal copy; if the note changes, the case can go red on
+    an unchanged product.
+42. (C-58) Committed sentences to correct, one task: the S12 slice document's Options menu "cut off by the window's
+    foot" (9 openings stayed inside the window, and the menu is clamped) and its unmeasured hit-test claim;
+    `size-budget.json`'s `comment-e04-m01-s12` sizes (the head reads 11 192 and 43 884); the test title "is the pointer
+    is share" in `details-layout.test.ts`.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at
