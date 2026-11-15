@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
 
+import { openDetailsStore } from './details-store';
 import { registerHandlers } from './handlers';
 import { createRepositoryClient } from './repository-client';
 import type { RepositoryClient } from './repository-client';
@@ -49,6 +50,7 @@ function start(): void {
     windowOf: () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null,
     theme,
     selections: openSelectionStore(home),
+    details: openDetailsStore(home),
   });
   openWindow();
 

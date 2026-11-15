@@ -33,6 +33,7 @@
   },
   "bundles": {
     "main.cjs": [
+      "src/app/details-store.ts",
       "src/app/handlers.ts",
       "src/app/main.ts",
       "src/app/repository-client.ts",
@@ -42,6 +43,7 @@
       "src/app/window.ts",
       "src/contracts/branch-menu.ts",
       "src/contracts/commit-details.ts",
+      "src/contracts/details-layout.ts",
       "src/contracts/file-action.ts",
       "src/contracts/ipc.ts",
       "src/contracts/kept-selection.ts",
@@ -100,6 +102,7 @@
       "src/contracts/bridge.ts",
       "src/contracts/column-read.ts",
       "src/contracts/commit-columns.ts",
+      "src/contracts/details-layout.ts",
       "src/contracts/file-tree.ts",
       "src/contracts/ipc.ts",
       "src/contracts/kept-selection.ts",
@@ -110,6 +113,7 @@
       "src/contracts/row-moves.ts",
       "src/ui/branch-control.ts",
       "src/ui/details-area.ts",
+      "src/ui/details-controls.ts",
       "src/ui/details-panel.ts",
       "src/ui/file-menu.ts",
       "src/ui/file-pane.ts",

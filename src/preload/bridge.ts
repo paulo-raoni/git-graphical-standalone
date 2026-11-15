@@ -7,11 +7,15 @@ import type {
   ChooseFolderResponse,
   ChooseThemeRequest,
   ChooseThemeResponse,
+  DetailsOptions,
+  DetailsOptionsResponse,
   DetailsRequest,
   DetailsResponse,
   FileActionRequest,
   FileActionResponse,
   GitGraphicalBridge,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenRepositoryRequest,
@@ -57,6 +61,12 @@ const bridge: GitGraphicalBridge = {
     request<ThemeChoiceResponse>(CHANNELS.themeChoice),
   chooseTheme: (themeRequest: ChooseThemeRequest): Promise<ChooseThemeResponse> =>
     request<ChooseThemeResponse>(CHANNELS.chooseTheme, themeRequest),
+  detailsOptions: (): Promise<DetailsOptionsResponse> =>
+    request<DetailsOptionsResponse>(CHANNELS.detailsOptions),
+  chooseDetailsOptions: (options: DetailsOptions): Promise<DetailsOptionsResponse> =>
+    request<DetailsOptionsResponse>(CHANNELS.chooseDetailsOptions, options),
+  keepDetailsLayout: (keepRequest: KeepDetailsLayoutRequest): Promise<KeepDetailsLayoutResponse> =>
+    request<KeepDetailsLayoutResponse>(CHANNELS.keepDetailsLayout, keepRequest),
   // The page is handed the checked payload and never the event, whose `sender`
   // is this preload's `ipcRenderer`.
   unkeptChoice: (listener: (unkept: UnkeptChoice) => void): void => {

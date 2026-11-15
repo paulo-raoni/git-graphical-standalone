@@ -31,7 +31,7 @@ interface BranchSelection {
 
 value CHAIN_SEPARATOR: " / "
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly fileAction: "repository:file-action"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; readonly unkeptChoice: "application:unkept-choice"; }
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly fileAction: "repository:file-action"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; readonly detailsOptions: "details:options"; readonly chooseDetailsOptions: "details:choose-options"; readonly keepDetailsLayout: "details:keep-layout"; readonly unkeptChoice: "application:unkept-choice"; }
 
 interface ChangedFile {
     readonly additions: number | null
@@ -41,7 +41,7 @@ interface ChangedFile {
     readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
 }
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "repository:file-action" | "application:info" | "theme:choice" | "theme:choose" | "application:unkept-choice"
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "repository:file-action" | "application:info" | "theme:choice" | "theme:choose" | "details:options" | "details:choose-options" | "details:keep-layout" | "application:unkept-choice"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
 
@@ -80,12 +80,34 @@ interface CommitDetails {
     readonly parents: readonly string[]
 }
 
+value DEFAULT_DETAILS_LAYOUT: DetailsLayout
+
+value DEFAULT_DETAILS_OPTIONS: DetailsOptions
+
+interface DetailsLayout {
+    readonly divider: number
+    readonly fileView: FileView | null
+    readonly height: number
+}
+
+interface DetailsOptions {
+    readonly autoCenter: boolean
+    readonly compactFolders: boolean
+    readonly defaultFileView: "tree" | "list"
+    readonly place: "inline" | "docked"
+    readonly statusLetters: boolean
+}
+
+type DetailsOptionsResponse = import("./result").Failure | import("./result").Success<import("./details-layout").DetailsOptions>
+
 interface DetailsPerson {
     readonly email: string
     readonly name: string
     readonly offsetMinutes: number
     readonly time: number
 }
+
+type DetailsPlace = "inline" | "docked"
 
 interface DetailsRequest {
     readonly target: { readonly kind: "commit"; readonly hash: string; } | { readonly kind: "uncommitted"; }
@@ -164,10 +186,13 @@ interface FolderRow {
 
 interface GitGraphicalBridge {
     readonly applicationInfo: () => Promise<ApplicationInfoResponse>
+    readonly chooseDetailsOptions: (request: DetailsOptions) => Promise<DetailsOptionsResponse>
     readonly chooseFolder: () => Promise<ChooseFolderResponse>
     readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>
     readonly commitDetails: (request: DetailsRequest) => Promise<DetailsResponse>
+    readonly detailsOptions: () => Promise<DetailsOptionsResponse>
     readonly fileAction: (request: FileActionRequest) => Promise<FileActionResponse>
+    readonly keepDetailsLayout: (request: KeepDetailsLayoutRequest) => Promise<KeepDetailsLayoutResponse>
     readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
     readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
@@ -185,6 +210,13 @@ interface GraphPage {
 }
 
 value HASH_BYTE_LENGTH: 20
+
+interface KeepDetailsLayoutRequest {
+    readonly layout: DetailsLayout
+    readonly path: string
+}
+
+type KeepDetailsLayoutResponse = import("./result").Failure | import("./result").Success<import("./details-layout").DetailsLayout>
 
 interface LayoutRows {
     readonly colourIndex: Uint8Array<ArrayBufferLike>
@@ -204,6 +236,14 @@ interface LoadMoreCommitsRequest {
 
 type LoadMoreCommitsResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
 
+value MAX_DIVIDER: 0.8
+
+value MAX_KEPT_HEIGHT: 4096
+
+value MIN_DETAILS_HEIGHT: 120
+
+value MIN_DIVIDER: 0.2
+
 value NO_MOVE: -1
 
 interface OpenRepositoryRequest {
@@ -215,6 +255,7 @@ type OpenRepositoryResponse = import("./result").Failure | import("./result").Su
 
 interface OpenedPage {
     readonly commits: CommitColumns
+    readonly detailsLayout: DetailsLayout
     readonly hasMore: boolean
     readonly layout: LayoutRows
     readonly refs: Refs
@@ -322,9 +363,15 @@ value committerOf: (columns: CommitColumns, row: number) => Person
 
 value detailsTargetOf: (value: unknown) => DetailsTarget | null
 
+value draggedDivider: (pointer: number, left: number, width: number) => number
+
+value draggedHeight: (wanted: number, room: number) => number
+
 value fileActionRequestOf: (value: unknown) => FileActionRequest | null
 
 value fileRowsOf: (files: readonly ChangedFile[], options: FileViewOptions) => readonly FileTreeRow[]
+
+value heightRoom: (place: DetailsPlace, available: number, row: number) => number
 
 value hexHashOf: (columns: CommitColumns, row: number) => string
 
@@ -333,6 +380,10 @@ value isChecked: (menu: BranchMenu, name: string) => boolean
 value isObjectName: (text: unknown) => boolean
 
 value isRelativeFilePath: (path: unknown) => path is string
+
+value keptDetailsLayout: (value: unknown) => DetailsLayout | null
+
+value keptDetailsOptions: (value: unknown) => DetailsOptions | null
 
 value keptSelection: (value: unknown) => BranchSelection | null
 

@@ -17,12 +17,15 @@ import type {
   ChooseThemeRequest,
   ChooseThemeResponse,
   CommitDetails,
+  DetailsOptionsResponse,
   DetailsRequest,
   DetailsResponse,
   DetailsTarget,
   FileActionRequest,
   FileActionResponse,
   GraphPage,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   OpenRepositoryRequest,
   OpenRepositoryResponse,
@@ -35,6 +38,7 @@ import type {
 import type { ReaderDescription } from '../ports/index';
 import type { FilePlace } from '../ports/repository-reader';
 
+import type { DetailsStore } from './details-store';
 import type { RepositoryClient } from './repository-client';
 import type { SelectionStore } from './selections';
 import type { ThemeStore } from './theme';
@@ -43,13 +47,16 @@ import type { ThemeStore } from './theme';
  * Every channel of `src/contracts/ipc.ts`, answered.
  *
  * This is the whole of what the main process does with a repository: it
- * forwards. Five of the ten channels are a message to the utility process and
+ * forwards. Five of the thirteen channels are a message to the utility process and
  * its answer handed back unchanged, a commit's details among them; a sixth, the
  * file action, is such a message and then a write to the clipboard or a call to
  * the file manager, which only this process may make (`fileAction` below); one is a
  * folder dialog, which only a process that owns a window can show; one is a
- * string read off the command line at startup; and two read and set the colour
- * scheme, which is the application's and not a repository's (`./theme.ts`). A
+ * string read off the command line at startup; two read and set the colour
+ * scheme, which is the application's and not a repository's (`./theme.ts`); and
+ * three read and keep the Commit Details View's options, the application's, and
+ * each repository's layout, which the open's reply carries (`./details-store.ts`,
+ * E04-M01-S12). A
  * request for details is forwarded unchecked, because the reader checks it
  * (`detailsTargetOf` of `src/contracts/commit-details.ts`). No git process is
  * started here, nothing is parsed here, and nothing here waits on anything but
@@ -84,6 +91,10 @@ import type { ThemeStore } from './theme';
 const CHOOSER_TITLE = 'Open Repository';
 const CHOOSER_BUTTON = 'Open';
 
+/** What a request to keep a layout is told when it is not one. */
+const NOT_A_DETAILS_LAYOUT =
+  'The request holds no path, or a layout this application does not write.';
+
 /** What the renderer is told when the user dismissed the chooser. */
 const DISMISSED = 'No folder was chosen.';
 
@@ -99,6 +110,8 @@ export interface HandlerContext {
   readonly theme: ThemeStore;
   /** The branch selection kept for each repository. */
   readonly selections: SelectionStore;
+  /** The Commit Details View's options and each repository's layout (E04-M01-S12). */
+  readonly details: DetailsStore;
 }
 
 /** Show the folder chooser and report what the user picked. */
@@ -232,7 +245,10 @@ function registerRepositoryHandlers(context: HandlerContext): void {
         return reply;
       }
       opened = path;
-      return { ok: true, value: { ...reply.value, selection } };
+      // The layout is read at each open and answered with the page, so it is applied
+      // in the same task as the page and no click can meet the defaults first.
+      const detailsLayout = context.details.layout(path);
+      return { ok: true, value: { ...reply.value, selection, detailsLayout } };
     },
   );
 
@@ -291,6 +307,31 @@ export function registerHandlers(context: HandlerContext): void {
   ipcMain.handle(CHANNELS.themeChoice, (): ThemeChoiceResponse => {
     return { ok: true, value: { choice: context.theme.current() } };
   });
+
+  ipcMain.handle(CHANNELS.detailsOptions, (): DetailsOptionsResponse => {
+    return { ok: true, value: context.details.options() };
+  });
+
+  ipcMain.handle(
+    CHANNELS.chooseDetailsOptions,
+    async (_event: unknown, request: unknown): Promise<DetailsOptionsResponse> => {
+      // Checked before it is written, because it came from the page.
+      return { ok: true, value: await context.details.choose(request) };
+    },
+  );
+
+  ipcMain.handle(
+    CHANNELS.keepDetailsLayout,
+    async (
+      _event: unknown,
+      request: Partial<KeepDetailsLayoutRequest> | undefined,
+    ): Promise<KeepDetailsLayoutResponse> => {
+      const kept = await context.details.keep(request?.path, request?.layout);
+      return kept === null
+        ? { ok: false, kind: FailureKind.GitFailed, message: NOT_A_DETAILS_LAYOUT }
+        : { ok: true, value: kept };
+    },
+  );
 
   ipcMain.handle(
     CHANNELS.chooseTheme,
