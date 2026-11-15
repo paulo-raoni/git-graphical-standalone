@@ -5,6 +5,7 @@ import { entryAt } from '../../src/contracts/column-read';
 import { HASH_BYTE_LENGTH, UNCOMMITTED_COLOUR } from '../../src/contracts/index';
 import type { CommitColumns, LayoutRows } from '../../src/contracts/index';
 import { createLayoutState, layoutPage } from '../../src/core/layout/index';
+import { LOADING_NOTE } from '../../src/ui/details-area';
 import {
   DETAILS_HEIGHT,
   GAP_ABOVE,
@@ -308,6 +309,8 @@ test('with an area open on a page of ten thousand rows, the window costs what it
     await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
     expect((await page.evaluate(loadMoreAndShow, 9700)).rows).toBeGreaterThanOrEqual(10_000);
     await page.locator('.row[style*="translateY(0px)"] .row__subject').click();
+    // The reply that fills the area asks for a frame when it lands, so it is waited for here.
+    await expect(page.locator('.details__info')).not.toHaveText(LOADING_NOTE, { timeout: 60_000 });
     const bound = visibleRowCount(await page.evaluate(viewportHeight)) + 2 * OVERSCAN_ROWS;
     let counts: number[] = [];
     for (const offset of [0, ROW_HEIGHT * 5, 120_000, 239_000]) {
