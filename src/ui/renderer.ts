@@ -35,7 +35,7 @@ import type { Shell } from './shell';
  * — the document loading, a click, or the view's Load More intent — and the
  * control that started one is disabled until it is answered.
  *
- * **It keeps nothing across a restart.** The branch selection and Show Remote
+ * **It keeps nothing across a restart itself.** The branch selection and Show Remote
  * Branches of each repository are kept by the main process (`src/app/selections.ts`),
  * which opens a repository on them and says in the open's reply which they were.
  * So are the Commit Details View's options, asked once before the first page, and
