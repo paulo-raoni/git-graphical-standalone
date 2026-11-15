@@ -176,10 +176,11 @@ function paintGap(
   row: number,
   gapTop: number,
   curves: boolean,
+  gap: number,
 ): void {
   const last = entryAt(rows.segmentOffsets, row + 1);
   for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
-    const halves = gapLines(scratch, rows, row, segment, gapTop);
+    const halves = gapLines(scratch, rows, row, segment, gapTop, gap);
     strokeHalves(context, halves, laneColour(entryAt(rows.segmentColour, segment)), curves);
   }
 }
@@ -288,12 +289,13 @@ function gapTopOnScreen(
   open: number,
   scrollTop: number,
   height: number,
+  gap: number,
 ): number | null {
   if (open < 0 || open >= rows.rowCount) {
     return null;
   }
-  const top = rowTopY(open, scrollTop, open) + ROW_HEIGHT;
-  return top < height && top + DETAILS_HEIGHT > 0 ? top : null;
+  const top = rowTopY(open, scrollTop, open, gap) + ROW_HEIGHT;
+  return top < height && top + gap > 0 ? top : null;
 }
 
 /**
@@ -307,7 +309,7 @@ function gapTopOnScreen(
  * drawing cost, and it is proportional to the viewport.
  *
  * **The area (E04-M01-S09).** When the details of row `open` are showing, every
- * row after it is drawn `DETAILS_HEIGHT` lower (`rowTopY`), and the lines of the
+ * row after it is drawn `gap` lower, the area's height in force (`rowTopY`), and the lines of the
  * gap between `open` and the row after it are drawn by `gapLines` whenever any of
  * the gap is on screen, **whether or not either row is drawn**: the area may fill
  * the view with both rows scrolled out of it. That reads the open row's segments
@@ -331,6 +333,7 @@ export function paintGraph(
   scrollTop: number,
   ratio: number,
   open = NO_ROW,
+  gap = DETAILS_HEIGHT,
 ): void {
   const rows = page.layout;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -338,19 +341,19 @@ export function paintGraph(
   context.clearRect(0, 0, context.canvas.width / ratio, height);
   context.lineWidth = LINE_WIDTH;
   context.lineCap = 'round';
-  const gapTop = gapTopOnScreen(rows, open, scrollTop, height);
-  const gap = gapTop !== null;
-  if (gap) {
-    paintGap(context, rows, open, gapTop, true);
+  const gapTop = gapTopOnScreen(rows, open, scrollTop, height, gap);
+  const crossed = gapTop !== null;
+  if (crossed) {
+    paintGap(context, rows, open, gapTop, true, gap);
   }
   for (let row = first; row < first + count; row += 1) {
-    paintRow(context, rows, row, rowTopY(row, scrollTop, open), true, gapSide(row, open));
+    paintRow(context, rows, row, rowTopY(row, scrollTop, open, gap), true, gapSide(row, open));
   }
-  if (gap) {
-    paintGap(context, rows, open, gapTop, false);
+  if (crossed) {
+    paintGap(context, rows, open, gapTop, false, gap);
   }
   for (let row = first; row < first + count; row += 1) {
-    const top = rowTopY(row, scrollTop, open);
+    const top = rowTopY(row, scrollTop, open, gap);
     paintRow(context, rows, row, top, false, gapSide(row, open));
     paintUncommittedArrival(context, rows, row, top);
     paintVertex(context, rows, row, top, row === 0 && page.workingTree.hasChanges);

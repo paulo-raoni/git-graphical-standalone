@@ -1,8 +1,12 @@
 import type { DetailsRequest, DetailsResponse } from './commit-details';
+import type { DetailsOptions } from './details-layout';
 import type { FileActionRequest, FileActionResponse } from './file-action';
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
+  DetailsOptionsResponse,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenRepositoryRequest,
@@ -62,6 +66,14 @@ export interface GitGraphicalBridge {
   readonly themeChoice: () => Promise<ThemeChoiceResponse>;
   /** Apply a colour scheme to the whole application and keep it for the next start. */
   readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>;
+  /** Report the options of the Commit Details View in force (E04-M01-S12). */
+  readonly detailsOptions: () => Promise<DetailsOptionsResponse>;
+  /** Apply options of the Commit Details View and keep them for the next start. */
+  readonly chooseDetailsOptions: (request: DetailsOptions) => Promise<DetailsOptionsResponse>;
+  /** Keep one repository's layout of the Commit Details View for the next start. */
+  readonly keepDetailsLayout: (
+    request: KeepDetailsLayoutRequest,
+  ) => Promise<KeepDetailsLayoutResponse>;
   /**
    * Call `listener` each time the main process says a choice could not be kept
    * for the next start. It is handed the two strings of the message, checked,

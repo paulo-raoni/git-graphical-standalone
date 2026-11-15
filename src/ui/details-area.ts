@@ -10,7 +10,9 @@ import type { CommitDetails, DetailsPerson, UncommittedDetails } from '../contra
  * ever read as markup.
  *
  * It holds no rule about where it sits or when it opens: `./graph-table` places
- * it, and this module writes into it.
+ * it, and this module writes into it. Its two drag handles are part of it
+ * (E04-M01-S12): one strip along the edge away from the row, which sets the
+ * height, and one along the left of the files pane, which sets the divider.
  */
 
 import { createFilePane } from './file-pane';
@@ -36,6 +38,10 @@ export interface DetailsArea {
   readonly close: HTMLButtonElement;
   /** The changed files, as a tree or a list (E04-M01-S10). */
   readonly pane: FilePane;
+  /** The strip that drags the height: along the foot inline, along the top docked. */
+  readonly edge: HTMLElement;
+  /** The strip that drags the divider between the left pane and the files pane. */
+  readonly divider: HTMLElement;
   /** The pane's one menu element, which the view places where `position: fixed` is the window's. */
   readonly menu: HTMLElement;
 }
@@ -61,11 +67,17 @@ export function createDetailsArea(): DetailsArea {
   close.title = 'Close';
   close.ariaLabel = 'Close';
   const pane = createFilePane();
-  files.append(pane.root);
+  const edge = make('div', 'details__edge');
+  const divider = make('div', 'details__divider');
+  edge.setAttribute('role', 'separator');
+  edge.ariaOrientation = 'horizontal';
+  divider.setAttribute('role', 'separator');
+  divider.ariaOrientation = 'vertical';
+  files.append(pane.root, divider);
   controls.append(close, ...pane.controls);
-  root.append(info, files, controls);
+  root.append(info, files, controls, edge);
   root.hidden = true;
-  return { root, info, files, close, pane, menu: pane.menu };
+  return { root, info, files, close, pane, edge, divider, menu: pane.menu };
 }
 
 function pad(value: number): string {

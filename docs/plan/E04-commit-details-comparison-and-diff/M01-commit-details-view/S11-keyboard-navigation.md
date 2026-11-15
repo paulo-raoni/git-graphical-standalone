@@ -209,3 +209,9 @@ Up and Down scrolling with no details open, Ctrl+H, Ctrl+R, Ctrl+S, Ctrl+Shift+S
 (E03-M02); Auto Center's off value and its control, the docked place, the area's height (S12); moving through the
 changed files by key, folding a folder by key and opening a file's menu by key (a design of its own, since the pane is
 virtualised; the plan decides whether it is planned); cancelling or skipping a held key's reads (the plan decides).
+
+## Note of 2026-11-14 (E04-M01-S12)
+
+`centreBlock` is now `keepInView` in `src/ui/details-panel.ts`, still called by `openDetails` and still the one place an
+opening keeps its row in view. Auto Center's off value scrolls there by the smallest amount that shows the block, and
+docked the block is the row alone. Auto Center on, inline, is what this slice measured and is unchanged.

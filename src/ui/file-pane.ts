@@ -12,8 +12,8 @@ import type {
 
 import { createPoolRow, FILE_ROW_HEIGHT, icon, make, writeRow } from './file-row';
 import type { PoolRow } from './file-row';
-import { createFileMenu, optionEntries, optionGroups } from './file-menu';
-import type { FileMenu, MenuEntry, OptionGroup, Settings } from './file-menu';
+import { actionEntries, createFileMenu, optionEntries, optionGroups } from './file-menu';
+import type { FileMenu, OptionGroup, Settings } from './file-menu';
 
 /**
  * The changed-files pane of the details area (E04-M01-S10): the files as a tree
@@ -42,6 +42,16 @@ export type { OptionChoice, OptionGroup } from './file-menu';
 /** What the pane calls to do a file action, and is told the outcome of. */
 export type ActionListener = (request: FileActionRequest) => Promise<FileActionResponse>;
 
+/** What the pane tells its owner (E04-M01-S12 added the last two): each is called, when set, as it happens. */
+export interface PaneListeners {
+  /** A file action to do; answered with its outcome. */
+  action: ActionListener | null;
+  /** The view a button chose on the open repository. */
+  view: ((view: FileView) => void) | null;
+  /** The three options, after the menu changed one. */
+  settings: ((settings: Settings) => void) | null;
+}
+
 /** What the area builds the pane's surroundings from, and drives it with. */
 export interface FilePane {
   /** The pane itself, to put in the area's files cell. */
@@ -60,9 +70,15 @@ export interface FilePane {
   readonly stepMenu: (delta: number) => void;
   /** Show no file, and close the menu. */
   readonly clear: () => void;
-  /** Say which repository is open: the key its view is kept by. */
-  readonly setRepository: (path: string | null) => void;
-  readonly onAction: (listener: ActionListener) => void;
+  /**
+   * Say which repository is open, the key its view is kept by, and the view a
+   * button chose on it before, or `null` when none was pressed (E04-M01-S12).
+   */
+  readonly setRepository: (path: string | null, view: FileView | null) => void;
+  /** Set the three options the menu changes, and draw the rows again. */
+  readonly setSettings: (settings: Settings) => void;
+  /** What the pane tells its owner: set a member to be told. */
+  readonly on: PaneListeners;
   /** Add an option and its values to the options menu. */
   readonly addOptions: (group: OptionGroup) => void;
 }
@@ -85,12 +101,12 @@ interface State {
   collapsed: Set<string>;
   settings: Settings;
   /** The view a person pressed, by the path the repository was opened by. */
-  views: Map<string, FileView>;
+  views: Map<string, FileView | null>;
   repository: string | null;
   pool: PoolRow[];
   slotRows: Int32Array;
   frame: number | null;
-  listener: ActionListener | null;
+  on: PaneListeners;
   groups: OptionGroup[];
 }
 
@@ -173,10 +189,10 @@ function showError(parts: Parts, text: string): void {
 
 function perform(parts: Parts, state: State, name: FileAction, file: FileRow): void {
   showError(parts, '');
-  if (state.target === null || state.listener === null) {
+  if (state.target === null || state.on.action === null) {
     return;
   }
-  const done = state.listener({ action: name, target: state.target, path: file.path });
+  const done = state.on.action({ action: name, target: state.target, path: file.path });
   void done.then(
     (reply) => {
       showError(parts, reply.ok ? '' : reply.message);
@@ -186,12 +202,6 @@ function perform(parts: Parts, state: State, name: FileAction, file: FileRow): v
     },
   );
 }
-
-const MENU_LABELS: Readonly<Record<FileAction, string>> = {
-  'open-file': 'Open File',
-  'copy-absolute-path': 'Copy Absolute File Path',
-  'copy-relative-path': 'Copy Relative File Path',
-};
 
 /** The row an event happened on, with its slot's row. */
 function rowOf(state: State, event: Event): FileTreeRow | null {
@@ -220,12 +230,9 @@ function contextOf(parts: Parts, state: State, event: MouseEvent): void {
     return;
   }
   event.preventDefault();
-  const entries: MenuEntry[] = row.actions.map((name) => ({
-    label: MENU_LABELS[name],
-    run: (): void => {
-      perform(parts, state, name, row);
-    },
-  }));
+  const entries = actionEntries(row.actions, (name) => {
+    perform(parts, state, name, row);
+  });
   parts.menu.open(entries, event.clientX, event.clientY, event);
 }
 
@@ -275,13 +282,16 @@ function listen(parts: Parts, state: State): void {
   const choose = (name: FileView): void => {
     state.views.set(state.repository ?? '', name);
     restart(parts, state);
+    state.on.view?.(name);
   };
-  parts.tree.addEventListener('click', () => {
-    choose('tree');
-  });
-  parts.list.addEventListener('click', () => {
-    choose('list');
-  });
+  for (const [button, name] of [
+    [parts.tree, 'tree'],
+    [parts.list, 'list'],
+  ] as const) {
+    button.addEventListener('click', () => {
+      choose(name);
+    });
+  }
   parts.options.addEventListener('click', (event) => {
     const wasOpen = parts.menu.isOpen();
     parts.menu.close();
@@ -305,7 +315,7 @@ function initialState(): State {
     pool: [],
     slotRows: new Int32Array(0),
     frame: null,
-    listener: null,
+    on: { action: null, view: null, settings: null },
     groups: [],
   };
 }
@@ -317,6 +327,7 @@ export function createFilePane(): FilePane {
   state.groups.push(
     ...optionGroups(state.settings, () => {
       restart(parts, state);
+      state.on.settings?.({ ...state.settings });
     }),
   );
   listen(parts, state);
@@ -340,11 +351,15 @@ export function createFilePane(): FilePane {
     clear: (): void => {
       reset([], null);
     },
-    setRepository: (path: string | null): void => {
+    setRepository: (path: string | null, view: FileView | null): void => {
       state.repository = path;
+      state.views.set(path ?? '', view);
+      rebuild(parts, state);
     },
-    onAction: (listener: ActionListener): void => {
-      state.listener = listener;
+    on: state.on,
+    setSettings: (settings: Settings): void => {
+      Object.assign(state.settings, settings);
+      rebuild(parts, state);
     },
     addOptions: (group: OptionGroup): void => {
       state.groups.push(group);

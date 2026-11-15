@@ -1,3 +1,4 @@
+import type { DetailsLayout, DetailsOptions } from './details-layout';
 import type { GraphPage } from './graph-page';
 import type { Result } from './result';
 
@@ -31,6 +32,12 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   themeChoice: 'theme:choice',
   /** Apply a colour scheme to the application and keep it for the next start. */
   chooseTheme: 'theme:choose',
+  /** Report the options of the Commit Details View in force. Reads no repository. */
+  detailsOptions: 'details:options',
+  /** Apply options of the Commit Details View and keep them for the next start. */
+  chooseDetailsOptions: 'details:choose-options',
+  /** Keep one repository's layout of the Commit Details View for the next start. */
+  keepDetailsLayout: 'details:keep-layout',
   /**
    * The one message the main process sends the window unasked: a choice that
    * could not be kept for the next start ({@link UnkeptChoice}).
@@ -125,6 +132,12 @@ export interface OpenedPage extends GraphPage {
    * keep: the one kept for the repository, or every branch.
    */
   readonly selection: BranchSelection;
+  /**
+   * The layout of the Commit Details View kept for the path, or the defaults
+   * (E04-M01-S12). Answered with the page so that it is applied in the same task
+   * and no click can meet the defaults first.
+   */
+  readonly detailsLayout: DetailsLayout;
 }
 
 /** The first page, or why the repository could not be opened. */
@@ -252,3 +265,15 @@ export interface UnkeptChoice {
   /** The absolute path of the file that could not be written. */
   readonly file: string;
 }
+
+/** Keep a repository's layout: `path` is the one it was opened by (`OpenRepositoryRequest.path`). */
+export interface KeepDetailsLayoutRequest {
+  readonly path: string;
+  readonly layout: DetailsLayout;
+}
+
+/** The options of the Commit Details View in force. */
+export type DetailsOptionsResponse = Result<DetailsOptions>;
+
+/** The layout kept, or why it was not. */
+export type KeepDetailsLayoutResponse = Result<DetailsLayout>;

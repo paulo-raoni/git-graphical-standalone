@@ -189,15 +189,9 @@ test('each option has two values, and the rows follow each', async () => {
     await show(page, TWO_PEOPLE);
     await page.locator('.details:not([hidden]) button[title="Options"]').click();
     expect(await page.locator('.files__menu > *').allTextContents()).toEqual([
-      'Default File View',
-      '●Tree',
-      'List',
-      'Compact Folders',
-      '●On',
-      'Off',
-      'Status Letters',
-      'On',
-      '●Off',
+      ...['Default File View', '●Tree', 'List', 'Compact Folders', '●On', 'Off'],
+      ...['Status Letters', 'On', '●Off', 'Location', '●Inline', 'Docked to Bottom'],
+      ...['Auto Center', '●On', 'Off'],
     ]);
     // The button toggles: pressed again, it closes the menu it opened.
     await page.locator('.details:not([hidden]) button[title="Options"]').click();

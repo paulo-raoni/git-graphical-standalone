@@ -1,5 +1,5 @@
 import { entryAt } from '../contracts/column-read';
-import { RowFlag } from '../contracts/index';
+import { DEFAULT_DETAILS_LAYOUT, RowFlag } from '../contracts/index';
 import type { LayoutRows } from '../contracts/index';
 
 /**
@@ -35,33 +35,35 @@ import type { LayoutRows } from '../contracts/index';
 export const ROW_HEIGHT = 24;
 
 /**
- * The height of the details area that opens under a row, in CSS pixels, its
- * border included (E04-M01-S09). The same for every row: the reference
- * extension's was read at about 10.4 rows, 249 pixels against a 24-pixel row, and
- * the orchestrator's choice is 250. `mountGraphTable` writes it onto the view as
- * `--details-height`, for the reason {@link ROW_HEIGHT} gives.
+ * The height of the details area a repository that kept none has, in CSS pixels,
+ * its border included (E04-M01-S09): the contract's default
+ * (`DEFAULT_DETAILS_LAYOUT`), the orchestrator's choice from the reference
+ * extension's reading of about 10.4 rows, 249 pixels against a 24-pixel row.
+ * **Not the height in force** (E04-M01-S12): a person drags it and each repository
+ * keeps its own, so every function below takes the height in force as its last
+ * argument, `gap`, and this is what it is when none is named.
+ * `mountGraphTable` writes the height in force onto the view as `--details-height`,
+ * for the reason {@link ROW_HEIGHT} gives.
  */
-export const DETAILS_HEIGHT = 250;
+export const DETAILS_HEIGHT = DEFAULT_DETAILS_LAYOUT.height;
 
 /**
  * The row that has its details open is a layout row index, or `NO_ROW` for none.
  * Every function below that places a row takes it as `open`, and moves every row
- * after the open one down by {@link DETAILS_HEIGHT}; the rows up to and
+ * after the open one down by the area's height, `gap`; the rows up to and
  * including it stay where they were.
  */
 export const NO_ROW = -1;
 
-/** The top edge of a row inside the scrolling content, the open area counted. */
-export function rowOffsetY(row: number, open = NO_ROW): number {
-  return row * ROW_HEIGHT + (open >= 0 && row > open ? DETAILS_HEIGHT : 0);
+/** The top edge of a row inside the scrolling content, the open area of height `gap` counted. */
+export function rowOffsetY(row: number, open = NO_ROW, gap = DETAILS_HEIGHT): number {
+  return row * ROW_HEIGHT + (open >= 0 && row > open ? gap : 0);
 }
 
 /** The row whose band, or whose open area, holds the content offset `y`. */
-function rowAtOffset(y: number, open: number): number {
+function rowAtOffset(y: number, open: number, gap: number): number {
   const row = Math.floor(Math.max(y, 0) / ROW_HEIGHT);
-  return open < 0 || row <= open
-    ? row
-    : Math.max(open, Math.floor((y - DETAILS_HEIGHT) / ROW_HEIGHT));
+  return open < 0 || row <= open ? row : Math.max(open, Math.floor((y - gap) / ROW_HEIGHT));
 }
 
 /**
@@ -153,9 +155,10 @@ export function firstDrawnRow(
   viewportHeight: number,
   rowCount: number,
   open = NO_ROW,
+  gap = DETAILS_HEIGHT,
 ): number {
   const lastStart = Math.max(0, rowCount - rowPoolSize(viewportHeight));
-  const wanted = rowAtOffset(scrollTop, open) - OVERSCAN_ROWS;
+  const wanted = rowAtOffset(scrollTop, open, gap) - OVERSCAN_ROWS;
   return Math.min(Math.max(wanted, 0), lastStart);
 }
 
@@ -187,8 +190,13 @@ export function rowInSlot(slot: number, first: number, count: number, size: numb
  * {@link rowOffsetY}, the function this one subtracts the scroll offset from, so
  * the two cannot disagree about where the rows below an open area are.
  */
-export function rowTopY(row: number, scrollTop: number, open = NO_ROW): number {
-  return rowOffsetY(row, open) - scrollTop;
+export function rowTopY(
+  row: number,
+  scrollTop: number,
+  open = NO_ROW,
+  gap = DETAILS_HEIGHT,
+): number {
+  return rowOffsetY(row, open, gap) - scrollTop;
 }
 
 /** The centre of a lane, measured from the graph column's left edge. */
@@ -394,7 +402,7 @@ export function segmentLines(
  * the segment's line does not cross the foot of `row`, otherwise two.
  *
  * `gapTop` is the area's top edge, which is `row`'s foot, in the same
- * coordinates as the row tops. The line runs the whole of the area's height
+ * coordinates as the row tops, and `gap` its height. The line runs the whole of the area's height
  * between `row`'s centre and the next row's, and a change of lane in it is one
  * row tall, **fixed to one dot** as the reference extension was seen to draw it
  * (E04-M01-S09, item 5):
@@ -416,6 +424,7 @@ export function gapLines(
   row: number,
   segment: number,
   gapTop: number,
+  gap = DETAILS_HEIGHT,
 ): number {
   if (!reachesBottom(rows, row, segment)) {
     return 0;
@@ -423,7 +432,7 @@ export function gapLines(
   const toLane = entryAt(rows.segmentToLane, segment);
   const x = laneCentreX(centreLane(rows, segment, entryAt(rows.laneIndex, row)));
   const other = laneCentreX(neighbourLane(rows, row + 1, toLane, rows.segmentFromLane));
-  const bottom = gapTop + DETAILS_HEIGHT;
+  const bottom = gapTop + gap;
   if (laneCentreX(toLane) === x && x !== other) {
     const meet = bottom - HALF_ROW;
     into[0] = x;
@@ -505,12 +514,13 @@ export function vertexRowAt(
   scrollTop: number,
   rows: LayoutRows,
   open = NO_ROW,
+  gap = DETAILS_HEIGHT,
 ): number {
-  const row = rowAtOffset(y + scrollTop, open);
+  const row = rowAtOffset(y + scrollTop, open, gap);
   if (row < 0 || row >= rows.rowCount) {
     return -1;
   }
   const dx = x - laneCentreX(entryAt(rows.laneIndex, row));
-  const dy = y - (rowTopY(row, scrollTop, open) + ROW_HEIGHT / 2);
+  const dy = y - (rowTopY(row, scrollTop, open, gap) + ROW_HEIGHT / 2);
   return dx * dx + dy * dy <= VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS ? row : -1;
 }

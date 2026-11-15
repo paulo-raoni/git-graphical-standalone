@@ -147,6 +147,26 @@ export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';
 
+/**
+ * The rules of the Commit Details View's size, place and options kept across
+ * restarts: the defaults, the limits, the checks a record and a value from the
+ * page pass, and the clamps a drag goes through (E04-M01-S12).
+ */
+export {
+  DEFAULT_DETAILS_LAYOUT,
+  DEFAULT_DETAILS_OPTIONS,
+  draggedDivider,
+  draggedHeight,
+  heightRoom,
+  keptDetailsLayout,
+  keptDetailsOptions,
+  MAX_DIVIDER,
+  MAX_KEPT_HEIGHT,
+  MIN_DETAILS_HEIGHT,
+  MIN_DIVIDER,
+} from './details-layout';
+export type { DetailsLayout, DetailsOptions, DetailsPlace } from './details-layout';
+
 export { CHANNELS, ThemeChoice } from './ipc';
 export type {
   ApplicationInfo,
@@ -157,6 +177,9 @@ export type {
   ChooseThemeRequest,
   ChooseThemeResponse,
   ChosenFolder,
+  DetailsOptionsResponse,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenedPage,
