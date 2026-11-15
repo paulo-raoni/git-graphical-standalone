@@ -64,16 +64,52 @@ canvas equal to the closed one, no second request on a change of place, Load Mor
 own after a relaunch, the options and the first area docked after a relaunch, malformed records read as nothing, no
 record from an open or a scroll).
 
-Frames of a 300-pixel drag over 60 frames on `large` grown to 10 000 commits, printed by `a drag of 300 pixels over 60
-frames` (one run, machine load not sampled): inline median 0.6 to 6.5 ms, worst 1.6 to 27.8 ms over five drags; docked
-median 0.7 to 7.1 ms, worst 8.0 to 29.0 ms. The first inline drag and the second docked drag were the slow ones, which is
-an observation and not an explanation. No budget is added.
+Cases added by the second session, each compared with a literal or a count, and each planted red then green (the probes are
+in the audit): the docked change of place counts the calls the main process answers on the commit-details channel (none
+after either change of place; the first version of the case watched only for the loading note, which a second read that
+keeps the drawn text never writes, and a probe that re-asked read green until it was replaced).
 
-Read from code: the stylesheet bounds of the docked panel (`--docked-height`), the sizes written by `writeSizes`.
-Inferred: that 120 pixels keeps the controls column inside the area (98 pixels, a sum from `renderer.css`).
+**What a drag costs per frame.** `a drag of 300 pixels over 60 frames` drags the foot of the inline area 300 pixels in
+60 frames, one pointer move per frame, with the details open in the middle of `large` grown to 10 000 commits, and then the
+top edge of the docked panel the same way, five drags each, and prints the area's height at the start and the end of each
+drag with every frame's time (the time from the move to the first task after the frame that drew it). One run on
+2026-11-15, the machine's processor load sampled by `Win32_Processor.LoadPercentage` every two seconds or so over the run
+(9 samples, mean 73 %, maximum 94 %, so **not a free machine**, and the sampler is not the free-machine rule's): inline
+median 3.1 to 3.9 ms and worst 6.6 to 26.3 ms over the five drags, docked median 3.1 to 4.7 ms and worst 8.5 to 16.8 ms.
+Each drag moved the area by 298 pixels (250 to 548), the 2 pixels being the press at the handle's middle rather than its
+top; each drag back started 2 pixels lower, which the printed heights show (250 to 240 over the ten drags). No budget is
+added (`ADR-0002` decision 6 names none). **A defect of the first version of this case, found and repaired here:** the
+grown area's foot lay below the window's foot, so the case's drag back never reached it and four of its five inline
+runs moved nothing, which read as 0.3 ms frames; the first version's printed readings were of that case and are not
+kept. A grown inline area's foot is below the window whenever its row is not at the top of the list, as the
+specification's clamp (the list less a row) allows, so a person reaches the handle by scrolling the list.
+
+**What the open now reads.** The time `DetailsStore.layout(path)`, the call the open's handler makes, takes to read and
+check one record, a node script over the store bundled by esbuild (not through the Electron handler), 50 repositories with
+a record and 50 without, on 2026-11-15, three runs after the first, processor load 73 % (one sample): with a record,
+median 0.28 to 0.40 ms, 95th percentile 0.52 to 0.74 ms, worst 0.76 to 1.10 ms; with none, median 0.15 to 0.18 ms, 95th
+percentile 0.28 to 0.44 ms, worst 1.29 to 1.62 ms. A first run under heavier load (the playwright run beside it, load not
+sampled) read medians of 0.80 and 0.40 ms and a worst of 50 ms, which is the load and is not kept. The budgets gate's
+start cases judge the whole (the audit's readings).
+
+**Opened and looked at** (the built application on `details`, `stashes` and `large`, 1264 x 693 pixels of view, a
+Playwright-driven window; screenshots stay in the session's scratch folder). Against the reference items: inline the
+area opens 250 high with the left pane starting under the Description column (item 1, item 3); the foot dragged 100
+pixels down gave 350, to the foot of the window 645 (the list less a row) and, dragged up past the least, 120; the
+divider dragged to a quarter gave panes of 292 and 876 pixels, to the least 234 and 934, to the greatest 934 and 234
+(the fifth and four fifths of 1168); docked, the panel spans the view at the height in force with the list above it
+shortened by exactly that, the open row keeps its band, the panel's top edge dragged up to 597 leaves the head and
+three rows (96 pixels) (items 4, 5, 7); Auto Center off with the panel docked moved the open row with S11's Down key and
+scrolled nothing, the row being in view already; Escape closed it. In both colour schemes (the window follows the
+system's scheme through `emulateMedia`) the area, its handles and its controls drew as the first screenshots showed. After
+closing and relaunching on one profile the options marked Tree, On, Off, Docked to Bottom and Off, the repository
+that was dragged opened docked at its kept height with the divider at a fifth, and a second repository opened at 250
+pixels with the divider at half, the options still docked (items 4 and 8's override, which the reference leaves
+unread). Seen, and not repaired because it is S10's menu and not this slice's: the Options menu opens under its button at
+a fixed position and is cut off by the window's foot when the button is low in the window, which a grown inline
+area's button can be.
 
 ## Not done in this lane, and why
 
-The audit lists what the session did not finish: the full `npm run gates` run (mutation included), the budgets readings on
-a free machine, the probes of each scope, the reading of the read time of the layout record under load, and the
-looking at the built window in both themes.
+Nothing of scope A to H is left. Not measured: the reference was never seen dragged, so every limit stays the
+orchestrator's choice (task, *Gaps*); the first session's readings are lost and are not used anywhere here.
