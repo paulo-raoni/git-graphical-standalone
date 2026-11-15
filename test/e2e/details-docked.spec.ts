@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { ElectronApplication, Page } from '@playwright/test';
 
 import { laneCentreX, ROW_HEIGHT } from '../../src/ui/geometry';
 
@@ -32,6 +32,29 @@ interface Scope {
     observe: (target: object, options: object) => void;
   };
   seenInfo?: string[];
+}
+
+/** Count the calls the main process answers, by channel, from now on. */
+async function countCalls(
+  application: ElectronApplication,
+): Promise<() => Promise<Record<string, number>>> {
+  await application.evaluate(({ ipcMain }) => {
+    const scope = globalThis as unknown as { asked: Record<string, number> };
+    scope.asked = {};
+    const handlers = (
+      ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> }
+    )._invokeHandlers;
+    for (const [channel, handler] of handlers) {
+      handlers.set(channel, (...args: unknown[]) => {
+        scope.asked[channel] = (scope.asked[channel] ?? 0) + 1;
+        return handler(...args);
+      });
+    }
+  });
+  return () =>
+    application.evaluate(() => ({
+      ...(globalThis as unknown as { asked: Record<string, number> }).asked,
+    }));
 }
 
 /** Runs in the page: write down every text the left pane takes from now on. */
@@ -156,10 +179,11 @@ test('docked: the close control, a second click, another row and Escape do what 
 });
 
 test('docked: the canvas above the panel is the closed graph, and a change of place asks for nothing', async () => {
-  await withBudgeted({ open: fixture('details', 'script', 6) }, async ({ page }) => {
+  await withBudgeted({ open: fixture('details', 'script', 6) }, async ({ application, page }) => {
     await ready(page);
     await openRow(page, MERGE);
     await page.evaluate(watchInfo);
+    const asked = await countCalls(application);
     const text = await page.locator(INFO).textContent();
     await choose(page, 'Location', 'Docked to Bottom');
     const scroll = await page.evaluate(offset);
@@ -170,6 +194,8 @@ test('docked: the canvas above the panel is the closed graph, and a change of pl
     expect(await page.locator(INFO).textContent()).toBe(text);
     // A second ask writes the loading note again; none was written.
     expect(await page.evaluate(seenInfo)).not.toContain('Loading…');
+    // The main process was asked for no commit's details by either change of place.
+    expect((await asked())['repository:commit-details'] ?? 0).toBe(0);
     await page.locator('.details__close').click();
     await page.evaluate(scrollListTo, scroll);
     await painted(page);
@@ -187,6 +213,7 @@ test('docked: the last row and Load More are reached by scrolling the list above
     await ready(page);
     await page.locator('.row:not([hidden])').nth(3).locator('.row__subject').click();
     await expect(page.locator(AREA)).toBeVisible();
+    await expect(page.locator(INFO)).not.toHaveText('Loading…');
     await choose(page, 'Location', 'Docked to Bottom');
     await page.evaluate(scrollListTo, 1e9);
     await painted(page);
