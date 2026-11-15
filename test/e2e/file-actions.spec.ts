@@ -218,6 +218,27 @@ test('a request that names no file of the repository reaches neither git, the cl
   });
 });
 
+/**
+ * Wait until an action has answered: the replaced clipboard or file manager was handed the
+ * calls in `answered` since `since`. A request that is refused answers by its reply, which
+ * the caller awaits, so it names none.
+ */
+async function answeredBy(
+  application: ElectronApplication,
+  since: Handed,
+  answered?: { copied?: number; shown?: number },
+): Promise<void> {
+  if (answered === undefined) {
+    return;
+  }
+  await expect
+    .poll(async () => {
+      const handed = await handedOf(application);
+      return [handed.copied.length - since.copied.length, handed.shown.length - since.shown.length];
+    })
+    .toEqual([answered.copied ?? 0, answered.shown ?? 0]);
+}
+
 test('each action starts the git processes it needs and no more', async () => {
   test.setTimeout(240_000);
   const scratch = mkdtempSync(join(tmpdir(), 'git-graphical-actions-'));
@@ -230,22 +251,32 @@ test('each action starts the git processes it needs and no more', async () => {
   try {
     await withWindow(
       ownFixture('details', 'script', 6),
-      async (page) => {
+      async (page, application) => {
         await show(page, TWO_PEOPLE);
-        const counted = async (work: () => Promise<void>): Promise<number> => {
+        const counted = async (
+          work: () => Promise<void>,
+          answered?: { copied?: number; shown?: number },
+        ): Promise<number> => {
           const before = started();
+          const handedBefore = await handedOf(application);
           await work();
-          await page.waitForTimeout(500);
+          await answeredBy(application, handedBefore, answered);
           return started() - before;
         };
-        const relative = await counted(() => menu(page, 'leaf.txt', 'Copy Relative File Path'));
-        const absolute = await counted(() => menu(page, 'leaf.txt', 'Copy Absolute File Path'));
-        const opened = await counted(() => menu(page, 'leaf.txt', 'Open File'));
+        const relative = await counted(() => menu(page, 'leaf.txt', 'Copy Relative File Path'), {
+          copied: 1,
+        });
+        const absolute = await counted(() => menu(page, 'leaf.txt', 'Copy Absolute File Path'), {
+          copied: 1,
+        });
+        const opened = await counted(() => menu(page, 'leaf.txt', 'Open File'), { shown: 1 });
         const refused = await counted(async () => {
           await ask(page, { action: 'open-file', target: { kind: 'uncommitted' }, path: '..' });
         });
         await show(page, 'Uncommitted changes');
-        const uncommitted = await counted(() => menu(page, 'untracked ünï.txt', 'Open File'));
+        const uncommitted = await counted(() => menu(page, 'untracked ünï.txt', 'Open File'), {
+          shown: 1,
+        });
         expect([relative, absolute, opened, refused, uncommitted]).toEqual([0, 1, 2, 0, 1]);
       },
       { ...(process.env as Record<string, string>), GIT_TRACE2_EVENT: trace },
