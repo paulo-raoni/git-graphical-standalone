@@ -268,3 +268,11 @@ The files as a tree or a list, status colours and counts (S10); every key (S11, 
 `S11-keyboard-navigation.md`); the height dragged, the docked place,
 Auto Center off, the options control (S12); the Code Review button (E04-M04); links inside a message, e-mail links
 (E04-M05); a hover band.
+
+## Note of 2026-11-14 (E04-M01-S12)
+
+The height is no longer the same for every row, nor fixed at 250: `DETAILS_HEIGHT` is the height of a repository that
+kept none, and the height in force is dragged and kept per repository, as `S12-panel-size-place-and-options.md` says.
+Every function of `src/ui/geometry.ts` that moved the rows below the open one by `DETAILS_HEIGHT` takes the height in
+force as its last argument, which is that number when none is named. Auto Center's off value, the docked place and the
+options control are that slice's too.

@@ -303,3 +303,11 @@ A click on a file opening its diff, *View Diff*, *View File at this Revision*, *
 (E04-M02); the Code Review button and *Mark as Reviewed* (E04-M04); every key (S11); the area's size and place and
 keeping any choice across a restart (S12); the settings UI and *Context Menu Actions Visibility* (E02-M03). A menu on a
 folder row is not built.
+
+## Note of 2026-11-14 (E04-M01-S12)
+
+*The view is kept per repository, for the run of the application* no longer holds: the view a button chose on a
+repository, and the three options of the menu, are kept across restarts by the main process
+(`src/app/details-store.ts`), and the open's reply carries the repository's. This closes the gap that left them to the
+run. The `choose` of an `OptionGroup` that S10 left to S12 is what Location and Auto Center use, as
+`S12-panel-size-place-and-options.md` records.
