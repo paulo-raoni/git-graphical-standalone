@@ -1,16 +1,25 @@
 import { entryAt } from '../contracts/column-read';
-import type { DetailsTarget, GraphPage } from '../contracts/index';
+import type { GraphPage } from '../contracts/index';
 
 import { createDetailsArea } from './details-area';
 import type { DetailsArea } from './details-area';
-import { askDetails, closeDetails, keepDetails, placeArea, toggleDetails } from './details-panel';
-import type { DetailsListener } from './details-panel';
+import { controlsOf, listenControls } from './details-controls';
+import type { ControlsView } from './details-controls';
 import {
-  DETAILS_HEIGHT,
+  askDetails,
+  closeDetails,
+  gapRow,
+  initialDetails,
+  keepDetails,
+  placeArea,
+  toggleDetails,
+  writeSizes,
+} from './details-panel';
+import type { DetailsListener, PanelState } from './details-panel';
+import {
   drawnRowCount,
   firstDrawnRow,
   graphColumnWidth,
-  NO_ROW,
   rowInSlot,
   rowOffsetY,
   rowPoolSize,
@@ -57,7 +66,7 @@ export type { DetailsListener } from './details-panel';
  * mounted, so the pool holds the elements it held (1), the area is opened and
  * closed by a click, a key or a call and by nothing on a timer (2), and `paint` still
  * reads before it writes (3): the open row is state, not a measurement. Every row
- * after the open one is placed `DETAILS_HEIGHT` lower by `rowOffsetY` and
+ * after the open one is placed the area's height in force lower by `rowOffsetY` and
  * `rowTopY` of `./geometry`, which the DOM and the canvas both take their tops
  * from.
  *
@@ -97,7 +106,7 @@ const HEADINGS = ['Graph', 'Description', 'Date', 'Author', 'Commit'];
  * what it draws. The details of a row are the same: the view says what it wants
  * read and is handed the reply.
  */
-export interface GraphTableView {
+export interface GraphTableView extends ControlsView {
   /**
    * Draw this page, replacing whatever is on screen, at the scroll offset the
    * table already has: a grown or re-read page of the same repository. Open
@@ -142,8 +151,6 @@ export interface GraphTableView {
   readonly rereadUncommitted: () => void;
   /** Register what a file action of the files pane is done with (E04-M01-S10). */
   readonly onFileAction: (listener: ActionListener) => void;
-  /** Say which repository is open, the key the files pane's view is kept by. */
-  readonly setRepository: (path: string | null) => void;
   /** Add an option and its values to the files pane's options menu. */
   readonly addFileOptions: (group: OptionGroup) => void;
 }
@@ -160,28 +167,14 @@ interface TableParts {
   readonly area: DetailsArea;
 }
 
-/** Everything that changes. */
-interface TableState {
-  page: GraphPage | null;
+/** Everything that changes: the details area's state, and the pool and the frame. */
+interface TableState extends PanelState {
   pool: RowElement[];
   /** The row each pool slot currently holds, or `-1`. Sized with the pool. */
   slotRows: Int32Array;
   /** The animation frame already requested, or `null`. */
   frame: number | null;
   listener: (() => void) | null;
-  /** Ask for a frame, once however often it is called before the frame runs. */
-  schedule: () => void;
-  /** Mark every pool slot as holding no row, so that the next frame writes them all. */
-  forget: () => void;
-  /** Draw now in place of the pending frame, which is cancelled. */
-  flush: () => void;
-  /** The layout row whose details are open, or `NO_ROW`. */
-  open: number;
-  /** What the open row's details are of, or `null` while none are open. */
-  target: DetailsTarget | null;
-  /** Which request the open area waits for: a reply to any other is stale. */
-  asked: number;
-  details: DetailsListener | null;
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -252,7 +245,6 @@ function buildParts(root: HTMLElement): TableParts {
   view.append(scroll, canvas, area.menu);
   view.hidden = true;
   view.style.setProperty('--row-height', `${String(ROW_HEIGHT)}px`);
-  view.style.setProperty('--details-height', `${String(DETAILS_HEIGHT)}px`);
   root.replaceChildren(empty, view);
   const context = canvas.getContext('2d');
   if (context === null) {
@@ -320,7 +312,7 @@ function writeRows(state: TableState, page: GraphPage, first: number, count: num
     state.slotRows[slot] = row;
     made.root.hidden = row < 0;
     if (row >= 0) {
-      writeRow(made, rowViewAt(page, row), rowOffsetY(row, state.open));
+      writeRow(made, rowViewAt(page, row), rowOffsetY(row, gapRow(state), state.height));
       made.root.classList.toggle('row--open', row === state.open);
     }
   }
@@ -342,11 +334,12 @@ function paint(parts: TableParts, state: TableState): void {
   if (state.pool.length !== size) {
     resizePool(parts, state, size);
   }
-  const first = firstDrawnRow(scrollTop, height, rowCount, state.open);
+  const open = gapRow(state);
+  const first = firstDrawnRow(scrollTop, height, rowCount, open, state.height);
   const count = drawnRowCount(first, height, rowCount);
   writeRows(state, page, first, count);
   resizeCanvas(parts.canvas, Math.round(width * ratio), Math.round(height * ratio));
-  paintGraph(parts.context, page, first, count, scrollTop, ratio, state.open);
+  paintGraph(parts.context, page, first, count, scrollTop, ratio, open, state.height);
 }
 
 /**
@@ -410,6 +403,7 @@ function listen(parts: TableParts, state: TableState): void {
     closeDetails(parts, state);
   });
   listenKeys(parts, state);
+  listenControls(parts, state);
   new ResizeObserver(state.schedule).observe(parts.view);
   watchPixelRatio(state.schedule);
 }
@@ -452,11 +446,9 @@ function viewOf(parts: TableParts, state: TableState): GraphTableView {
       }
     },
     onFileAction: (listener: ActionListener): void => {
-      parts.area.pane.onAction(listener);
+      parts.area.pane.on.action = listener;
     },
-    setRepository: (path: string | null): void => {
-      parts.area.pane.setRepository(path);
-    },
+    ...controlsOf(parts, state),
     addFileOptions: (group: OptionGroup): void => {
       parts.area.pane.addOptions(group);
     },
@@ -467,7 +459,7 @@ function viewOf(parts: TableParts, state: TableState): GraphTableView {
 export function mountGraphTable(root: HTMLElement): GraphTableView {
   const parts = buildParts(root);
   const state: TableState = {
-    page: null,
+    ...initialDetails(),
     pool: [],
     slotRows: new Int32Array(0),
     frame: null,
@@ -477,10 +469,6 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
       forgetRows(state);
     },
     flush: () => undefined,
-    open: NO_ROW,
-    target: null,
-    asked: 0,
-    details: null,
   };
   state.schedule = (): void => {
     state.frame ??= requestAnimationFrame(() => {
@@ -493,6 +481,7 @@ export function mountGraphTable(root: HTMLElement): GraphTableView {
     }
     paint(parts, state);
   };
+  writeSizes(parts, state);
   listen(parts, state);
   return viewOf(parts, state);
 }

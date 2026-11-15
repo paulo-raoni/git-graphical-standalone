@@ -1,4 +1,4 @@
-import type { FileView } from '../contracts/index';
+import type { FileAction, FileView } from '../contracts/index';
 
 /**
  * The one menu of the changed-files pane (E04-M01-S10): the context menu of a
@@ -45,6 +45,25 @@ export interface Settings {
   defaultView: FileView;
   compact: boolean;
   letters: boolean;
+}
+
+const MENU_LABELS: Readonly<Record<FileAction, string>> = {
+  'open-file': 'Open File',
+  'copy-absolute-path': 'Copy Absolute File Path',
+  'copy-relative-path': 'Copy Relative File Path',
+};
+
+/** The context menu's lines for a file: one entry for each action it has, which `run` does. */
+export function actionEntries(
+  actions: readonly FileAction[],
+  run: (action: FileAction) => void,
+): MenuEntry[] {
+  return actions.map((name) => ({
+    label: MENU_LABELS[name],
+    run: (): void => {
+      run(name);
+    },
+  }));
 }
 
 /** The options menu's lines: each group's title, then its values, the chosen one marked. */

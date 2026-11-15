@@ -14,6 +14,7 @@ import {
 } from '../contracts/index';
 import type { BranchEntry, BranchMenu, Failure, GraphPage, Refs, Result } from '../contracts/index';
 
+import { connectKept, showStoredOptions } from './details-controls';
 import { mountGraphTable } from './graph-table';
 import type { GraphTableView } from './graph-table';
 import { mountShell, OPEN_LABEL, REFRESH_LABEL } from './shell';
@@ -37,6 +38,9 @@ import type { Shell } from './shell';
  * **It keeps nothing across a restart.** The branch selection and Show Remote
  * Branches of each repository are kept by the main process (`src/app/selections.ts`),
  * which opens a repository on them and says in the open's reply which they were.
+ * So are the Commit Details View's options, asked once before the first page, and
+ * each repository's height, divider and file view, which the open's reply carries
+ * (`src/app/details-store.ts`, E04-M01-S12).
  */
 
 /** Where the view is published on the window's global. */
@@ -229,6 +233,18 @@ function run(shell: Shell, work: Promise<void>): void {
   });
 }
 
+/** Ask the main process to keep something, and show why it could not, if it could not. */
+function keeping(shell: Shell, work: Promise<Result<unknown>>): void {
+  run(
+    shell,
+    work.then((reply) => {
+      if (!reply.ok) {
+        report(shell, reply);
+      }
+    }),
+  );
+}
+
 /** Hand the Branches control the entries of the last page and what is checked. */
 function showBranches(shell: Shell, session: Session): void {
   session.entries =
@@ -264,7 +280,7 @@ async function open(
     const { selection, refs } = opened.value;
     const shown = survivingSelection(selection, refs);
     session.path = path;
-    view.setRepository(path);
+    view.setRepository(path, opened.value.detailsLayout);
     session.menu = menuOf(shown);
     session.showRemoteBranches = shown.showRemoteBranches;
     if (!sameSelection(shown, selection)) {
@@ -324,15 +340,7 @@ function chooseTheme(shell: Shell): void {
     return;
   }
   shell.showTheme(choice);
-  run(
-    shell,
-    (async (): Promise<void> => {
-      const reply = await window.gitGraphical.chooseTheme({ choice });
-      if (!reply.ok) {
-        report(shell, reply);
-      }
-    })(),
-  );
+  keeping(shell, window.gitGraphical.chooseTheme({ choice }));
 }
 
 /** Show the colour scheme the main process applied before this window existed. */
@@ -366,7 +374,8 @@ function connectBranches(shell: Shell, view: GraphTableView, session: Session): 
  * Read the details of a row when the view asks, and hand the view the reply. The
  * view decides whether the reply is still wanted (E04-M01-S09).
  */
-function connectDetails(shell: Shell, view: GraphTableView): void {
+function connectDetails(shell: Shell, view: GraphTableView, session: Session): void {
+  connectKept(view, () => session.path, keeping.bind(null, shell));
   view.onFileAction((request) => window.gitGraphical.fileAction(request));
   view.onDetails((target, answer) => {
     run(
@@ -413,7 +422,7 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
   });
 
   connectBranches(shell, view, session);
-  connectDetails(shell, view);
+  connectDetails(shell, view, session);
 
   window.gitGraphical.unkeptChoice(shell.showUnkept);
 
@@ -435,6 +444,10 @@ function connect(shell: Shell, view: GraphTableView, session: Session): void {
 
 /** Ask what the application was started with, and open it if it was given one. */
 async function begin(shell: Shell, view: GraphTableView, session: Session): Promise<void> {
+  // Before the first page, so the first area a person opens is already where it was left.
+  await showStoredOptions(view, (failure) => {
+    report(shell, failure);
+  });
   const started = await window.gitGraphical.startupRepository();
   if (!started.ok) {
     report(shell, started);

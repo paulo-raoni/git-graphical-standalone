@@ -422,8 +422,73 @@ body {
   border-bottom: 1px solid var(--line);
   background: var(--raised);
   font-size: 12px;
-  grid-template-columns: var(--graph-width, 100px) minmax(0, 1fr) minmax(0, 1fr) 32px;
+  grid-template-columns:
+    var(--graph-width, 100px) minmax(0, var(--details-left, 1fr)) minmax(
+      0,
+      var(--details-right, 1fr)
+    )
+    32px;
   grid-template-rows: minmax(0, 1fr);
+}
+
+/*
+ * Docked at the bottom of the view (E04-M01-S12): the same element, a panel along
+ * the foot at the height in force, held to the view's height less the head and
+ * three rows. The list, its head and its canvas end at the panel's top edge.
+ */
+.graph--docked {
+  --docked-height: min(var(--details-height), calc(100% - 4 * var(--row-height)));
+}
+
+.graph--docked .graph__scroll {
+  bottom: var(--docked-height);
+}
+
+.graph--docked .graph__canvas {
+  height: calc(100% - var(--row-height) - var(--docked-height));
+}
+
+.details--docked {
+  top: auto;
+  bottom: 0;
+  height: var(--docked-height);
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  grid-template-columns:
+    minmax(0, var(--details-left, 1fr)) minmax(0, var(--details-right, 1fr))
+    32px;
+}
+
+.details--docked .details__info {
+  grid-column: 1;
+}
+
+/* The drag handles: strips inside the area, away from the row it belongs to. */
+.details__edge {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.details--docked .details__edge {
+  top: 0;
+  bottom: auto;
+}
+
+.details__divider {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  cursor: col-resize;
+  touch-action: none;
 }
 
 .details__info {
@@ -433,6 +498,7 @@ body {
 }
 
 .details__files {
+  position: relative;
   min-width: 0;
   overflow: hidden;
 }
