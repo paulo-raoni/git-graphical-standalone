@@ -70,12 +70,9 @@ function isOneOf<T extends string>(values: readonly T[], value: unknown): value 
 
 /** Whether `value` is a whole number of pixels from the minimum to the most a record may claim. */
 function isKeptHeight(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= MIN_DETAILS_HEIGHT &&
-    value <= MAX_KEPT_HEIGHT
-  );
+  // `Number.isInteger` is false for everything that is not a number, so no `typeof` is asked.
+  const height = value as number;
+  return Number.isInteger(height) && height >= MIN_DETAILS_HEIGHT && height <= MAX_KEPT_HEIGHT;
 }
 
 /** Whether `value` is a finite share from {@link MIN_DIVIDER} to {@link MAX_DIVIDER}. */
