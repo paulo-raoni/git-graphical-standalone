@@ -43,6 +43,8 @@ import { fixture } from './support/fixtures';
  * from an S-curve built here, not taken from the code under test.
  */
 
+// What the area says while its reply is on its way (`LOADING_NOTE` in `src/ui/details-area.ts`).
+const LOADING = 'Loading…';
 const [X0, X1] = [laneCentreX(0), laneCentreX(1)];
 const HALF = ROW_HEIGHT / 2;
 
@@ -308,6 +310,8 @@ test('with an area open on a page of ten thousand rows, the window costs what it
     await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
     expect((await page.evaluate(loadMoreAndShow, 9700)).rows).toBeGreaterThanOrEqual(10_000);
     await page.locator('.row[style*="translateY(0px)"] .row__subject').click();
+    // The reply that fills the area asks for a frame when it lands, so it is waited for here.
+    await expect(page.locator('.details__info')).not.toHaveText(LOADING, { timeout: 60_000 });
     const bound = visibleRowCount(await page.evaluate(viewportHeight)) + 2 * OVERSCAN_ROWS;
     let counts: number[] = [];
     for (const offset of [0, ROW_HEIGHT * 5, 120_000, 239_000]) {
