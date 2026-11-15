@@ -299,24 +299,37 @@ test('a drag of 300 pixels over 60 frames: each frame is printed, inline and doc
     await expect(page.locator(INFO)).not.toHaveText('Loading…');
     for (const place of ['inline', 'docked']) {
       if (place === 'docked') {
+        // The menu opens under the button, so the button goes to the middle of the window first.
+        await page
+          .locator(`${AREA} button[title="Options"]`)
+          .evaluate((button: { scrollIntoView: (to: object) => void }) => {
+            button.scrollIntoView({ block: 'center' });
+          });
         await page.locator(`${AREA} button[title="Options"]`).click();
         await page.locator('.files__menu-item', { hasText: 'Docked to Bottom' }).click();
         await painted(page);
       }
       for (let run = 1; run <= 5; run += 1) {
+        // The edge of a grown area is below the window's foot: bring it in, to press it.
+        await page.locator(EDGE).scrollIntoViewIfNeeded();
+        await painted(page);
         const at = await box(page, EDGE);
         await page.mouse.move(at.x + at.w / 2, at.y + at.h / 2);
         await page.mouse.down();
         const step = place === 'inline' ? 5 : -5;
+        const from = (await box(page, AREA)).h;
         const times = await page.evaluate(dragFrames, { frames: 60, step });
+        const to = (await box(page, AREA)).h;
         await page.mouse.up();
         await painted(page);
         const sorted = [...times].sort((a, b) => a - b);
         process.stdout.write(
-          `${place} drag ${String(run)}: median ${(sorted[30] ?? 0).toFixed(1)} ms, worst ${(sorted[59] ?? 0).toFixed(1)} ms, frames ${times.map((time) => time.toFixed(1)).join(' ')}\n`,
+          `${place} drag ${String(run)}: area ${String(from)} to ${String(to)} px, median ${(sorted[30] ?? 0).toFixed(1)} ms, worst ${(sorted[59] ?? 0).toFixed(1)} ms, frames ${times.map((time) => time.toFixed(1)).join(' ')}\n`,
         );
         expect(times).toHaveLength(60);
         // Back to where it began, so each run drags the same 300 pixels.
+        await page.locator(EDGE).scrollIntoViewIfNeeded();
+        await painted(page);
         await drag(page, EDGE, 0, place === 'inline' ? -300 : 300);
       }
     }
