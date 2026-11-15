@@ -1,13 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { BRIDGE_GLOBAL_NAME, CHANNELS } from '../contracts/index';
+import { BRIDGE_GLOBAL_NAME, CHANNELS, unkeptChoiceOf } from '../contracts/index';
 import type {
   ApplicationInfoResponse,
   ChannelName,
   ChooseFolderResponse,
   ChooseThemeRequest,
   ChooseThemeResponse,
+  DetailsOptions,
+  DetailsOptionsResponse,
+  DetailsRequest,
+  DetailsResponse,
+  FileActionRequest,
+  FileActionResponse,
   GitGraphicalBridge,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenRepositoryRequest,
@@ -16,6 +24,7 @@ import type {
   RefreshResponse,
   StartupRepositoryResponse,
   ThemeChoiceResponse,
+  UnkeptChoice,
 } from '../contracts/index';
 
 /**
@@ -42,12 +51,32 @@ const bridge: GitGraphicalBridge = {
     request<LoadMoreCommitsResponse>(CHANNELS.loadMoreCommits, loadRequest),
   refresh: (refreshRequest: RefreshRequest): Promise<RefreshResponse> =>
     request<RefreshResponse>(CHANNELS.refresh, refreshRequest),
+  commitDetails: (detailsRequest: DetailsRequest): Promise<DetailsResponse> =>
+    request<DetailsResponse>(CHANNELS.commitDetails, detailsRequest),
+  fileAction: (actionRequest: FileActionRequest): Promise<FileActionResponse> =>
+    request<FileActionResponse>(CHANNELS.fileAction, actionRequest),
   applicationInfo: (): Promise<ApplicationInfoResponse> =>
     request<ApplicationInfoResponse>(CHANNELS.applicationInfo),
   themeChoice: (): Promise<ThemeChoiceResponse> =>
     request<ThemeChoiceResponse>(CHANNELS.themeChoice),
   chooseTheme: (themeRequest: ChooseThemeRequest): Promise<ChooseThemeResponse> =>
     request<ChooseThemeResponse>(CHANNELS.chooseTheme, themeRequest),
+  detailsOptions: (): Promise<DetailsOptionsResponse> =>
+    request<DetailsOptionsResponse>(CHANNELS.detailsOptions),
+  chooseDetailsOptions: (options: DetailsOptions): Promise<DetailsOptionsResponse> =>
+    request<DetailsOptionsResponse>(CHANNELS.chooseDetailsOptions, options),
+  keepDetailsLayout: (keepRequest: KeepDetailsLayoutRequest): Promise<KeepDetailsLayoutResponse> =>
+    request<KeepDetailsLayoutResponse>(CHANNELS.keepDetailsLayout, keepRequest),
+  // The page is handed the checked payload and never the event, whose `sender`
+  // is this preload's `ipcRenderer`.
+  unkeptChoice: (listener: (unkept: UnkeptChoice) => void): void => {
+    ipcRenderer.on(CHANNELS.unkeptChoice, (_event: unknown, payload: unknown) => {
+      const unkept = unkeptChoiceOf(payload);
+      if (unkept !== null) {
+        listener(unkept);
+      }
+    });
+  },
 };
 
 contextBridge.exposeInMainWorld(BRIDGE_GLOBAL_NAME, bridge);

@@ -7,11 +7,11 @@ import { described, holdToBaseline, median, paintedState, withBudgeted } from '.
 import {
   countRowElements,
   loadMoreAndShow,
-  readProbe,
   sampleScrollFrames,
   scrollListTo,
   setMarking,
   viewportHeight,
+  wakeupsSettled,
 } from './support/budgets-page';
 import { fixture } from './support/fixtures';
 
@@ -39,6 +39,13 @@ import { fixture } from './support/fixtures';
 
 const LARGE = 10_000;
 
+/**
+ * How long `wakeupsSettled` may wait for the page's pending callbacks before the
+ * case fails: a count is read once every callback the page asked for has run,
+ * not after a fixed pause (E04-M01-S05; `./support/budgets-page.ts` says why).
+ */
+const SETTLE_LIMIT_MILLISECONDS = 30_000;
+
 /** Open the fixture and load all of it, painted. */
 async function openAll(page: Page, repository: string): Promise<number> {
   await paintedState(page, (state) => state.path === repository && state.rows === 300);
@@ -56,7 +63,7 @@ test('live row elements: a function of the window, not of the commits loaded', a
     const atFirstPage = await openAll(page, repository);
     for (const offset of [40_000, 120_000, 239_000, 0]) {
       expect(await page.evaluate(scrollListTo, offset)).toBe(offset);
-      await page.waitForTimeout(100);
+      await page.evaluate(wakeupsSettled, SETTLE_LIMIT_MILLISECONDS);
     }
     const atAll = await page.evaluate(countRowElements);
     const bound = visibleRowCount(await page.evaluate(viewportHeight)) + 2 * OVERSCAN_ROWS;
@@ -92,6 +99,19 @@ const SET_ASIDE_FRAMES = 4;
  * few per cent under its own milliseconds.
  */
 const REFERENCE_MILLISECONDS = 2.3;
+
+/**
+ * The reference bound (E04-M01-S05): a reading is discarded, neither red nor green,
+ * when the reference timings of its ten held runs, 2 400 of them, have a 95th
+ * percentile over this many milliseconds. The test's comment says why that
+ * statistic, and the slice document
+ * `docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S05-budgets-and-reference-bound.md`
+ * has every reading the number was set from.
+ */
+const REFERENCE_BOUND_MILLISECONDS = 4;
+
+/** The share of reference timings at or under the one held to the bound. */
+const REFERENCE_BOUND_SHARE = 0.95;
 
 /**
  * Runs in the page: put the reference workload in the document, as the page's
@@ -153,6 +173,16 @@ const frameReference = (on: boolean): void => {
   scope.frameReferenceBox = box;
 };
 
+/** What {@link framesAt} read: each run's figures, and the two held per reference. */
+interface Frames {
+  readonly means: number[];
+  readonly worsts: number[];
+  readonly trimmed: number[];
+  /** Every reference timing of every run, in the order taken. */
+  readonly timings: number[];
+  readonly held: number[];
+}
+
 /**
  * The mean, the worst frame and the worst frame once the {@link SET_ASIDE_FRAMES}
  * slowest are set aside, of each run, at one scroll step, `pause` ms between runs,
@@ -160,16 +190,12 @@ const frameReference = (on: boolean): void => {
  * straight after it, times `REFERENCE_MILLISECONDS`; and the lowest of the runs'
  * means and of their fifth-slowest frames, both per reference.
  */
-async function framesAt(
-  page: Page,
-  step: number,
-  runs: number,
-  pause: number,
-): Promise<{ means: number[]; worsts: number[]; trimmed: number[]; held: number[] }> {
+async function framesAt(page: Page, step: number, runs: number, pause: number): Promise<Frames> {
   const means: number[] = [];
   const worsts: number[] = [];
   const trimmed: number[] = [];
   const references: number[] = [];
+  const timings: number[] = [];
   const perMeans: number[] = [];
   const perTrimmed: number[] = [];
   const fifthSlowest = (values: readonly number[]): number =>
@@ -181,6 +207,7 @@ async function framesAt(
     await page.evaluate(frameReference, true);
     const sample = await page.evaluate(sampleScrollFrames, { frames: 240, step, reference: true });
     await page.evaluate(frameReference, false);
+    timings.push(...sample.reference);
     const per = sample.work.map(
       (work, frame) => (REFERENCE_MILLISECONDS * work) / (sample.reference[frame] ?? Number.NaN),
     );
@@ -199,7 +226,8 @@ async function framesAt(
       `mean per reference ${described(perMeans, 2)} ms, ` +
       `fifth-slowest per reference ${described(perTrimmed, 1)} ms\n`,
   );
-  return { means, worsts, trimmed, held: [Math.min(...perMeans), Math.min(...perTrimmed)] };
+  const held = [Math.min(...perMeans), Math.min(...perTrimmed)];
+  return { means, worsts, trimmed, timings, held };
 }
 
 /**
@@ -292,6 +320,35 @@ async function framesAt(
  * and the fifth-slowest cannot see one that slows four or fewer frames of every
  * run; the slice document, *Main-thread work per frame while scrolling*, has the
  * rest.
+ *
+ * **No frame over 16.7 ms is held literally since E04-M01-S05** (2026-11-06), the
+ * number of `docs/ADR-0002-architecture-and-performance.md` decision 6, by the
+ * owner's ruling of 2026-10-28: each run's longest frame **as timed**, not per
+ * reference, and the lowest of the ten, held to `scrollFrameLongestMilliseconds`,
+ * whose baseline and ceiling are both 16.7 with no tolerance. The run whose
+ * longest frame is shortest is held for the reason the lowest is held above: so it
+ * is red when every one of the ten runs has a frame over 16.7 ms, which a product
+ * that makes one slow frame in every 240 does, and it cannot see a slow frame the
+ * product makes in some runs only. In the lane's kept readings on a quiet machine
+ * it read 6.8 to 8.0 ms; a busy-wait of 20 ms planted in every 240th `paint`, one
+ * frame a run, read 24.8, red.
+ *
+ * **A reading is discarded since E04-M01-S05 when the 95th percentile of its
+ * reference timings is over `REFERENCE_BOUND_MILLISECONDS`**, 4 ms: its three
+ * verdicts are printed `DISCARDED` and none is asserted. The lane measured two ways
+ * a load under `AGENTS.md` §11's 40 per cent blinds these verdicts. A load that
+ * slows the reference throughout — two threads copying memory, or a shader on the
+ * graphics processor beside one or two busy threads — read the 5 ms busy-wait
+ * green on both verdicts per reference in all six of its readings (lowest means
+ * 6.29 to 6.84), and the unchanged product red on the literal verdict in four of
+ * five (18.8 to 22.6 ms). A load that takes the processor from a frame now and
+ * then — three busy threads — left the reference's median at 2.4 ms and read the
+ * unchanged product's literal verdict 20.0, red: its slowest frames were followed
+ * by slow references. A median of the reference rises with the first kind only;
+ * its 95th percentile rises with both. On the unchanged product it read 3.3 and
+ * 3.4 where the literal verdict read 6.6 to 7.9, quiet or under busy threads, 4.1
+ * where it read 14.3 and 15.6, and 5.9 where it read 20.0. The slice document has
+ * every reading and which side of the bound it fell.
  */
 test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);
@@ -300,19 +357,44 @@ test('main-thread work per frame while scrolling @budgets', async () => {
     await page.evaluate(setMarking, false);
     await framesAt(page, 72, 5, 0);
     const jumping = await framesAt(page, 1_200, HELD_RUNS, HELD_PAUSE_MILLISECONDS);
+    const timings = [...jumping.timings].sort((left, right) => left - right);
+    const reference = timings[Math.floor(REFERENCE_BOUND_SHARE * timings.length)] ?? Number.NaN;
+    const discarded = !(reference <= REFERENCE_BOUND_MILLISECONDS);
+    const account =
+      `the reference's ${String(timings.length)} timings have a 95th percentile of ` +
+      `${reference.toFixed(1)} ms, against a bound of ${String(REFERENCE_BOUND_MILLISECONDS)} ms`;
+    process.stdout.write(
+      discarded
+        ? `  DISCARDED reading: ${account}: the machine slowed the reference past where these ` +
+            'verdicts tell a regression from its load, so none is held; read the case again on a ' +
+            'quieter machine\n'
+        : `  kept reading: ${account}\n`,
+    );
     const verdicts = [
       holdToBaseline(
         'scrollFrameMeanMilliseconds',
         'mean main-thread work a frame',
         jumping.held[0] ?? Number.NaN,
+        discarded,
       ).failed,
       holdToBaseline(
         'scrollFrameWorstMilliseconds',
         'worst main-thread frame of a run, its four slowest set aside',
         jumping.held[1] ?? Number.NaN,
+        discarded,
+      ).failed,
+      holdToBaseline(
+        'scrollFrameLongestMilliseconds',
+        'longest main-thread frame, as timed, of the run where it is shortest',
+        Math.min(...jumping.worsts),
+        discarded,
       ).failed,
     ];
-    expect(verdicts).toEqual([false, false]);
+    if (discarded) {
+      test.info().annotations.push({ type: 'discarded', description: account });
+      return;
+    }
+    expect(verdicts).toEqual([false, false, false]);
   });
 });
 
@@ -345,15 +427,13 @@ test('canvas redraws: one a scrolled frame, one for a burst of scroll events', a
   await withBudgeted({ open: repository }, async ({ page }) => {
     await openAll(page, repository);
     await page.evaluate(setMarking, false);
-    await page.waitForTimeout(300);
-    const before = (await page.evaluate(readProbe)).redraws;
+    const before = await page.evaluate(wakeupsSettled, SETTLE_LIMIT_MILLISECONDS);
     await page.evaluate(sampleScrollFrames, { frames: 120, step: 240 });
-    await page.waitForTimeout(300);
-    const scrolled = (await page.evaluate(readProbe)).redraws - before;
+    const scrolled = (await page.evaluate(wakeupsSettled, SETTLE_LIMIT_MILLISECONDS)) - before;
     const offsets = Array.from({ length: 25 }, (_unused, step) => (step + 1) * 53);
     expect(await page.evaluate(burst, offsets)).toBe(25 * 53);
-    await page.waitForTimeout(300);
-    const burstRedraws = (await page.evaluate(readProbe)).redraws - before - scrolled;
+    const burstRedraws =
+      (await page.evaluate(wakeupsSettled, SETTLE_LIMIT_MILLISECONDS)) - before - scrolled;
     process.stdout.write(
       `  ${String(scrolled)} redraws for 120 scrolled frames, ${String(burstRedraws)} for 25 events in one task\n`,
     );

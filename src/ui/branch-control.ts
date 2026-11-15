@@ -58,7 +58,10 @@ interface ControlState {
 export interface BranchControl {
   /** The elements the bar shows, in order. */
   readonly parts: readonly HTMLElement[];
-  /** Show Remote Branches. Disabled until {@link BranchControl.enable}. */
+  /**
+   * Show Remote Branches. Disabled until {@link BranchControl.enable}, and
+   * indeterminate until the renderer sets what the repository keeps.
+   */
   readonly remotes: HTMLInputElement;
   /** Show these entries, checked as `menu` says, in the box and in the open list. */
   readonly show: (entries: readonly BranchEntry[], menu: BranchMenu) => void;
@@ -121,7 +124,8 @@ function buildParts(): Parts {
   const remotesLabel = element('label', 'bar__label');
   const remotes = document.createElement('input');
   remotes.type = 'checkbox';
-  remotes.checked = true;
+  // In neither state until the first page says what is kept (`open` in `./renderer.ts`).
+  remotes.indeterminate = true;
   remotes.disabled = true;
   remotesLabel.append(remotes, 'Show Remote Branches');
   const measure = document.createElement('canvas').getContext('2d');

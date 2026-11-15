@@ -1,11 +1,27 @@
 import { createGitRepositoryReader } from '../adapters/git-repository-reader';
-import { FailureKind } from '../contracts/index';
-import type { BranchSelection, GraphPage, Result } from '../contracts/index';
-import { createLayoutState, layoutPage } from '../core/layout/index';
+import { entryAt } from '../contracts/column-read';
+import { FailureKind, RefKind } from '../contracts/index';
+import type {
+  BranchSelection,
+  CommitDetails,
+  DetailsTarget,
+  GraphPage,
+  Refs,
+  Result,
+  UncommittedDetails,
+} from '../contracts/index';
+import { createLayoutState } from '../core/layout/index';
 import type { LayoutState } from '../core/layout/index';
-import { addPage, continuesBlock, createRowBlock, FIRST_PAGE_COMMITS } from '../core/page/index';
+import {
+  addPage,
+  continuesReading,
+  createRowBlock,
+  FIRST_PAGE_COMMITS,
+  layoutReading,
+} from '../core/page/index';
 import type { RowBlock } from '../core/page/index';
 import type { ReaderDescription, RepositoryPage } from '../ports/index';
+import type { FilePlace } from '../ports/repository-reader';
 
 import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
 
@@ -53,12 +69,15 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * **Only if the repository has not changed**, and nothing but the reading can
  * say whether it has: a commit, a fetch, a new branch or a rebase between two
  * reads moves the log. So every reading a Load More applies is first put to
- * `continuesBlock`, against the object names the block was laid out from, which
+ * `continuesReading`, against the object names the block was laid out from, which
  * {@link OpenRepository.laidOutFrom} keeps; a reading that does not begin with
  * them is laid out whole, from a fresh block and a fresh layout state, exactly
  * as a Refresh lays out its own. The press then costs the layout of every row it
  * returns rather than of its new rows alone, once, and the page it answers is
- * the repository as it now is.
+ * the repository as it now is. Since E04-M01-S14 the same holds of the
+ * uncommitted row's line, which the layout keeps a lane for down to HEAD's row:
+ * a reading that would draw it to another row, or draw it where the block has
+ * none or none where the block has one, is laid out whole too.
  *
  * The figures are in
  * `docs/plan/E01-commit-graph/M01-first-graph/S06-open-a-repository.md`.
@@ -149,6 +168,76 @@ function superseded(): Result<never> {
   );
 }
 
+/**
+ * The full names of the branches `refs` lists, as a selection names them: every
+ * local branch, and while they are shown every remote-tracking branch and
+ * remote's HEAD — the entries the Branches dropdown offers (`branchEntries` of
+ * `src/contracts/branch-menu.ts`). Read here from the columns themselves rather
+ * than through that module, which this process's bundle does not carry: with it,
+ * `npm run gates:size` measured `src/contracts/branch-menu.ts` and
+ * `src/contracts/ref-list.ts` arriving in `repository.cjs`, 891 bytes the module
+ * manifest refuses (E04-M01-S16, 2026-11-08).
+ */
+function listedBranches(refs: Refs, showRemoteBranches: boolean): Set<string> {
+  const listed = new Set<string>();
+  for (let ref = 0; ref < refs.count; ref += 1) {
+    const kind = entryAt(refs.kind, ref);
+    const name = refs.names.slice(
+      entryAt(refs.nameOffsets, ref),
+      entryAt(refs.nameOffsets, ref + 1),
+    );
+    if (kind === RefKind.LocalHead) {
+      listed.add(`refs/heads/${name}`);
+    } else if (
+      showRemoteBranches &&
+      (kind === RefKind.RemoteBranch || kind === RefKind.RemoteSymbolicHead)
+    ) {
+      listed.add(`refs/remotes/${name}`);
+    }
+  }
+  return listed;
+}
+
+/**
+ * Read a page of `repositoryPath` under `selection`, of a log given only names its
+ * own reference listing names as a branch or a remote branch.
+ *
+ * A selected name that passes the adapter's checks can still read another
+ * reference: git tries a name under `refs/tags/` among other places, so where the
+ * branch `refs/heads/gone` was deleted while it was selected, a tag spelled
+ * `refs/heads/gone` was read in its place (review round 01 of E04-M01, on git
+ * 2.51.0). The listing a page is read with is what says which branches exist, and
+ * it is read in the same request as the log, after it (`readGitPage` of
+ * `src/adapters/git-page.ts`). So the page is read, and if its listing does not
+ * name every selected name as a branch, it is read again under the names it does
+ * name. Every read after the first drops at least one name, so there is at most
+ * one read more than there are names, and the page answered is one whose own
+ * listing names every name its log was given. A repository with every selected
+ * branch present pays for one read, as before.
+ *
+ * The selection kept is the one asked for, never the narrowed one: a branch made
+ * again under a deleted name is read again from the next page on.
+ */
+async function readListed(
+  repositoryPath: string,
+  pageSize: number,
+  selection: BranchSelection,
+): Promise<Result<RepositoryPage>> {
+  let narrowed = selection;
+  for (;;) {
+    const read = await reader.readPage({ repositoryPath, pageSize, selection: narrowed });
+    if (!read.ok || narrowed.branches === null) {
+      return read;
+    }
+    const listed = listedBranches(read.value.refs, narrowed.showRemoteBranches);
+    const branches = narrowed.branches.filter((name) => listed.has(name));
+    if (branches.length === narrowed.branches.length) {
+      return read;
+    }
+    narrowed = { ...narrowed, branches };
+  }
+}
+
 /** A failure of this process rather than of git, which the contract has no kind for. */
 function failed(kind: FailureKind, message: string): Result<never> {
   return { ok: false, kind, message };
@@ -159,7 +248,7 @@ function failed(kind: FailureKind, message: string): Result<never> {
  * from, and produce the page.
  */
 function assemble(repository: OpenRepository, read: RepositoryPage): Result<GraphPage> {
-  const rows = layoutPage(repository.layout, read.commits, repository.block.rowCount);
+  const rows = layoutReading(repository.layout, repository.block, read);
   const page = addPage(repository.block, rows, read);
   repository.laidOutFrom = read.commits.hashes;
   return { ok: true, value: page };
@@ -209,11 +298,7 @@ async function openRepository(
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const read = await reader.readPage({
-    repositoryPath: path,
-    pageSize: FIRST_PAGE_COMMITS,
-    selection,
-  });
+  const read = await readListed(path, FIRST_PAGE_COMMITS, selection);
   if (open !== null && open.ticket > ticket) {
     return superseded();
   }
@@ -233,7 +318,7 @@ async function openRepository(
  * The reading is asked for at the size the block would grow to, so either way
  * the page answered holds every commit read, which is at least as many as were
  * asked for while the repository has them. What decides between the two is
- * `continuesBlock` alone; see *How a further page is read* above.
+ * `continuesReading` alone; see *How a further page is read* above.
  */
 async function loadMore(count: number): Promise<Result<GraphPage>> {
   const repository = open;
@@ -241,18 +326,14 @@ async function loadMore(count: number): Promise<Result<GraphPage>> {
     return failed(FailureKind.Cancelled, 'No repository is open, so there is nothing to add to.');
   }
   const pageSize = repository.block.rowCount + count;
-  const read = await reader.readPage({
-    repositoryPath: repository.path,
-    pageSize,
-    selection: repository.selection,
-  });
+  const read = await readListed(repository.path, pageSize, repository.selection);
   if (open !== repository) {
     return superseded();
   }
   if (!read.ok) {
     return read;
   }
-  if (!continuesBlock(repository.block, repository.laidOutFrom, read.value.commits)) {
+  if (!continuesReading(repository.block, repository.laidOutFrom, read.value)) {
     startOver(repository);
   }
   return assemble(repository, read.value);
@@ -284,11 +365,7 @@ async function refresh(selection: BranchSelection | undefined): Promise<Result<G
     return select(repository, selection);
   }
   const pageSize = Math.max(repository.block.rowCount, FIRST_PAGE_COMMITS);
-  const read = await reader.readPage({
-    repositoryPath: repository.path,
-    pageSize,
-    selection: repository.selection,
-  });
+  const read = await readListed(repository.path, pageSize, repository.selection);
   if (open !== repository) {
     return superseded();
   }
@@ -316,11 +393,7 @@ async function select(
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const read = await reader.readPage({
-    repositoryPath: repository.path,
-    pageSize: FIRST_PAGE_COMMITS,
-    selection,
-  });
+  const read = await readListed(repository.path, FIRST_PAGE_COMMITS, selection);
   if (open?.ticket !== repository.ticket || open.selectedBy > ticket) {
     return superseded();
   }
@@ -332,8 +405,64 @@ async function select(
   return assemble(selected, read.value);
 }
 
+/**
+ * Read the details of `target` in the open repository, on request and never
+ * otherwise: nothing an open, a refresh or a load more does reads them.
+ *
+ * They are read from the repository the state holds, and dropped like a page if
+ * a different repository was opened while they were read, so the window is never
+ * handed the details of a folder it no longer shows. A branch selection applied
+ * meanwhile does not drop them: it changes which commits a page holds, not what a
+ * commit is.
+ */
+async function details(target: DetailsTarget): Promise<Result<CommitDetails | UncommittedDetails>> {
+  const repository = open;
+  if (repository === null) {
+    return failed(FailureKind.Cancelled, 'No repository is open, so there are no details to read.');
+  }
+  const read = await reader.readDetails({ repositoryPath: repository.path, target });
+  if (open?.ticket !== repository.ticket) {
+    return failed(
+      FailureKind.Cancelled,
+      'Another repository was opened while these details were being read, so this reply was dropped.',
+    );
+  }
+  return read;
+}
+
+/**
+ * Where a changed file is in the open repository, on request and never
+ * otherwise (E04-M01-S10). Dropped like details if another repository was
+ * opened while it was read.
+ */
+async function filePlace(
+  target: DetailsTarget,
+  path: string,
+  follow: boolean,
+): Promise<Result<FilePlace>> {
+  const repository = open;
+  if (repository === null) {
+    return failed(FailureKind.Cancelled, 'No repository is open, so there is no file to find.');
+  }
+  const read = await reader.readFilePlace({
+    repositoryPath: repository.path,
+    target,
+    path,
+    follow,
+  });
+  if (open?.ticket !== repository.ticket) {
+    return failed(
+      FailureKind.Cancelled,
+      'Another repository was opened while this file was being found, so this reply was dropped.',
+    );
+  }
+  return read;
+}
+
 /** The answer to one request, as a value; nothing here throws at the caller. */
-async function answer(request: RepositoryRequest): Promise<Result<GraphPage | ReaderDescription>> {
+async function answer(
+  request: RepositoryRequest,
+): Promise<Result<GraphPage | ReaderDescription | CommitDetails | UncommittedDetails | FilePlace>> {
   switch (request.kind) {
     case 'open':
       return openRepository(request.path, request.selection);
@@ -343,6 +472,10 @@ async function answer(request: RepositoryRequest): Promise<Result<GraphPage | Re
       return refresh(request.selection);
     case 'describe':
       return reader.describe();
+    case 'details':
+      return details(request.target);
+    case 'file-place':
+      return filePlace(request.target, request.path, request.follow);
   }
 }
 

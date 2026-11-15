@@ -68,6 +68,13 @@ const filter = (): Locator => page.getByRole('textbox', { name: 'Filter branches
 const remotes = (): Locator => page.getByRole('checkbox', { name: 'Show Remote Branches' });
 const entry = (label: string): Locator => options().filter({ hasText: new RegExp(`^${label}$`) });
 
+/**
+ * The checkbox after a first page, as assistive technology reads it: checked or not,
+ * where an indeterminate box reads `mixed` and matches neither. `toBeChecked` reads
+ * the `checked` property alone, which a box left indeterminate also carries.
+ */
+const [SHOWN, HIDDEN] = ['- checkbox [checked=true]', '- checkbox [checked=false]'];
+
 /** What {@link measure} touches in the page. `tsconfig.node.json` has no DOM library. */
 interface PageScope {
   readonly document: {
@@ -100,14 +107,19 @@ function gitLog(revisions: readonly string[]): string[] {
   return printed.toString().split('\n').filter(Boolean);
 }
 
-/** Launch on `repository` with `home` as its user-data directory, run `body`, close it. */
-async function withWindow(repository: string, home: string, body: () => Promise<unknown>) {
-  const args = ['.', repository, `--user-data-dir=${home}`];
+/**
+ * Launch on `repository`, or on none, with `home` as its user-data directory, run
+ * `body`, close it. On none, no page arrives until one is opened: the control is
+ * required disabled, as it is before a first page.
+ */
+async function withWindow(repository: string | null, home: string, body: () => Promise<unknown>) {
+  const args = ['.', ...(repository === null ? [] : [repository]), `--user-data-dir=${home}`];
   const application = await electron.launch({ args, cwd: repositoryRoot });
   const child = application.process();
   try {
     page = await application.firstWindow();
-    await expect(box()).toBeEnabled();
+    if (repository === null) await expect(remotes()).toBeDisabled();
+    else await expect(box()).toBeEnabled();
     await body();
   } finally {
     await application.close();
@@ -223,9 +235,8 @@ function buildMany(directory: string): void {
 }
 
 test.beforeAll(() => {
-  expect(existsSync(join(repositoryRoot, 'dist', 'main.cjs')), 'run `npm run build` first').toBe(
-    true,
-  );
+  const built = existsSync(join(repositoryRoot, 'dist', 'main.cjs'));
+  expect(built, 'run `npm run build` first').toBe(true);
   remotesRepository = fixture('remotes', 'remotes', 5000);
   manyRepository = join(freshHome(), 'many');
   buildMany(manyRepository);
@@ -237,7 +248,7 @@ test.afterAll(() => {
 
 test('the bar shows Branches, the box and the checkbox, and the list opens under the box', async () => {
   await withWindow(remotesRepository, freshHome(), async () => {
-    await expect(remotes()).toBeChecked();
+    await expect(remotes()).toMatchAriaSnapshot(SHOWN);
     await play([{ box: 'Show All', listed: [], graph: [EVERY, true, true] }]);
     const label = await rect(page.getByText('Branches:', { exact: true }));
     const [shut, checkbox] = [await rect(box()), await rect(remotes())];
@@ -248,6 +259,10 @@ test('the bar shows Branches, the box and the checkbox, and the list opens under
     await expect(list()).toBeHidden();
     // `main` first is the checked-out branch first: by name it would follow `feature`.
     await play([{ do: 'open', checked: ALONE, listed: ENTRIES }]);
+    // Found by its exact name: the check mark is drawn, and `aria-selected` alone says it.
+    const checked = list().getByRole('option', { name: 'Show All', exact: true, selected: true });
+    await expect(checked).toHaveCSS('content', '"✓ " / ""', { pseudo: 'before' });
+    await expect(entry('feature')).toHaveCSS('content', 'none', { pseudo: 'before' });
     await expect(box()).toHaveAttribute('aria-expanded', 'true');
     await expect(filter()).toHaveAttribute('placeholder', 'Filter branches…');
     const [popup, opened] = [await rect(page.locator('.branches__popup')), await rect(box())];
@@ -336,11 +351,13 @@ test('Refresh and Load More keep the selection; a restart keeps it and Show Remo
     await expect.poll(rowCount).toBe(FIRST_PAGE_COMMITS + FURTHER_PAGE_COMMITS);
   });
   await withWindow(remotesRepository, home, async () => {
-    await expect(remotes()).not.toBeChecked();
+    await expect(remotes()).toMatchAriaSnapshot(HIDDEN);
     await play([feature, { do: 'open', checked: ['feature'], listed: ['Show All', ...LOCALS] }]);
   });
+  // Before a first page, nothing has said what is kept: the checkbox is in neither state.
+  await withWindow(null, home, () => expect(remotes()).toBeChecked({ indeterminate: true }));
   // Another repository on the same user-data directory has a choice of its own.
-  await withWindow(manyRepository, home, () => expect(remotes()).toBeChecked());
+  await withWindow(manyRepository, home, () => expect(remotes()).toMatchAriaSnapshot(SHOWN));
 });
 
 test('the control works from the keyboard alone', async () => {

@@ -1,4 +1,13 @@
-import type { BranchSelection, CommitColumns, Refs, Result, WorkingTree } from '../contracts/index';
+import type {
+  BranchSelection,
+  CommitColumns,
+  CommitDetails,
+  DetailsTarget,
+  Refs,
+  Result,
+  UncommittedDetails,
+  WorkingTree,
+} from '../contracts/index';
 
 /**
  * What the application needs from a repository, said without naming git.
@@ -53,6 +62,45 @@ export interface RepositoryPage {
   readonly hasMore: boolean;
 }
 
+/** Which details to read, and where. */
+export interface DetailsQuery {
+  /** A path inside the repository, as a page was read from. */
+  readonly repositoryPath: string;
+  /**
+   * A commit by its full object name, or the uncommitted changes. The reader
+   * checks it before anything of it reaches git, because it came from the page.
+   */
+  readonly target: DetailsTarget;
+}
+
+/** Where to find a changed file. */
+export interface FilePlaceQuery {
+  /** A path inside the repository, as a page was read from. */
+  readonly repositoryPath: string;
+  /** The details the file was listed in. Checked by the reader, because it came from the page. */
+  readonly target: DetailsTarget;
+  /** The file's path as the details reply carries it. Checked before the call. */
+  readonly path: string;
+  /**
+   * Whether to follow the file to where the working tree has it now. A commit's
+   * file is followed by one more git process; the uncommitted changes' path is
+   * the working tree's already.
+   */
+  readonly follow: boolean;
+}
+
+/** Where a changed file is. */
+export interface FilePlace {
+  /** The repository's top level, as git prints it. */
+  readonly top: string;
+  /**
+   * The file's path, relative to {@link FilePlace.top}, where the working tree has
+   * it: the path asked for, or the one a rename since the commit gave it. `null`
+   * when the working tree deleted it. Without `follow`, the path asked for.
+   */
+  readonly path: string | null;
+}
+
 /** Where the program that reads repositories was found, and which one it is. */
 export interface ReaderDescription {
   /** The absolute path the reader is running. */
@@ -74,4 +122,12 @@ export interface RepositoryReader {
   describe(): Promise<Result<ReaderDescription>>;
   /** One page of the repository, or why it could not be read. */
   readPage(request: PageRequest): Promise<Result<RepositoryPage>>;
+  /**
+   * One commit's details or the uncommitted changes', or why they could not be
+   * read: a target that is neither, or a hash that is not a commit of the
+   * repository, is a failure.
+   */
+  readDetails(query: DetailsQuery): Promise<Result<CommitDetails | UncommittedDetails>>;
+  /** The repository's top level and, if asked, the current place of one changed file. */
+  readFilePlace(query: FilePlaceQuery): Promise<Result<FilePlace>>;
 }

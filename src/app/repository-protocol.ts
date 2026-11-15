@@ -1,4 +1,4 @@
-import type { BranchSelection, Result } from '../contracts/index';
+import type { BranchSelection, DetailsTarget, Result } from '../contracts/index';
 
 /**
  * What crosses between the main process and the utility process that reads
@@ -57,6 +57,26 @@ export type RepositoryQuestion =
   | {
       /** Report which git this is, or why there is none. */
       readonly kind: 'describe';
+    }
+  | {
+      /**
+       * Read one commit's details, or the uncommitted changes', from the open
+       * repository. Not checked here: it came from the page, and the reader
+       * checks it before anything of it reaches git.
+       */
+      readonly kind: 'details';
+      readonly target: DetailsTarget;
+    }
+  | {
+      /**
+       * Where a changed file is: the repository's top level and, with `follow`,
+       * the path the working tree has it at now (E04-M01-S10). The main process
+       * checked the request before it asked; the reader checks the target again.
+       */
+      readonly kind: 'file-place';
+      readonly target: DetailsTarget;
+      readonly path: string;
+      readonly follow: boolean;
     };
 
 /**
@@ -71,7 +91,8 @@ export type RepositoryRequest = RepositoryQuestion & { readonly id: number };
  * One answer.
  *
  * The value's shape is decided by the request the `id` names — a `GraphPage` for
- * the first three, a `ReaderDescription` for the last — so it is `unknown` here
+ * the first three, a `ReaderDescription` for `describe`, a `CommitDetails` or an
+ * `UncommittedDetails` for `details`, a `FilePlace` for `file-place` — so it is `unknown` here
  * and is narrowed at the one place that knows which question it asked. A tagged
  * union would carry the tag over the wire and still be narrowed by a cast on
  * arrival, because nothing type-checks a structured clone.

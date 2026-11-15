@@ -20,6 +20,11 @@
   --text-primary: light-dark(#1f1f1f, #e8e8e8);
   --text-secondary: light-dark(#5c5c5c, #a0a0a0);
   --line: light-dark(#e2e2e2, #333333);
+  --raised: light-dark(#f3f3f3, #262626);
+  --open-row: light-dark(#e8eef7, #2d3340);
+  --added: light-dark(#1a7f37, #56d364);
+  --deleted: light-dark(#cf222e, #ff7b72);
+  --tool-active: light-dark(#ffffff, #3a3a3a);
 
   font-family:
     system-ui,
@@ -188,7 +193,27 @@ body {
 
 .branches__option[aria-selected='true']::before {
   margin-left: -14px;
-  content: '✓ ';
+  content: '✓ ' / '';
+}
+
+/* A choice not kept: in the column's flow, so it covers nothing. */
+.notices {
+  flex: none;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: light-dark(#fff4ce, #3d3418);
+  gap: 8px;
+}
+
+.notice__text {
+  flex: 1 1 auto;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .stage {
@@ -335,6 +360,39 @@ body {
   border-radius: 9px;
 }
 
+/*
+ * A stash's label, as the reference extension was seen to draw it (E04-M01-S14):
+ * a square of the stash's lane colour holding a white inbox tray, then the name
+ * on dark grey inside a thin grey outline. The grey was seen in a dark theme
+ * only, and is the same in both themes here.
+ */
+.ref--stash {
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+  border-color: #6e6e6e;
+  background: #3c3c3c;
+  color: #e8e8e8;
+}
+
+.ref__icon {
+  display: flex;
+  width: 15px;
+  align-items: center;
+  justify-content: center;
+  background: var(--ref-colour);
+  color: #ffffff;
+}
+
+.ref__icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.ref__name {
+  padding: 0 5px;
+}
+
 .graph__canvas {
   position: absolute;
   top: var(--row-height);
@@ -347,4 +405,303 @@ body {
 .graph__more {
   display: block;
   margin: 6px 8px 10px;
+}
+
+/* The details area (E04-M01-S09). */
+.row--open {
+  background: var(--open-row);
+}
+
+.details {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  height: var(--details-height);
+  border-bottom: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 12px;
+  grid-template-columns:
+    var(--graph-width, 100px) minmax(0, var(--details-left, 1fr)) minmax(
+      0,
+      var(--details-right, 1fr)
+    )
+    32px;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/*
+ * Docked at the bottom of the view (E04-M01-S12): the same element, a panel along
+ * the foot at the height in force, held to the view's height less the head and
+ * three rows. The list, its head and its canvas end at the panel's top edge.
+ */
+.graph--docked {
+  --docked-height: min(var(--details-height), calc(100% - 4 * var(--row-height)));
+}
+
+.graph--docked .graph__scroll {
+  bottom: var(--docked-height);
+}
+
+.graph--docked .graph__canvas {
+  height: calc(100% - var(--row-height) - var(--docked-height));
+}
+
+.details--docked {
+  top: auto;
+  bottom: 0;
+  height: var(--docked-height);
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  grid-template-columns:
+    minmax(0, var(--details-left, 1fr)) minmax(0, var(--details-right, 1fr))
+    32px;
+}
+
+.details--docked .details__info {
+  grid-column: 1;
+}
+
+/* The drag handles: strips inside the area, away from the row it belongs to. */
+.details__edge {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.details--docked .details__edge {
+  top: 0;
+  bottom: auto;
+}
+
+.details__divider {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.details__info {
+  overflow: auto;
+  padding: 6px 8px;
+  user-select: text;
+}
+
+.details__files {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.files {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.details__info {
+  grid-column: 2;
+}
+
+.details__label {
+  font-weight: 700;
+}
+
+.details__line {
+  overflow-wrap: anywhere;
+}
+
+.details__message {
+  margin-top: 1em;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.details__controls {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.details__close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* The changed files (E04-M01-S10): the view and options buttons, the pane, its menu. */
+.details__tool {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-secondary);
+}
+
+.details__tool svg,
+.files__act svg,
+.files__row svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.details__tool--active {
+  background: var(--tool-active);
+  color: var(--text-primary);
+}
+
+.files__error {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--deleted);
+}
+
+.files__scroll {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.files__spacer {
+  position: relative;
+}
+
+.files__row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+.files__row--folder {
+  cursor: pointer;
+}
+
+.files__row--added {
+  color: var(--added);
+}
+
+.files__row--deleted {
+  color: var(--deleted);
+}
+
+.files__letter {
+  font-weight: 700;
+}
+
+.files__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.files__counts {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.files__plus {
+  color: var(--added);
+}
+
+.files__minus {
+  color: var(--deleted);
+}
+
+.files__acts {
+  display: none;
+  margin-left: auto;
+  flex: none;
+  gap: 2px;
+}
+
+.files__row--file:hover .files__acts {
+  display: flex;
+}
+
+.files__act {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+}
+
+.files__menu {
+  position: fixed;
+  z-index: 10;
+  min-width: 160px;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: 0 2px 8px light-dark(#0003, #0009);
+  font-size: 12px;
+}
+
+.files__menu-heading {
+  padding: 4px 12px 2px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.files__menu-item {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  padding: 3px 12px;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.files__menu-item:hover {
+  background: var(--open-row);
+}
+
+.files__menu-item:focus {
+  background: var(--open-row);
+  outline: 1px solid var(--text-secondary);
+  outline-offset: -1px;
+}
+
+.files__menu-mark {
+  width: 8px;
+  flex: none;
 }

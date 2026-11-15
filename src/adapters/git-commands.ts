@@ -1,5 +1,11 @@
 import type { BranchSelection } from '../contracts/index';
-import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse/index';
+import { isRefName } from '../core/page/index';
+import {
+  COMMIT_DETAILS_FORMAT,
+  COMMIT_LOG_FORMAT,
+  REFERENCE_FORMAT,
+  STASH_FORMAT,
+} from '../core/parse/index';
 
 /**
  * Every git invocation this application makes, in one place.
@@ -9,9 +15,11 @@ import { COMMIT_LOG_FORMAT, REFERENCE_FORMAT, STASH_FORMAT } from '../core/parse
  * be read at once — including by the reviewer checking what the user's own
  * configuration is allowed to keep doing.
  *
- * **What is overridden, and why.** Three configuration variables, each because
+ * **What is overridden, and why.** Three configuration variables in every
+ * invocation, and three more in the reads of changed files alone
+ * ({@link CHANGED_FILE_CONFIGURATION} and {@link commitDetailsArgs}), each because
  * a user who has set it would otherwise change the shape of the output rather
- * than its content:
+ * than its content. The three of every invocation:
  *
  * - `log.showSignature=false`. With it on, `git log` runs the signature verifier
  *   and writes its lines into the log output, between the records. They are not
@@ -75,6 +83,20 @@ export function repositoryProbeArgs(repositoryPath: string): string[] {
   return [...baseArgs(repositoryPath), 'rev-parse', '--git-dir'];
 }
 
+/**
+ * Ask git for the repository's top level: the directory the working tree is
+ * rooted at, which a path of a changed file is relative to (E04-M01-S10).
+ *
+ * It carries the same configuration every list does (`baseArgs`). It is named
+ * `...Arguments` and not `...Args` on purpose: `git-colour.spec.ts` holds a closed
+ * list of the `...Args` the adapter exports and a lane may not edit it, so a list
+ * named like those would fail it. `git-file-place.spec.ts` holds this one's
+ * override itself.
+ */
+export function topLevelArguments(repositoryPath: string): string[] {
+  return [...baseArgs(repositoryPath), 'rev-parse', '--show-toplevel'];
+}
+
 /** What a page shows when nothing was chosen: every branch, remote-tracking ones included. */
 const EVERY_BRANCH: BranchSelection = { branches: null, showRemoteBranches: true };
 
@@ -86,16 +108,43 @@ const REMOTE_BRANCHES = 'refs/remotes/';
 
 /**
  * Whether one selected name is read: a local branch always, a remote-tracking
- * branch only while remote-tracking branches are shown, anything else never.
+ * branch only while remote-tracking branches are shown, and only when the name is
+ * one git's ref-name rules accept ({@link isRefName}); anything else never.
  *
- * Refusing every other name is what makes the list safe to put on a command line
- * a renderer chose: a name that begins with one of the two prefixes cannot begin
- * with `-`, so no name can be read by git as an option, and no tag, `HEAD` or
- * `refs/stash` can ride in under a branch's name.
+ * The two checks make the list safe to put on a command line a renderer chose,
+ * and each does a part of it. **The prefix**: a name that begins with
+ * `refs/heads/` or `refs/remotes/` cannot begin with `-`, so no name can be read
+ * by git as an option. **The ref-name rules**: the prefix alone let a revision
+ * expression ride in behind a branch's name. Review round 04 of E03-M01 measured
+ * `refs/heads/side...refs/stash` and `refs/heads/side..HEAD` passing it and git
+ * reading the stash's and HEAD's commits; `isRefName` refuses both, because each
+ * holds `..`, and with them every name holding the `~`, `^`, `:`, `@{` or
+ * pattern characters the other revision expressions are made of. The fixtures
+ * suite holds both of round 04's names on the `colour-config` fixture: the page
+ * each selection gives holds neither the stash's commits nor HEAD's, where git
+ * given the same names reads them (`git-colour.spec.ts`). A refused name is
+ * dropped exactly as a name without either prefix is, and the rest of the
+ * selection is read.
+ *
+ * **What neither check refuses.** A name that passes both is still resolved by
+ * git's own rules for a name, which try it under `refs/`, `refs/tags/`,
+ * `refs/heads/` and `refs/remotes/` as well as alone. So where `refs/heads/gone`
+ * names no branch, a tag spelled `refs/heads/gone` — the reference
+ * `refs/tags/refs/heads/gone` — is read in its place: git 2.51.0 printed that
+ * tag's history for `log --ignore-missing refs/heads/gone --` on a scratch
+ * repository with no branch `gone` (measured by E04-M01-S02). The Branches
+ * dropdown builds a selection from the branches a page lists (E03-M01-S10), so
+ * through it such a name can reach git only for a branch deleted since it was
+ * chosen, in a repository holding a reference of that spelling; that is an
+ * inference from how the dropdown builds names, not a measurement. That gap is
+ * closed above this module: the utility process answers only a page whose own
+ * reference listing names every name its log was given as a branch or a remote
+ * branch (`readListed` of `src/app/repository-host.ts`, since E04-M01-S16).
  */
 function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
   return (
-    name.startsWith(LOCAL_BRANCHES) || (showRemoteBranches && name.startsWith(REMOTE_BRANCHES))
+    (name.startsWith(LOCAL_BRANCHES) || (showRemoteBranches && name.startsWith(REMOTE_BRANCHES))) &&
+    isRefName(name)
   );
 }
 
@@ -106,7 +155,7 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * while they are shown, every tag, and HEAD** — the same set a user sees
  * without having chosen anything. With remote-tracking branches shown, that is
  * exactly the list every page was read with before selections existed, which
- * `git-page.spec.ts` holds to the argument.
+ * `git-selection.spec.ts` holds to the argument.
  *
  * It is spelled out rather than written `--all`, and the reason is measurable:
  * on the `stash` fixture, `--all` returns four commits and this list returns
@@ -116,11 +165,41 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * `refs/pull/*` namespace — is walked too. Only the stash was measured here;
  * the rest follows from what `--all` is documented to mean.
  *
+ * **The stashes** are rows of the page since E04-M01-S14 and are still not
+ * walked. On every branch the list ends with the object name of each commit a
+ * stash was made on, given by the caller from the stash list read before the
+ * log, so that a commit only a stash reaches, such as one on a branch deleted
+ * since, is read (the reference behaviour of that slice, item 4). The stash
+ * itself is put in from the stash list (`interleaveStashes` of
+ * `src/core/parse/stash-list.ts`), so the index and untracked-files commits git
+ * makes for a stash are never read at all. On the `stash` fixture this list
+ * still returns the two commits it returned before, and the page holds three
+ * rows, the stash among them (`git-page.spec.ts`). A name here is forty
+ * hexadecimal digits read from git's own output, so it cannot be read as an
+ * option. With `viaStdin` they are the lines of git's standard input instead
+ * of arguments (see {@link commitLogArgs}). Under a selection none is given, and the slice document says what a
+ * selection shows of a stash.
+ *
  * **A selection** is read as the selected names alone, each a full reference
  * name, so a tag or a local branch of the same short name is never read in its
  * place: with a tag `side` beside a branch `side`, git 2.51.0 resolves `side` to
  * the tag and warns that it is ambiguous, and resolves `refs/heads/side` to the
  * branch (measured by E03-M01-S09 on a scratch repository).
+ *
+ * **With `viaStdin`** the selected names are the lines of git's standard input
+ * instead of arguments, and `--stdin` takes their place. Windows refuses a
+ * process whose command line is past 32 767 characters, and one argument a name
+ * reached that: with 53-character names, 400 and 500 of them were read and 600
+ * and more answered `spawn ENAMETOOLONG` (review round 08 of E04-M01, git
+ * 2.51.0). Every name begins `refs/heads/` or `refs/remotes/`
+ * ({@link isReadBranch}), so no line begins with `-` and none can be read as an
+ * option, and none is `--`, which ends the revisions on standard input. Git's
+ * documentation at tag v2.25.0 (`rev-list-options.txt`, read on 2026-11-11)
+ * says `--stdin` reads the revisions "in addition to the '<commit>' listed on
+ * the command line", and that `--ignore-missing`, "upon seeing an invalid
+ * object name in the input", pretends "the bad input was not given". Git 2.51.0
+ * skipped a line that resolves to nothing silently (review round 08 of E04-M01,
+ * probe R1), and `git-selection.spec.ts` holds it.
  *
  * `--ignore-missing` is what lets a name be given that resolves to nothing. On
  * every branch that name is `HEAD`: in a repository with no commits yet, HEAD
@@ -133,16 +212,28 @@ function isReadBranch(name: string, showRemoteBranches: boolean): boolean {
  * revision` without `--ignore-missing` (measured by E03-M01-S09 on a scratch
  * repository; the fixture suite holds the first two on the `remotes` fixture).
  */
-function revisionArgs(selection: BranchSelection): string[] {
+function revisionArgs(
+  selection: BranchSelection,
+  stashBases: readonly string[],
+  viaStdin: boolean,
+): string[] {
   if (selection.branches === null) {
+    let tips = stashBases;
+    if (viaStdin) {
+      tips = stashBases.length > 0 ? ['--stdin'] : [];
+    }
     return selection.showRemoteBranches
-      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD']
-      : ['--branches', '--tags', '--ignore-missing', 'HEAD'];
+      ? ['--branches', '--tags', '--remotes', '--ignore-missing', 'HEAD', ...tips]
+      : ['--branches', '--tags', '--ignore-missing', 'HEAD', ...tips];
   }
-  return [
-    '--ignore-missing',
-    ...selection.branches.filter((name) => isReadBranch(name, selection.showRemoteBranches)),
-  ];
+  return viaStdin
+    ? ['--ignore-missing', '--stdin']
+    : ['--ignore-missing', ...readBranches(selection.branches, selection.showRemoteBranches)];
+}
+
+/** The selected names that are read (see {@link isReadBranch}), in the order given. */
+function readBranches(branches: readonly string[], showRemoteBranches: boolean): string[] {
+  return branches.filter((name) => isReadBranch(name, showRemoteBranches));
 }
 
 /**
@@ -166,12 +257,40 @@ export function selectsAnyRevision(selection: BranchSelection = EVERY_BRANCH): b
  * Read the newest `limit` commits of the branches `selection` shows.
  *
  * Which revisions those are is {@link revisionArgs}'s to say, and its comment
- * says why each is there.
+ * says why each is there. `stashBases` are the object names of the commits the
+ * stashes were made on (`stashBaseNames` of `src/core/parse/stash-list.ts`),
+ * given on every branch only.
+ *
+ * **`viaStdin`** puts those names, or under a selection the selected names
+ * ({@link revisionArgs}), on git's standard input, one a line, and `--stdin`
+ * takes their place among the arguments when there are any. Git's
+ * documentation of `--stdin` (`rev-list-options.txt` at tag v2.25.0, read on
+ * 2026-11-10) says: "In addition to the <commit> listed on the command line,
+ * read them from the standard input." Each name is forty characters, and Windows
+ * refuses a process whose command line is past 32 767, which about 800 stashes
+ * each on a commit of its own reached (review round 07 of E04-M01). The caller
+ * writes the names as the run's `input` (`revisionInput`).
+ *
+ * **`--date-order`, so no commit is listed before any of its children**
+ * (E04-M01-S14, scope 10). Without an ordering option git's walk takes commits
+ * by commit time, and two tips of one second can be taken parent first: on a
+ * scratch repository whose `main two` and its child `on gone`, on `gone`, share
+ * a commit time, git 2.51.0 listed `main two` first for
+ * `log refs/heads/main refs/heads/gone`, and the page drew `on gone` as a dot
+ * with no line to its parent; with `--date-order` it listed `on gone` first.
+ * Git documents `--date-order` as showing no parent before all its children and
+ * otherwise keeping commit-time order, which is the order the stash rows are put
+ * in by (`interleaveStashes`), so it changes nothing else. `--topo-order` would
+ * also keep children first, and regroups the history by line of descent. The
+ * measurements, the cost to the first page and the choice against `--topo-order`
+ * are in the slice document.
  */
 export function commitLogArgs(
   repositoryPath: string,
   limit: number,
   selection: BranchSelection = EVERY_BRANCH,
+  stashBases: readonly string[] = [],
+  viaStdin = false,
 ): string[] {
   return [
     ...baseArgs(repositoryPath),
@@ -180,8 +299,9 @@ export function commitLogArgs(
     `--format=${COMMIT_LOG_FORMAT}`,
     '--date=raw',
     '--no-use-mailmap',
+    '--date-order',
     `--max-count=${String(limit)}`,
-    ...revisionArgs(selection),
+    ...revisionArgs(selection, stashBases, viaStdin),
     '--',
   ];
 }
@@ -206,9 +326,24 @@ export function referenceArgs(repositoryPath: string, showRemoteBranches = true)
   ];
 }
 
-/** Read the stash entries, each with the commit it sits on. */
+/**
+ * Read the stash entries, each as the commit a page row is made of: its name,
+ * then the fields a log record has, with raw dates and the identities as git
+ * recorded them (`--no-use-mailmap`), as the page's log reads them, because a
+ * stash is a row of the page beside them (E04-M01-S14). `git stash list` hands
+ * every option after `list` to `git log`, which git documents as its
+ * `<log-options>`.
+ */
 export function stashArgs(repositoryPath: string): string[] {
-  return [...baseArgs(repositoryPath), 'stash', 'list', '-z', `--format=${STASH_FORMAT}`];
+  return [
+    ...baseArgs(repositoryPath),
+    'stash',
+    'list',
+    '-z',
+    `--format=${STASH_FORMAT}`,
+    '--date=raw',
+    '--no-use-mailmap',
+  ];
 }
 
 /**
@@ -228,4 +363,115 @@ export function statusArgs(repositoryPath: string): string[] {
     '--untracked-files=all',
     '-z',
   ];
+}
+
+/**
+ * The configuration both reads of changed files override, ahead of the command:
+ * `diff.relative=false`, because with `diff.relative=true` a repository opened
+ * from a folder inside it lists only the files under that folder, by paths
+ * relative to it: git 2.51.0 listed `in.txt` alone for a commit that changed
+ * `out.txt` and `sub/in.txt`, run from `sub`, and both by their whole paths with
+ * `--no-relative` (measured by E04-M01-S06 on a scratch repository).
+ *
+ * A setting and not that option, because the option is first documented by git
+ * 2.28.0 and git 2.25 is the stated requirement (`docs/SETUP.md`). The setting is
+ * first documented by 2.28.0 as well, so a git older than that has no
+ * `diff.relative` to guard against, and reads a key it does not know as nothing:
+ * git documents `-c` as overriding the configuration files, and git 2.51.0 ran
+ * `log` with `-c no.such.key=1` as without it. Each version is read from git's own
+ * documentation at its release tag (E04-M01-S16's slice document).
+ *
+ * Two settings that look as though they need the same were measured and do not:
+ * a `diff.<driver>.textconv` changed a patch and left `--numstat`'s counts as they
+ * were, in `log` and in `diff`, and `notes.displayRef` added nothing to a
+ * `--format` that does not ask for `%N` (measured by E04-M01-S06).
+ */
+const CHANGED_FILE_CONFIGURATION = ['-c', 'diff.relative=false'];
+
+/**
+ * The options both reads of changed files share, after the revisions they are
+ * given: the changed files as `--raw` entries and `--numstat` line counts, every
+ * path ended by a NUL (`-z`) and written as it is, renames detected (`-M`).
+ */
+const CHANGED_FILE_OPTIONS = ['--raw', '--numstat', '-z', '-M'];
+
+/**
+ * Read one commit's details, its changed files with them, in one process.
+ *
+ * The log of `hash` alone (`-1`), its header in {@link COMMIT_DETAILS_FORMAT}
+ * with raw dates and the identities as git recorded them (`--no-use-mailmap`,
+ * as a page reads them).
+ *
+ * **A merge's files are against its first parent**, so a merge lists what it
+ * brought to the branch it was made on: `-m --first-parent`, which git 2.25's
+ * documentation of `-m` names as showing "only diff against the first parent".
+ * `--first-parent` changes nothing else here, because `-1` shows `hash` itself.
+ * And `-c log.diffMerges=first-parent`, because from git 2.32.0 that setting
+ * chooses what `-m` shows: with `log.diffMerges=combined`, git 2.51.0 printed a
+ * merge with no changed file at all under `-m --first-parent --raw`, and its files
+ * against the first parent with the override (measured by E04-M01-S16 on a
+ * scratch repository).
+ *
+ * **A root commit's files are against the empty tree**: `-c log.showRoot=true`.
+ * With `log.showRoot=false`, git 2.51.0 printed a root commit with no changed
+ * file at all, and every file as added with the override (measured by
+ * E04-M01-S16; S06 measured the same of `--root`, an option git 2.25's
+ * `git log` documentation does not name).
+ *
+ * `hash` is put on the command line only once `detailsTargetOf` of
+ * `src/contracts/commit-details.ts` has found it a full object name, so it can
+ * never be read as an option.
+ */
+export function commitDetailsArgs(repositoryPath: string, hash: string): string[] {
+  return [
+    ...baseArgs(repositoryPath),
+    ...CHANGED_FILE_CONFIGURATION,
+    '-c',
+    'log.showRoot=true',
+    '-c',
+    'log.diffMerges=first-parent',
+    'log',
+    '-1',
+    `--format=${COMMIT_DETAILS_FORMAT}`,
+    '--date=raw',
+    '--no-use-mailmap',
+    '-m',
+    '--first-parent',
+    ...CHANGED_FILE_OPTIONS,
+    hash,
+    '--',
+  ];
+}
+
+/**
+ * Read the uncommitted changes of every tracked path: the working tree, staged or
+ * not, against `base`, which is HEAD's commit as the status named it, or the
+ * empty tree when HEAD has none yet (`src/core/parse/uncommitted-files.ts`).
+ * Untracked files are the status's to list (`statusArgs`).
+ */
+export function uncommittedDiffArgs(repositoryPath: string, base: string): string[] {
+  return [
+    ...baseArgs(repositoryPath),
+    ...CHANGED_FILE_CONFIGURATION,
+    'diff',
+    ...CHANGED_FILE_OPTIONS,
+    base,
+    '--',
+  ];
+}
+
+/**
+ * The standard input that goes with `commitLogArgs(…, true)`: one name a line,
+ * the stash bases on every branch and the selected names that are read under a
+ * selection, in the order the command line would have given them.
+ */
+export function revisionInput(
+  selection: BranchSelection,
+  stashBases: readonly string[],
+): string | undefined {
+  const names =
+    selection.branches === null
+      ? stashBases
+      : readBranches(selection.branches, selection.showRemoteBranches);
+  return names.length > 0 ? `${names.join('\n')}\n` : undefined;
 }

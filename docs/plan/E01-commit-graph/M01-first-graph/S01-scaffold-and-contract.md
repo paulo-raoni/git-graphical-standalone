@@ -110,7 +110,10 @@ line crossing the vertical band of a single row; a line passing straight through
 segment whose two lanes are equal. That is the whole drawing instruction set — no curves, no multi-row
 edges, no scene graph — so painting a viewport is a walk over a slice of these arrays and nothing else.
 Colours are palette **indices**, never colour values, so a theme change repaints without recomputing the
-layout.
+layout. *Corrected by E04-M01-S08, 2026-11-07:* "no curves" is still true of the instruction set, because that
+slice left `LayoutRows` as it was: a segment still names two lanes and nothing else. It is no longer true of the
+drawing. Since E04-M01-S08 the painter (`src/ui/graph-canvas.ts`) strokes a segment whose two lanes differ as a
+curve between the two ends `segmentLines` writes for it, leaving and arriving vertically.
 
 **Two bits of `RowFlag` say where a row's own line begins and ends**, because a segment cannot. A segment
 spans a whole band, so a branch tip's departing line and a root's arriving line are both spelled `(V, V)` in

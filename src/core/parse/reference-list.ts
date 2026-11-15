@@ -74,6 +74,28 @@ export function addReference(
 ): void {
   ensureTargetRoom(list);
   writeObjectName(bytes, from, to, list.targets, list.count * HASH_BYTE_LENGTH);
+  pushEntry(list, kind, name, flags);
+}
+
+/**
+ * Add one reference whose target is `target`, a binary object name of exactly
+ * `HASH_BYTE_LENGTH` bytes, as a stash's own commit is held once it has been read
+ * (`./stash-list.ts`).
+ */
+export function addReferenceTo(
+  list: ReferenceList,
+  kind: RefKind,
+  name: string,
+  flags: number,
+  target: Uint8Array,
+): void {
+  ensureTargetRoom(list);
+  list.targets.set(target, list.count * HASH_BYTE_LENGTH);
+  pushEntry(list, kind, name, flags);
+}
+
+/** Everything of one reference but its target, which the caller has written. */
+function pushEntry(list: ReferenceList, kind: RefKind, name: string, flags: number): void {
   list.kinds.push(kind);
   list.flags.push(flags);
   list.names.push(name);

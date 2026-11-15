@@ -1,6 +1,12 @@
+import type { DetailsRequest, DetailsResponse } from './commit-details';
+import type { DetailsOptions } from './details-layout';
+import type { FileActionRequest, FileActionResponse } from './file-action';
 import type {
   ApplicationInfoResponse,
   ChooseFolderResponse,
+  DetailsOptionsResponse,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenRepositoryRequest,
@@ -10,6 +16,8 @@ import type {
   StartupRepositoryResponse,
 } from './ipc';
 import type { ChooseThemeRequest, ChooseThemeResponse, ThemeChoiceResponse } from './ipc';
+import type { UnkeptChoice } from './ipc';
+
 /** The property the preload attaches the bridge to on the renderer's global. */
 export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
 
@@ -22,8 +30,10 @@ export const BRIDGE_GLOBAL_NAME = 'gitGraphical';
  * reason the bridge exists. Adding a capability here is a change to this file
  * and to the preload, and therefore visible in review.
  *
- * Every method resolves to a `Result`. None of them rejects on a failure the
- * user could be told about; a rejection here means the bridge itself is broken.
+ * Every method that asks resolves to a `Result`. None of them rejects on a
+ * failure the user could be told about; a rejection here means the bridge itself
+ * is broken. One method does not ask: {@link GitGraphicalBridge.unkeptChoice}
+ * subscribes to the one message the main process sends unasked.
  */
 export interface GitGraphicalBridge {
   /** Report the folder the application was started with, if it was given one. */
@@ -39,12 +49,37 @@ export interface GitGraphicalBridge {
    * or apply the selection the request carries and answer its first page.
    */
   readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>;
+  /**
+   * Read the details of one commit of the open repository, named by its full
+   * object name, or of its uncommitted changes, from git, at each call.
+   */
+  readonly commitDetails: (request: DetailsRequest) => Promise<DetailsResponse>;
+  /**
+   * Open one changed file in the file manager, or copy its absolute or relative
+   * path to the clipboard (E04-M01-S10). The request is checked once, in the main
+   * process, before anything of it reaches git or the file system.
+   */
+  readonly fileAction: (request: FileActionRequest) => Promise<FileActionResponse>;
   /** Report the application's own versions. */
   readonly applicationInfo: () => Promise<ApplicationInfoResponse>;
   /** Report the colour scheme in force. */
   readonly themeChoice: () => Promise<ThemeChoiceResponse>;
   /** Apply a colour scheme to the whole application and keep it for the next start. */
   readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>;
+  /** Report the options of the Commit Details View in force (E04-M01-S12). */
+  readonly detailsOptions: () => Promise<DetailsOptionsResponse>;
+  /** Apply options of the Commit Details View and keep them for the next start. */
+  readonly chooseDetailsOptions: (request: DetailsOptions) => Promise<DetailsOptionsResponse>;
+  /** Keep one repository's layout of the Commit Details View for the next start. */
+  readonly keepDetailsLayout: (
+    request: KeepDetailsLayoutRequest,
+  ) => Promise<KeepDetailsLayoutResponse>;
+  /**
+   * Call `listener` each time the main process says a choice could not be kept
+   * for the next start. It is handed the two strings of the message, checked,
+   * and never the message itself; a message that is not one is dropped.
+   */
+  readonly unkeptChoice: (listener: (unkept: UnkeptChoice) => void) => void;
 }
 
 declare global {

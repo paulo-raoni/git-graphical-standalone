@@ -2,14 +2,14 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { _electron as electron, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import { FailureKind } from '../../src/contracts/index';
 import type { GitGraphicalBridge, GraphPage } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
-import { fixture } from './support/fixtures';
+import { fixture, withOwnProfile } from './support/fixtures';
 
 /**
  * A reply is applied only to the repository it was read for.
@@ -223,22 +223,19 @@ async function raceSameRepository(input: { count: number }): Promise<ReplySummar
 /* --- Driving the built application. --- */
 
 /**
- * Launch the built application on `open`, run `body` against its window, and
- * stop it; the exit status is read back, because a leaked Electron process is a
- * failure whatever the assertions said, and the utility process is its child.
+ * Launch the built application on `open`, on a user-data directory of its own,
+ * run `body` against its window, and stop it. `withOwnProfile`
+ * (`./support/fixtures.ts`) reads the exit status back, because a leaked
+ * Electron process is a failure whatever the assertions said, and the utility
+ * process is its child.
  */
 async function withWindow(
   open: string,
   body: (page: Page, application: ElectronApplication) => Promise<void>,
 ): Promise<void> {
-  const application = await electron.launch({ args: ['.', open], cwd: repositoryRoot });
-  try {
-    await body(await application.firstWindow(), application);
-  } finally {
-    const child = application.process();
-    await application.close();
-    expect(child.exitCode === null && !child.killed).toBe(false);
-  }
+  await withOwnProfile({ open }, async (application) =>
+    body(await application.firstWindow(), application),
+  );
 }
 
 /**

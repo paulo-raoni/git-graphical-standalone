@@ -1,3 +1,4 @@
+import type { DetailsLayout, DetailsOptions } from './details-layout';
 import type { GraphPage } from './graph-page';
 import type { Result } from './result';
 
@@ -21,12 +22,27 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   loadMoreCommits: 'repository:load-more-commits',
   /** Re-read the open repository, or apply a branch selection, and return the page. */
   refresh: 'repository:refresh',
+  /** Read one commit's details, or the uncommitted changes', from the open repository. */
+  commitDetails: 'repository:commit-details',
+  /** Do one thing with one changed file: open it, or copy its path. */
+  fileAction: 'repository:file-action',
   /** Report the application's own versions. Reads no repository. */
   applicationInfo: 'application:info',
   /** Report the colour scheme in force. Reads no repository. */
   themeChoice: 'theme:choice',
   /** Apply a colour scheme to the application and keep it for the next start. */
   chooseTheme: 'theme:choose',
+  /** Report the options of the Commit Details View in force. Reads no repository. */
+  detailsOptions: 'details:options',
+  /** Apply options of the Commit Details View and keep them for the next start. */
+  chooseDetailsOptions: 'details:choose-options',
+  /** Keep one repository's layout of the Commit Details View for the next start. */
+  keepDetailsLayout: 'details:keep-layout',
+  /**
+   * The one message the main process sends the window unasked: a choice that
+   * could not be kept for the next start ({@link UnkeptChoice}).
+   */
+  unkeptChoice: 'application:unkept-choice',
 } as const);
 
 /** One of the channel names in {@link CHANNELS}. */
@@ -62,7 +78,12 @@ export type StartupRepositoryResponse = Result<StartupRepository>;
  *   branch and `refs/remotes/<remote>/<branch>` for a remote-tracking one — the
  *   prefix is what tells a local branch called `origin/main` from the
  *   remote-tracking `origin/main`, and what keeps a tag of the same name from
- *   being read instead. A name with neither prefix is not read. A name git does
+ *   being read instead. A name with neither prefix is not read, and neither is
+ *   one that git's ref-name rules refuse (those of `git check-ref-format`): a
+ *   prefix alone let `refs/heads/side..HEAD` and `refs/heads/side...refs/stash`
+ *   through, which git reads as ranges, taking in HEAD's and the stash's commits
+ *   (E03-M01's review round 04 measured both; the fixtures suite of
+ *   `src/adapters/` holds both refused, by E04-M01-S02). A name git does
  *   not resolve, such as a branch deleted since it was chosen, is skipped, and a
  *   list whose every name is skipped reads no commit at all. An empty list reads
  *   no commit either; it is not a second spelling of every branch.
@@ -111,6 +132,12 @@ export interface OpenedPage extends GraphPage {
    * keep: the one kept for the repository, or every branch.
    */
   readonly selection: BranchSelection;
+  /**
+   * The layout of the Commit Details View kept for the path, or the defaults
+   * (E04-M01-S12). Answered with the page so that it is applied in the same task
+   * and no click can meet the defaults first.
+   */
+  readonly detailsLayout: DetailsLayout;
 }
 
 /** The first page, or why the repository could not be opened. */
@@ -223,3 +250,30 @@ export interface ChooseThemeRequest {
  * that stayed when the request named none of the three.
  */
 export type ChooseThemeResponse = Result<ThemeSetting>;
+
+/**
+ * A choice the main process could not write for the next start, sent to the
+ * window on {@link CHANNELS}`.unkeptChoice` so that it can say so: the choice
+ * still applies until the application closes. It is a push, the only one, because
+ * the failure happens after the reply that applied the choice may already have
+ * been drawn. Each kind is sent at most once per run (`sayUnkept`,
+ * `src/app/window.ts`).
+ */
+export interface UnkeptChoice {
+  /** The choice in plain words, such as `theme choice` or `branch selection`. */
+  readonly what: string;
+  /** The absolute path of the file that could not be written. */
+  readonly file: string;
+}
+
+/** Keep a repository's layout: `path` is the one it was opened by (`OpenRepositoryRequest.path`). */
+export interface KeepDetailsLayoutRequest {
+  readonly path: string;
+  readonly layout: DetailsLayout;
+}
+
+/** The options of the Commit Details View in force. */
+export type DetailsOptionsResponse = Result<DetailsOptions>;
+
+/** The layout kept, or why it was not. */
+export type KeepDetailsLayoutResponse = Result<DetailsLayout>;

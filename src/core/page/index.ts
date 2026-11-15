@@ -3,10 +3,13 @@
  *
  * `src/core/layout/` answers which lane a commit is in and `src/adapters/` reads
  * a repository; neither of them knows what a *page of the view* is. This folder
- * does, and it holds the five decisions that make one: how the rows of every
- * page loaded so far are accumulated, whether a new reading may be appended to
- * them at all, which row HEAD is, where the uncommitted-changes row goes, and
- * whether a page read under a branch selection shows the working tree at all.
+ * does, and it holds the decisions that make one: how the rows of every page
+ * loaded so far are accumulated, whether a new reading may be appended to them
+ * at all, which row HEAD is, which rows are stashes, where the uncommitted-changes
+ * row goes and whether the layout is told of its line (E04-M01-S14),
+ * whether a page read under a branch selection shows the working tree at all,
+ * and whether a selected name is a reference name git accepts, which a page is
+ * read from only when it is.
  * They are here and not in `src/app/` because each of them can be wrong, and
  * `src/app/` contains no logic beyond wiring
  * (`docs/ADR-0002-architecture-and-performance.md` decision 1).
@@ -16,11 +19,27 @@
  */
 export { continuesBlock } from './continues-block';
 
-export { addPage, graphPageOf, layoutRowsOf } from './graph-page';
+export {
+  addPage,
+  continuesReading,
+  graphPageOf,
+  layoutReading,
+  layoutRowsOf,
+  uncommittedLineEnd,
+} from './graph-page';
 
 export { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from './page-sizes';
 
-export { appendRows, createRowBlock, markHeadRow, NO_HEAD_ROW } from './row-block';
+export {
+  appendRows,
+  createRowBlock,
+  markHeadRow,
+  markStashRows,
+  NO_HEAD_ROW,
+  NO_UNCOMMITTED_LINE,
+} from './row-block';
 export type { RowBlock } from './row-block';
+
+export { isRefName } from './ref-name';
 
 export { shownWorkingTree } from './shown-working-tree';

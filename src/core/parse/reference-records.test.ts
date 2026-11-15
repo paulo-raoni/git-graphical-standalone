@@ -6,13 +6,9 @@ import { createReferenceList } from './reference-list';
 import type { ReferenceList } from './reference-list';
 import {
   createReferenceParser,
-  createStashParser,
   finishReferences,
-  finishStashes,
   pushReferences,
-  pushStashes,
   REFERENCE_FORMAT,
-  STASH_FORMAT,
 } from './reference-records';
 
 const bytesOf = (text: string): Uint8Array =>
@@ -20,7 +16,6 @@ const bytesOf = (text: string): Uint8Array =>
 
 const RECORD = String.fromCharCode(0x1e);
 const UNIT = String.fromCharCode(0x1f);
-const NUL = String.fromCharCode(0);
 
 const COMMIT_A = '11'.repeat(HASH_BYTE_LENGTH);
 const COMMIT_B = '22'.repeat(HASH_BYTE_LENGTH);
@@ -38,11 +33,6 @@ function referenceRecord(
   return `${RECORD}${[refname, objectType, objectName, dereferenced, symref, head].join(UNIT)}\n`;
 }
 
-/** One `stash list` record, in the order `STASH_FORMAT` asks for. */
-function stashRecord(name: string, own: string, parents: string): string {
-  return `${RECORD}${[name, own, parents].join(UNIT)}${NUL}`;
-}
-
 function readReferences(text: string, chunkSize = 4096): ReferenceList {
   const list = createReferenceList();
   const parser = createReferenceParser(list);
@@ -51,17 +41,6 @@ function readReferences(text: string, chunkSize = 4096): ReferenceList {
     pushReferences(parser, bytes.subarray(at, Math.min(at + chunkSize, bytes.length)));
   }
   finishReferences(parser);
-  return list;
-}
-
-function readStashes(text: string, chunkSize = 4096): ReferenceList {
-  const list = createReferenceList();
-  const parser = createStashParser(list);
-  const bytes = bytesOf(text);
-  for (let at = 0; at < bytes.length; at += chunkSize) {
-    pushStashes(parser, bytes.subarray(at, Math.min(at + chunkSize, bytes.length)));
-  }
-  finishStashes(parser);
   return list;
 }
 
@@ -75,10 +54,6 @@ describe('the formats asked of git', () => {
       '%(symref)',
       '%(HEAD)',
     ]);
-  });
-
-  it('asks stash list for the entry, its own name and its parents, in that order', () => {
-    expect(STASH_FORMAT.split('%x1f')).toEqual(['%x1e%gd', '%H', '%P']);
   });
 });
 
@@ -168,41 +143,5 @@ describe('finishReferences', () => {
   it('reads a last record that arrived without its line feed', () => {
     const text = referenceRecord('refs/heads/main', 'commit', COMMIT_A).slice(0, -1);
     expect(readReferences(text).names).toEqual(['main']);
-  });
-});
-
-describe('pushStashes', () => {
-  it('points a stash at the commit it sits on, which is its first parent', () => {
-    const list = readStashes(stashRecord('stash@{0}', TAG_OBJECT, `${COMMIT_B} ${COMMIT_A}`));
-    expect(list.names).toEqual(['stash@{0}']);
-    expect(list.kinds).toEqual([RefKind.Stash]);
-    expect(list.flags).toEqual([0]);
-    expect(list.targets[0]).toBe(0x22);
-  });
-
-  it('skips a stash entry with no parent to sit on', () => {
-    expect(readStashes(stashRecord('stash@{0}', TAG_OBJECT, '')).count).toBe(0);
-  });
-
-  it('reads the same stashes at every chunk size, down to one byte', () => {
-    const text =
-      stashRecord('stash@{0}', TAG_OBJECT, COMMIT_A) +
-      stashRecord('stash@{1}', TAG_OBJECT, COMMIT_B);
-    for (let size = 1; size <= text.length + 1; size += 1) {
-      expect(readStashes(text, size).names).toEqual(['stash@{0}', 'stash@{1}']);
-    }
-  });
-
-  it('refuses a record with the wrong number of fields, and says how many it wanted', () => {
-    expect(() => readStashes(`${RECORD}stash@{0}${NUL}`)).toThrow(
-      /a stash record has 3 fields, not 1/,
-    );
-  });
-});
-
-describe('finishStashes', () => {
-  it('reads a last record that arrived without its terminator', () => {
-    const text = stashRecord('stash@{0}', TAG_OBJECT, COMMIT_A).slice(0, -1);
-    expect(readStashes(text).names).toEqual(['stash@{0}']);
   });
 });

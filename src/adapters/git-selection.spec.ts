@@ -71,7 +71,7 @@ function kindsOf(page: RepositoryPage): Set<number> {
 
 /** What git's own log of these revisions is. */
 function gitLog(revisions: readonly string[]): string[] {
-  return gitLines(where, ['log', '--format=%H', ...revisions, '--']);
+  return gitLines(where, ['log', '--format=%H', '--date-order', ...revisions, '--']);
 }
 
 const local = (name: string): string => `${String(RefKind.LocalHead)}:${name}`;
@@ -106,6 +106,7 @@ describe('every branch, as the arguments that were run before selections existed
       `--format=${COMMIT_LOG_FORMAT}`,
       '--date=raw',
       '--no-use-mailmap',
+      '--date-order',
       '--max-count=301',
       '--branches',
       '--tags',
@@ -130,6 +131,30 @@ describe('every branch, as the arguments that were run before selections existed
     ]);
     expect(referenceArgs('repository', true)).toEqual(referenceArgs('repository'));
     expect(referenceArgs('repository', false)).toEqual([...refs, 'refs/heads', 'refs/tags']);
+  });
+});
+
+describe('the log of a page with stashes', () => {
+  it('adds the commits the stashes were made on as tips on every branch, and under no selection', () => {
+    const bases = ['ab'.repeat(HASH_BYTE_LENGTH), 'cd'.repeat(HASH_BYTE_LENGTH)];
+    const every = commitLogArgs('repository', 301, undefined, bases);
+    expect(every.slice(-4)).toEqual(['HEAD', ...bases, '--']);
+    const local = commitLogArgs(
+      'repository',
+      301,
+      { branches: null, showRemoteBranches: false },
+      bases,
+    );
+    expect(local.slice(-7)).toEqual([
+      '--branches',
+      '--tags',
+      '--ignore-missing',
+      'HEAD',
+      ...bases,
+      '--',
+    ]);
+    const selected = commitLogArgs('repository', 301, shown('refs/heads/main'), bases);
+    expect(selected.slice(-3)).toEqual(['--ignore-missing', 'refs/heads/main', '--']);
   });
 });
 

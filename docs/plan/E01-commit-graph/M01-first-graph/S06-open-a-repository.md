@@ -29,6 +29,10 @@ its line descending into the tip; deleting the file and pressing Refresh again t
 back on row 0. That is an observation on this machine at this size on 2026-09-19, not a frame-time
 measurement; the budgets are S07's.
 
+*Corrected by E04-M01-S14, 2026-11-08:* the line did not descend into the tip. It stopped at the uncommitted
+row's bottom edge, because the tip's row carried `ClipAboveVertex`, which review round 06 of E04-M01 measured
+(its finding C-25). Since E04-M01-S14 it runs grey from the uncommitted row's ring down lane 0 into HEAD's dot.
+
 ## The process model, and what crosses each boundary
 
 `docs/ADR-0002-architecture-and-performance.md` decision 2, made real. Three processes and one more bundle
@@ -141,6 +145,13 @@ every later page shift every row already laid out. `layoutRowsOf` builds the shi
 gets lane 0, colour 0, one `(0, 0)` segment and the flags `Uncommitted | ClipAboveVertex`, and every other
 per-row and per-segment entry moves along by one. It is exactly what `test/e2e/graph-table.spec.ts` does by
 hand in `withUncommittedRow`.
+
+*Note of E04-M01-S14, 2026-11-08:* the row is still put on when the page is produced, and two things about
+it changed. Its vertex and its segment are in the grey `UNCOMMITTED_COLOUR` rather than colour 0, and it
+carries `ClipBelowVertex` as well while HEAD's commit is not a loaded row. And `src/core/layout/` is now told
+of its line before the first page (`layoutReading` of `src/core/page/graph-page.ts`): it keeps lane 0 for the
+line down to HEAD's row and marks that row `RowFlag.UncommittedAbove`, so a Load More whose reading would draw
+the line differently lays the page out again (`continuesReading`).
 
 **What that shift costs, and why it is paid there.** It is one copy of the block's nine columns per load:
 **eight bytes a row** — two for the lane, one for the colour, one for the flags and four for the row's

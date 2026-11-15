@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { keptSelection } from '../contracts/index';
 import type { BranchSelection } from '../contracts/index';
+import { sayUnkept } from './window';
 
 /**
  * The branch selection last applied to each repository, kept by the main process
@@ -81,6 +82,37 @@ async function replace(from: string, to: string): Promise<void> {
   }
 }
 
+/**
+ * Write `value` as the record at `file` inside `folder`, whole: a file of this
+ * process's own beside it, renamed over it. Shared with `./details-store.ts`,
+ * which keeps its records the same way and for the same reason.
+ *
+ * It never rejects. The value holds in this window whatever happens here; what is
+ * lost is that the next open will not find it. A failure is said on the process's
+ * own error stream, and in a notice inside the window once per run, as a theme
+ * that cannot be kept is (`./theme.ts`).
+ *
+ * @param what the record in plain words, for the notice: `branch selection`
+ */
+export async function writeRecord(
+  folder: string,
+  file: string,
+  value: unknown,
+  what: string,
+): Promise<void> {
+  try {
+    mkdirSync(folder, { recursive: true });
+    const written = `${file}.${String(process.pid)}`;
+    writeFileSync(written, JSON.stringify(value));
+    // The line a whole record hinges on: until this rename, readers see the
+    // previous record; after it, the new one, never a part of it.
+    await replace(written, file);
+  } catch (error: unknown) {
+    process.stderr.write(`The ${what} could not be kept: ${String(error)}\n`);
+    sayUnkept(what, file);
+  }
+}
+
 /** The selections kept, by the path each repository was opened by. */
 export interface SelectionStore {
   /** The selection kept for `path`, or `null` when nothing usable is kept. */
@@ -108,21 +140,7 @@ export function openSelectionStore(directory: string): SelectionStore {
     },
     keep: (path: string, selection: BranchSelection): Promise<void> => {
       const file = fileOf(path);
-      const written = `${file}.${String(process.pid)}`;
-      saved = saved
-        .then(async () => {
-          mkdirSync(folder, { recursive: true });
-          writeFileSync(written, JSON.stringify(selection));
-          // The line a whole record hinges on: until this rename, readers see the
-          // previous record; after it, the new one, never a part of it.
-          await replace(written, file);
-        })
-        .catch((error: unknown) => {
-          // The selection holds in this window whatever happens here; what is
-          // lost is that the next open will not find it. Said on the process's
-          // own error stream, as a theme that cannot be kept is (`./theme.ts`).
-          process.stderr.write(`The branch selection could not be kept: ${String(error)}\n`);
-        });
+      saved = saved.then(() => writeRecord(folder, file, selection, 'branch selection'));
       return saved;
     },
   };

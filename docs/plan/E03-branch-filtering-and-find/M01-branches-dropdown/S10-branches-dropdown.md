@@ -59,8 +59,12 @@ checkbox: seen once by this lane with a throwaway script, and held by no case of
   Show All is one press.
 - **The order.** The checked-out branch comes first among the local ones (the observation could not tell it from
   the name `main`; the task says take "current"). The rest are in code-unit order, the default order of
-  JavaScript's `sort` and the order git lists references in, which puts `origin/HEAD` before `origin/feature`,
-  where it was seen.
+  JavaScript's `sort`, which puts `origin/HEAD` before `origin/feature`, where it was seen. Git lists references
+  in code-point order (the byte order of their UTF-8 spelling), which differs from code-unit order only where
+  two names first differ by a character above U+FFFF against one from U+E000 to U+FFFF: code-unit order puts
+  the first ahead, git the second. Measured by E04-M01-S03 on 2026-11-03 with git 2.51.0 on Windows, through
+  `for-each-ref` and `branch --list`, loose and packed, over thirteen names from U+005A to U+20000; that the
+  two orders agree on every other pair follows from how UTF-16 spells such a character, and was not measured.
 - **What the box says when every entry is checked**, which the observation did not record: Show All, since the
   graph shows everything.
 - **A checked branch the list no longer offers**, such as one deleted since it was checked, is named in the box by

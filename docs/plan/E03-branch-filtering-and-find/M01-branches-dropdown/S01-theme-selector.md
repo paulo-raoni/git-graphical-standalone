@@ -64,6 +64,11 @@ chained so that two quick choices reach the disk in the order they were made. A 
 foreign file is read as no choice, which is System. A write that fails leaves the choice applied for the
 session and is reported on the main process's error stream: the window's only place for a failure replaces
 the graph, which is out of proportion to a setting that will not be remembered.
+*Corrected by E04-M01-S04, 2026-11-04:* since E04-M01-S03 a write that fails is also said in the window, once a
+run, by a warning message box titled *Not kept* attached to it (`sayUnkept` in `src/app/window.ts`, called from the
+write's `catch` in `src/app/theme.ts`); the error stream line stays, and the failure view is still not used, for
+the reason above. Read from that code and from E04-M01-S03's slice document, which records the box seen in the
+running application; not measured again by E04-M01-S04.
 
 ## Interfaces
 

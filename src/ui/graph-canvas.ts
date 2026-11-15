@@ -1,8 +1,20 @@
 import { entryAt } from '../contracts/column-read';
-import { RowFlag } from '../contracts/index';
+import { RowFlag, UNCOMMITTED_COLOUR } from '../contracts/index';
 import type { GraphPage, LayoutRows } from '../contracts/index';
 
-import { laneCentreX, rowTopY, ROW_HEIGHT, segmentLines, VERTEX_RADIUS } from './geometry';
+import {
+  DETAILS_HEIGHT,
+  gapLines,
+  gapSide,
+  laneCentreX,
+  NO_ROW,
+  rowTopY,
+  ROW_HEIGHT,
+  segmentLines,
+  STASH_CENTRE_RADIUS,
+  uncommittedArrival,
+  VERTEX_RADIUS,
+} from './geometry';
 import { laneColour } from './palette';
 
 /**
@@ -19,7 +31,10 @@ import { laneColour } from './palette';
  *
  * The cost of one paint is the rows on screen times their segments, and nothing
  * else is read: no row above the viewport is touched, and a page ten times
- * longer paints the same number of lines.
+ * longer paints the same number of lines. With the details of a row open
+ * (E04-M01-S09) it also reads that row and the one after it, however far from the
+ * viewport, because the area between them is drawn whenever any of it is on
+ * screen; that is two rows more, once, and no more for a longer page.
  *
  * **The stylesheet gives the canvas an explicit height, and must.** A canvas is
  * a replaced element, so with `height: auto` it takes its intrinsic size and
@@ -50,7 +65,8 @@ const LINE_WIDTH = 1.6;
 const HEAD_RING_RADIUS = VERTEX_RADIUS + 2;
 
 /**
- * Scratch for `segmentLines`, which writes at most two lines of four numbers.
+ * Scratch for `segmentLines`, which writes a start point and at most two pieces
+ * of six numbers, fourteen in all.
  *
  * Module-level and reused, which is the one piece of state in this file. It is
  * safe because a paint runs synchronously from its first line to its last and
@@ -58,7 +74,7 @@ const HEAD_RING_RADIUS = VERTEX_RADIUS + 2;
  * fresh array per segment per row per frame — is a few thousand short-lived
  * allocations a second while a finger is on the wheel.
  */
-const scratch: number[] = [0, 0, 0, 0, 0, 0, 0, 0];
+const scratch: number[] = new Array<number>(14).fill(0);
 
 /**
  * Match the canvas's backing store to its box and to the display.
@@ -77,42 +93,146 @@ export function resizeCanvas(canvas: HTMLCanvasElement, width: number, height: n
   }
 }
 
-/** Every line of one row, in its lanes' colours. */
-function paintRow(
+/**
+ * Stroke the `halves` halves in `scratch` that are of one kind, the curved ones
+ * when `curves` is true and the straight ones when it is false, in `colour`.
+ *
+ * `segmentLines` and `gapLines` write every number of the path, control points
+ * included, so this only strokes it: a half whose two ends share an `x` is a
+ * `lineTo`, any other a `bezierCurveTo`. A segment's two halves meet at the
+ * centre height, so two of one kind are one stroke and a straight line through a
+ * row has no join there. A segment with nothing of the kind asked for costs no
+ * stroke.
+ *
+ * Painting the two kinds apart is what puts every vertical line over every curve
+ * that crosses it: `paintGraph` paints all the curves first.
+ */
+function strokeHalves(
   context: CanvasRenderingContext2D,
-  rows: LayoutRows,
-  row: number,
-  top: number,
+  halves: number,
+  colour: string,
+  curves: boolean,
 ): void {
-  const vertexLane = entryAt(rows.laneIndex, row);
-  const flags = entryAt(rows.flags, row);
-  const last = entryAt(rows.segmentOffsets, row + 1);
-  for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
-    const lines = segmentLines(
-      scratch,
-      entryAt(rows.segmentFromLane, segment),
-      entryAt(rows.segmentToLane, segment),
-      vertexLane,
-      flags,
-      top,
-    );
-    context.strokeStyle = laneColour(entryAt(rows.segmentColour, segment));
-    context.beginPath();
-    for (let line = 0; line < lines; line += 1) {
-      context.moveTo(entryAt(scratch, line * 4), entryAt(scratch, line * 4 + 1));
-      context.lineTo(entryAt(scratch, line * 4 + 2), entryAt(scratch, line * 4 + 3));
+  let pen = false;
+  for (let half = 0; half < halves; half += 1) {
+    const at = 2 + 6 * half;
+    const x = entryAt(scratch, at + 4);
+    const y = entryAt(scratch, at + 5);
+    if ((entryAt(scratch, at - 2) !== x) !== curves) {
+      continue;
     }
+    if (!pen) {
+      context.strokeStyle = colour;
+      context.beginPath();
+      context.moveTo(entryAt(scratch, at - 2), entryAt(scratch, at - 1));
+      pen = true;
+    }
+    if (curves) {
+      const c = scratch;
+      context.bezierCurveTo(
+        entryAt(c, at),
+        entryAt(c, at + 1),
+        entryAt(c, at + 2),
+        entryAt(c, at + 3),
+        x,
+        y,
+      );
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+  if (pen) {
     context.stroke();
   }
 }
 
 /**
+ * The halves of one row's lines that are of one kind, each in its line's colour.
+ * `side` is which side of an open area the row is on (`gapSide`).
+ */
+function paintRow(
+  context: CanvasRenderingContext2D,
+  rows: LayoutRows,
+  row: number,
+  top: number,
+  curves: boolean,
+  side: number,
+): void {
+  const last = entryAt(rows.segmentOffsets, row + 1);
+  for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
+    const halves = segmentLines(scratch, rows, row, segment, top, side);
+    strokeHalves(context, halves, laneColour(entryAt(rows.segmentColour, segment)), curves);
+  }
+}
+
+/**
+ * The lines across the area under `row`, which opens at `top`'s foot: every
+ * segment of `row` that crosses its foot continues through the area in its own
+ * colour, the uncommitted row's grey line included.
+ */
+function paintGap(
+  context: CanvasRenderingContext2D,
+  rows: LayoutRows,
+  row: number,
+  gapTop: number,
+  curves: boolean,
+  gap: number,
+): void {
+  const last = entryAt(rows.segmentOffsets, row + 1);
+  for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
+    const halves = gapLines(scratch, rows, row, segment, gapTop, gap);
+    strokeHalves(context, halves, laneColour(entryAt(rows.segmentColour, segment)), curves);
+  }
+}
+
+/**
+ * The half of the uncommitted row's line in the band of the row it ends at,
+ * HEAD's: straight down the vertex's lane from the top edge to the dot, in the
+ * uncommitted row's grey (`RowFlag.UncommittedAbove`, E04-M01-S14). A row that
+ * does not carry the bit paints nothing here.
+ */
+function paintUncommittedArrival(
+  context: CanvasRenderingContext2D,
+  rows: LayoutRows,
+  row: number,
+  top: number,
+): void {
+  if (!uncommittedArrival(scratch, rows, row, top)) {
+    return;
+  }
+  context.strokeStyle = laneColour(UNCOMMITTED_COLOUR);
+  context.beginPath();
+  context.moveTo(entryAt(scratch, 0), entryAt(scratch, 1));
+  context.lineTo(entryAt(scratch, 2), entryAt(scratch, 3));
+  context.stroke();
+}
+
+/**
+ * Clear the inside of a ring at `(x, y)`, so that the background shows there and
+ * no line drawn before it does: a line in the ring's own lane runs to its centre
+ * (`segmentLines`), and the reference extension was seen to draw a stash's line
+ * and the uncommitted row's from the ring's edge (E04-M01-S14). Every other
+ * line passes a row's centre height in its own lane, at least half a lane,
+ * 7 pixels, from the ring's centre, and the ring's radius is half of that.
+ */
+function clearInside(context: CanvasRenderingContext2D, x: number, y: number): void {
+  context.globalCompositeOperation = 'destination-out';
+  context.beginPath();
+  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  context.fill();
+  context.globalCompositeOperation = 'source-over';
+}
+
+/**
  * The commit's own dot.
  *
- * Filled for a commit and hollow for the uncommitted-changes row. The reference
- * behaviour this task carries says only that the uncommitted row sits above
- * every commit, so the distinction is this lane's: an outline reads as a place
- * where a commit is not yet, and it costs nothing a filled dot would not.
+ * Filled for a commit, and a ring for the uncommitted-changes row and for a
+ * stash, with the background showing inside. The uncommitted row's ring is grey
+ * and has nothing in it; a stash's is in its lane's colour with a small filled
+ * disc at its centre, a third of the ring's width across. Both rings and the
+ * grey are as the reference extension was seen to draw them (E04-M01-S14); until
+ * then the uncommitted row's outline was this project's own choice, in lane 0's
+ * colour.
  *
  * Which row that is comes from `workingTree.hasChanges`, not from
  * `RowFlag.Uncommitted`, for the reason `./row-model` gives: `hasChanges` is
@@ -135,13 +255,22 @@ function paintVertex(
   const colour = laneColour(entryAt(rows.colourIndex, row));
   const x = laneCentreX(entryAt(rows.laneIndex, row));
   const y = top + ROW_HEIGHT / 2;
-  context.beginPath();
-  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  const stash = (entryAt(rows.flags, row) & RowFlag.Stash) !== 0;
   context.strokeStyle = colour;
   context.fillStyle = colour;
-  if (uncommitted) {
+  if (uncommitted || stash) {
+    clearInside(context, x, y);
+  }
+  context.beginPath();
+  context.arc(x, y, VERTEX_RADIUS, 0, Math.PI * 2);
+  if (uncommitted || stash) {
     context.stroke();
   } else {
+    context.fill();
+  }
+  if (stash) {
+    context.beginPath();
+    context.arc(x, y, STASH_CENTRE_RADIUS, 0, Math.PI * 2);
     context.fill();
   }
   if ((entryAt(rows.flags, row) & RowFlag.Head) !== 0) {
@@ -152,12 +281,49 @@ function paintVertex(
 }
 
 /**
- * Paint `count` rows starting at `first`, and nothing else.
+ * The top edge of the open area, or `null` when no area is open or none of it is
+ * on screen: it needs no row of the drawn window, only the scroll offset.
+ */
+function gapTopOnScreen(
+  rows: LayoutRows,
+  open: number,
+  scrollTop: number,
+  height: number,
+  gap: number,
+): number | null {
+  if (open < 0 || open >= rows.rowCount) {
+    return null;
+  }
+  const top = rowTopY(open, scrollTop, open, gap) + ROW_HEIGHT;
+  return top < height && top + gap > 0 ? top : null;
+}
+
+/**
+ * Paint `count` rows starting at `first`, and the lines across the open area,
+ * and nothing else.
  *
  * The caller has already decided which rows those are, from the scroll offset
  * and the viewport height (`./geometry`), so this reads exactly that slice of
- * the layout arrays. It is the whole of the drawing cost, and it is proportional
- * to the viewport.
+ * the layout arrays, and the segments of the one row on either side of it,
+ * which `segmentLines` reads to find where a line bends. It is the whole of the
+ * drawing cost, and it is proportional to the viewport.
+ *
+ * **The area (E04-M01-S09).** When the details of row `open` are showing, every
+ * row after it is drawn `gap` lower, the area's height in force (`rowTopY`), and the lines of the
+ * gap between `open` and the row after it are drawn by `gapLines` whenever any of
+ * the gap is on screen, **whether or not either row is drawn**: the area may fill
+ * the view with both rows scrolled out of it. That reads the open row's segments
+ * and the next row's, two rows more than the drawn window, once per paint, however
+ * far away they are.
+ *
+ * **The order is the layering, in two passes.** Every curved half of every row
+ * and of the gap first, then the straight halves of the gap, and, row by row,
+ * the straight halves and the dot. So a vertical line is drawn over every curve
+ * that crosses it, which is what the reference extension was seen to do
+ * (E04-M01-S15), and every dot over every line that reaches it. Where two curves
+ * cross, the one drawn later is on top: within one row's band that is segment
+ * order, the lines passing through in lane order from the left and then the lines
+ * born at the vertex.
  */
 export function paintGraph(
   context: CanvasRenderingContext2D,
@@ -166,15 +332,30 @@ export function paintGraph(
   count: number,
   scrollTop: number,
   ratio: number,
+  open = NO_ROW,
+  gap = DETAILS_HEIGHT,
 ): void {
   const rows = page.layout;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  context.clearRect(0, 0, context.canvas.width / ratio, context.canvas.height / ratio);
+  const height = context.canvas.height / ratio;
+  context.clearRect(0, 0, context.canvas.width / ratio, height);
   context.lineWidth = LINE_WIDTH;
   context.lineCap = 'round';
+  const gapTop = gapTopOnScreen(rows, open, scrollTop, height, gap);
+  const crossed = gapTop !== null;
+  if (crossed) {
+    paintGap(context, rows, open, gapTop, true, gap);
+  }
   for (let row = first; row < first + count; row += 1) {
-    const top = rowTopY(row, scrollTop);
-    paintRow(context, rows, row, top);
+    paintRow(context, rows, row, rowTopY(row, scrollTop, open, gap), true, gapSide(row, open));
+  }
+  if (crossed) {
+    paintGap(context, rows, open, gapTop, false, gap);
+  }
+  for (let row = first; row < first + count; row += 1) {
+    const top = rowTopY(row, scrollTop, open, gap);
+    paintRow(context, rows, row, top, false, gapSide(row, open));
+    paintUncommittedArrival(context, rows, row, top);
     paintVertex(context, rows, row, top, row === 0 && page.workingTree.hasChanges);
   }
 }

@@ -29,21 +29,29 @@ import type { RecordReader } from './records';
  */
 
 /**
- * The format asked of `git log`, with every field separated by the ASCII unit
- * separator and every record introduced by the record separator.
+ * The fields of one commit as `git log` and `git stash list` are asked for
+ * them, every field separated by the ASCII unit separator.
  *
  * The order is not arbitrary. **The subject is last**, so that the one field a
  * user writes freely cannot move any other field even if it contains a separator
  * of its own: a subject holding the unit separator absorbs the rest of its own
  * record, and every field before it is already read. The record terminator is
  * the NUL of `-z`, which a git object's message cannot contain at all.
+ *
+ * `./stash-list.ts` asks `git stash list` for the same fields after the stash's
+ * own name, so that a stash is read into the same commit a log record is.
  */
-export const COMMIT_LOG_FORMAT = '%x1e%H%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%cn%x1f%ce%x1f%cd%x1f%s';
+export const COMMIT_FIELDS = '%H%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%cn%x1f%ce%x1f%cd%x1f%s';
 
-/** Fields {@link COMMIT_LOG_FORMAT} asks for. */
-const FIELD_COUNT = 9;
+/**
+ * The format asked of `git log`: {@link COMMIT_FIELDS}, every record introduced
+ * by the record separator.
+ */
+export const COMMIT_LOG_FORMAT = `%x1e${COMMIT_FIELDS}`;
 
-const HASH = 0;
+/** Fields {@link COMMIT_FIELDS} asks for. */
+export const COMMIT_FIELD_COUNT = 9;
+
 const PARENTS = 1;
 const AUTHOR_NAME = 2;
 const AUTHOR_EMAIL = 3;
@@ -60,93 +68,116 @@ const INITIAL_PARENTS = 4;
 export type CommitSink = (commit: AppendedCommit) => void;
 
 /**
- * The parser's whole state.
+ * The buffers a record's commit fields are read with: the field bounds of the
+ * record, and the object names, **reused for every commit**.
  *
- * The two buffers are **reused for every commit**, which is safe for exactly the
- * reason `AppendedCommit` exists: the store copies each field into a column and
- * lets the object die in the nursery. A sink that retains an `AppendedCommit`
- * past its own return retains a buffer that the next commit overwrites, so a
- * sink that wants to keep one copies it.
+ * Reusing them is safe for exactly the reason `AppendedCommit` exists: the store
+ * copies each field into a column and lets the object die in the nursery. A sink
+ * that retains an `AppendedCommit` past its own return retains a buffer that the
+ * next commit overwrites, so a sink that wants to keep one copies it.
  */
-export interface CommitLogParser {
-  readonly reader: RecordReader;
+export interface CommitFieldBuffers {
   /** Field bounds of the record being read, reused so a record allocates none. */
   readonly bounds: Uint32Array;
   /** The object name of the commit being read. */
   readonly hash: Uint8Array;
   /** Its parents' object names, grown when a merge needs more room than this. */
   parents: Uint8Array;
+}
+
+/** The parser's whole state. */
+export interface CommitLogParser extends CommitFieldBuffers {
+  readonly reader: RecordReader;
   readonly onCommit: CommitSink;
+}
+
+/** Buffers for a record of `fields` fields. */
+export function createCommitFieldBuffers(fields: number): CommitFieldBuffers {
+  return {
+    bounds: new Uint32Array(fields * 2),
+    hash: new Uint8Array(HASH_BYTE_LENGTH),
+    parents: new Uint8Array(INITIAL_PARENTS * HASH_BYTE_LENGTH),
+  };
 }
 
 export function createCommitLogParser(onCommit: CommitSink): CommitLogParser {
   return {
     reader: createRecordReader(NUL_TERMINATOR),
-    bounds: new Uint32Array(FIELD_COUNT * 2),
-    hash: new Uint8Array(HASH_BYTE_LENGTH),
-    parents: new Uint8Array(INITIAL_PARENTS * HASH_BYTE_LENGTH),
+    ...createCommitFieldBuffers(COMMIT_FIELD_COUNT),
     onCommit,
   };
 }
 
 /** The text of field `index` of the record in `bytes`. */
-function text(parser: CommitLogParser, bytes: Uint8Array, index: number): string {
-  return decodeUtf8(bytes, fieldFrom(parser.bounds, index), fieldTo(parser.bounds, index));
+function text(buffers: CommitFieldBuffers, bytes: Uint8Array, index: number): string {
+  return decodeUtf8(bytes, fieldFrom(buffers.bounds, index), fieldTo(buffers.bounds, index));
 }
 
 /** The seconds and the offset of the raw date in field `index`. */
-function seconds(parser: CommitLogParser, bytes: Uint8Array, index: number): number {
-  return rawDateSeconds(bytes, fieldFrom(parser.bounds, index), fieldTo(parser.bounds, index));
+function seconds(buffers: CommitFieldBuffers, bytes: Uint8Array, index: number): number {
+  return rawDateSeconds(bytes, fieldFrom(buffers.bounds, index), fieldTo(buffers.bounds, index));
 }
 
-function offset(parser: CommitLogParser, bytes: Uint8Array, index: number): number {
+function offset(buffers: CommitFieldBuffers, bytes: Uint8Array, index: number): number {
   return rawDateOffsetMinutes(
     bytes,
-    fieldFrom(parser.bounds, index),
-    fieldTo(parser.bounds, index),
+    fieldFrom(buffers.bounds, index),
+    fieldTo(buffers.bounds, index),
   );
 }
 
-/** Read the parents of this record into the reused buffer, and report how many. */
-function readParents(parser: CommitLogParser, bytes: Uint8Array): number {
-  const from = fieldFrom(parser.bounds, PARENTS);
-  const to = fieldTo(parser.bounds, PARENTS);
+/** Read the parents in field `index` into the reused buffer, and report how many. */
+function readParents(buffers: CommitFieldBuffers, bytes: Uint8Array, index: number): number {
+  const from = fieldFrom(buffers.bounds, index);
+  const to = fieldTo(buffers.bounds, index);
   const required = objectNameCount(from, to) * HASH_BYTE_LENGTH;
-  if (required > parser.parents.length) {
-    parser.parents = new Uint8Array(required);
+  if (required > buffers.parents.length) {
+    buffers.parents = new Uint8Array(required);
   }
-  return writeObjectNames(bytes, from, to, parser.parents, 0);
+  return writeObjectNames(bytes, from, to, buffers.parents, 0);
+}
+
+/**
+ * The commit whose {@link COMMIT_FIELDS} start at field `first` of a record
+ * whose bounds `buffers` already holds. Its object name is that first field.
+ */
+export function commitOfFields(
+  buffers: CommitFieldBuffers,
+  bytes: Uint8Array,
+  first: number,
+): AppendedCommit {
+  writeObjectName(
+    bytes,
+    fieldFrom(buffers.bounds, first),
+    fieldTo(buffers.bounds, first),
+    buffers.hash,
+    0,
+  );
+  const parents = readParents(buffers, bytes, first + PARENTS);
+  return {
+    hash: buffers.hash,
+    parentHashes: buffers.parents.subarray(0, parents * HASH_BYTE_LENGTH),
+    authorName: text(buffers, bytes, first + AUTHOR_NAME),
+    authorEmail: text(buffers, bytes, first + AUTHOR_EMAIL),
+    authorTime: seconds(buffers, bytes, first + AUTHOR_DATE),
+    authorTzMinutes: offset(buffers, bytes, first + AUTHOR_DATE),
+    committerName: text(buffers, bytes, first + COMMITTER_NAME),
+    committerEmail: text(buffers, bytes, first + COMMITTER_EMAIL),
+    commitTime: seconds(buffers, bytes, first + COMMITTER_DATE),
+    commitTzMinutes: offset(buffers, bytes, first + COMMITTER_DATE),
+    subject: text(buffers, bytes, first + SUBJECT),
+  };
 }
 
 /** Turn one complete record into a commit and hand it to the sink. */
 function emitCommit(parser: CommitLogParser, bytes: Uint8Array, from: number, to: number): void {
   const found = splitFields(bytes, afterMark(bytes, from, to), to, UNIT_MARK, parser.bounds);
-  if (found !== FIELD_COUNT) {
+  if (found !== COMMIT_FIELD_COUNT) {
     throw new SyntaxError(
-      `a commit record has ${String(FIELD_COUNT)} fields, not ${String(found)}`,
+      `a commit record has ${String(COMMIT_FIELD_COUNT)} fields, not ${String(found)}`,
     );
   }
-  writeObjectName(
-    bytes,
-    fieldFrom(parser.bounds, HASH),
-    fieldTo(parser.bounds, HASH),
-    parser.hash,
-    0,
-  );
-  const parents = readParents(parser, bytes);
-  parser.onCommit({
-    hash: parser.hash,
-    parentHashes: parser.parents.subarray(0, parents * HASH_BYTE_LENGTH),
-    authorName: text(parser, bytes, AUTHOR_NAME),
-    authorEmail: text(parser, bytes, AUTHOR_EMAIL),
-    authorTime: seconds(parser, bytes, AUTHOR_DATE),
-    authorTzMinutes: offset(parser, bytes, AUTHOR_DATE),
-    committerName: text(parser, bytes, COMMITTER_NAME),
-    committerEmail: text(parser, bytes, COMMITTER_EMAIL),
-    commitTime: seconds(parser, bytes, COMMITTER_DATE),
-    commitTzMinutes: offset(parser, bytes, COMMITTER_DATE),
-    subject: text(parser, bytes, SUBJECT),
-  });
+  parser.onCommit(commitOfFields(parser, bytes, 0));
 }
 
 /** Feed one chunk of `git log` output. */

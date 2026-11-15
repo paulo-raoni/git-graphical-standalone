@@ -631,6 +631,14 @@ quiet and 9.377 to 9.625 under the game, green). **Under a load that slows layou
 reads a regression of script time smaller, and one of 5 ms went unseen.** It still cannot see a regression that
 slows the reference as much as the frames, nor one that slows four or fewer frames of every run.
 
+**Since E04-M01-S05 (2026-11-06) the case also holds no frame over 16.7 ms literally**, the longest frame of each
+run as timed and the lowest of the ten, and **discards a reading whose reference timings have a 95th percentile
+over 4 ms**: its verdicts are printed `DISCARDED` and none is asserted. That lane measured the busy-wait of 5 ms
+reading green on all three verdicts under a load the median of the reference did not mark, and the unchanged
+product reading red on the literal verdict under loads within `AGENTS.md` §11's 40 per cent; its slice document,
+`docs/plan/E04-commit-details-comparison-and-diff/M01-commit-details-view/S05-budgets-and-reference-bound.md`, has
+the readings and the argument.
+
 ### Live row elements
 
 37 row elements with 300 commits loaded, and 37 with 10 000 loaded after scrolling to four offsets across the
@@ -655,6 +663,19 @@ is named:
 | typed-array bytes allocated parsing a commit | 66.64 | the store's columns |
 | heap bytes allocated laying out a row | 13.512, tolerance 1.01 | |
 | typed-array bytes allocated laying out a row | 130.491 | the layout's output and segment buffer |
+
+*Note, 2026-11-10 (E04-M01-FIX-09).* The order in the row *git processes to open a repository* is the order
+before E04-M01-S14. Since S14 the stash list is read before the log: after `git --version`, the commands are
+`rev-parse`, `stash`, `log`, `for-each-ref` and `status`. Review round 07 read that order in `readGitPage` at
+`c109749`. E04-M01-FIX-09 then read it from the `start` events of a `GIT_TRACE2_EVENT` file written while
+`readGitPage` read one small repository holding one stash. The count stays 6 and the `unit` text of
+`gitProcessesPerOpen` in `perf/baselines.json` names the new order. In that trace `git stash list` also started
+one `git log` child of its own, so a repository with a stash may start one more process than the gate counts on
+the `large` fixture; that is one reading of one repository, not a measured count for any other.
+
+**The two redraw counts are read once the page is quiet since E04-M01-S05**: after every timeout, animation
+frame and idle callback the page asked for has run, and through two rendering updates more, where they were read
+after fixed waits of 300 ms (that slice's document, *Fixed waits replaced*).
 
 **Git processes are counted by git.** `GIT_TRACE2_EVENT`, set to a file in the application's environment,
 makes every git process append a `start` event as it begins; `src/adapters/git-process.ts` passes the
@@ -908,7 +929,8 @@ case, by the orchestrator's record in `docs/PLAN.md`; E03-M01-S04 repeats that r
   the first-paint check in the first launch, and with that check removed the bar check failed alone. The mark
   is therefore after the main thread painted what it shows and may be before the compositor presented it.
 - **A probe installed too late.** Each init script records whether the renderer's view already existed; every
-  launch requires all five to say no.
+  launch requires all five to say no. Since E04-M01-S05 a first window that missed one is reloaded once all five
+  are added, and the start cases time no reloaded launch (that slice's document, *The launch race*).
 - **A memory reading that misses a process, or counts one that is not the loaded application.** The tree is
   read from the operating system, rooted at the pid the main process reports, and must hold at least four
   processes. It held five in every reading taken; a sixth of the application's own lives for a few seconds two

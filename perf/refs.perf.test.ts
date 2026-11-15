@@ -28,7 +28,7 @@ import { held } from './workloads';
  * The workload is synthetic and the same on every run: a page of
  * {@link PAGE_COMMITS} commits with object names drawn from a fixed linear
  * congruential sequence, and references in the mix of the `many-refs` fixture
- * (`test/fixtures/generate.ts`) — local branches, one remote-tracking branch on
+ * (`src/adapters/reference-fixtures.spec-support.ts`) — local branches, one remote-tracking branch on
  * the same commit as each, and half as many tags as branches, every other one
  * annotated — spelled as `git for-each-ref` spells them in the reader's format
  * and read by the reader's own parser. Every reference stands on a commit of the

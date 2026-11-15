@@ -1,5 +1,5 @@
 import { entryAt } from '../contracts/column-read';
-import { RowFlag } from '../contracts/index';
+import { DEFAULT_DETAILS_LAYOUT, RowFlag } from '../contracts/index';
 import type { LayoutRows } from '../contracts/index';
 
 /**
@@ -35,6 +35,38 @@ import type { LayoutRows } from '../contracts/index';
 export const ROW_HEIGHT = 24;
 
 /**
+ * The height of the details area a repository that kept none has, in CSS pixels,
+ * its border included (E04-M01-S09): the contract's default
+ * (`DEFAULT_DETAILS_LAYOUT`), the orchestrator's choice from the reference
+ * extension's reading of about 10.4 rows, 249 pixels against a 24-pixel row.
+ * **Not the height in force** (E04-M01-S12): a person drags it and each repository
+ * keeps its own, so every function below takes the height in force as its last
+ * argument, `gap`, and this is what it is when none is named.
+ * `mountGraphTable` writes the height in force onto the view as `--details-height`,
+ * for the reason {@link ROW_HEIGHT} gives.
+ */
+export const DETAILS_HEIGHT = DEFAULT_DETAILS_LAYOUT.height;
+
+/**
+ * The row that has its details open is a layout row index, or `NO_ROW` for none.
+ * Every function below that places a row takes it as `open`, and moves every row
+ * after the open one down by the area's height, `gap`; the rows up to and
+ * including it stay where they were.
+ */
+export const NO_ROW = -1;
+
+/** The top edge of a row inside the scrolling content, the open area of height `gap` counted. */
+export function rowOffsetY(row: number, open = NO_ROW, gap = DETAILS_HEIGHT): number {
+  return row * ROW_HEIGHT + (open >= 0 && row > open ? gap : 0);
+}
+
+/** The row whose band, or whose open area, holds the content offset `y`. */
+function rowAtOffset(y: number, open: number, gap: number): number {
+  const row = Math.floor(Math.max(y, 0) / ROW_HEIGHT);
+  return open < 0 || row <= open ? row : Math.max(open, Math.floor((y - gap) / ROW_HEIGHT));
+}
+
+/**
  * Rows kept above and below the viewport.
  *
  * It buys two things: a row entering the view is already written and positioned
@@ -54,6 +86,13 @@ export const GRAPH_PADDING = 12;
 
 /** Radius of a commit's dot. */
 export const VERTEX_RADIUS = 3.5;
+
+/**
+ * Radius of the filled disc at the centre of a stash's ring: a third of the
+ * ring's width across, as the reference extension was seen to draw it
+ * (E04-M01-S14). The ring itself is drawn at {@link VERTEX_RADIUS}.
+ */
+export const STASH_CENTRE_RADIUS = VERTEX_RADIUS / 3;
 
 /**
  * How near a vertex a pointer counts as being on it.
@@ -105,10 +144,21 @@ export function rowPoolSize(viewportHeight: number): number {
  * would hang off the end of the list. The upper clamp is what keeps every pool
  * element in use near the foot of a long page instead of leaving a band of
  * hidden elements there.
+ *
+ * With the details of row `open` showing, the row at the top of the view is the
+ * one `rowAtOffset` finds, `open` itself while the view is inside its area. The
+ * area only takes room from the rows, so the view still shows no more rows than
+ * {@link visibleRowCount} counts and the pool still covers them.
  */
-export function firstDrawnRow(scrollTop: number, viewportHeight: number, rowCount: number): number {
+export function firstDrawnRow(
+  scrollTop: number,
+  viewportHeight: number,
+  rowCount: number,
+  open = NO_ROW,
+  gap = DETAILS_HEIGHT,
+): number {
   const lastStart = Math.max(0, rowCount - rowPoolSize(viewportHeight));
-  const wanted = Math.floor(Math.max(scrollTop, 0) / ROW_HEIGHT) - OVERSCAN_ROWS;
+  const wanted = rowAtOffset(scrollTop, open, gap) - OVERSCAN_ROWS;
   return Math.min(Math.max(wanted, 0), lastStart);
 }
 
@@ -132,9 +182,21 @@ export function rowInSlot(slot: number, first: number, count: number, size: numb
   return row < first + count ? row : -1;
 }
 
-/** The top edge of a row, in viewport coordinates. */
-export function rowTopY(row: number, scrollTop: number): number {
-  return row * ROW_HEIGHT - scrollTop;
+/**
+ * The top edge of a row, in viewport coordinates, the open area counted.
+ *
+ * **One of the two places the guarantee of E04-M01-S09 hangs on:** the canvas
+ * takes a row's top from here and the DOM takes the same row's top from
+ * {@link rowOffsetY}, the function this one subtracts the scroll offset from, so
+ * the two cannot disagree about where the rows below an open area are.
+ */
+export function rowTopY(
+  row: number,
+  scrollTop: number,
+  open = NO_ROW,
+  gap = DETAILS_HEIGHT,
+): number {
+  return rowOffsetY(row, open, gap) - scrollTop;
 }
 
 /** The centre of a lane, measured from the graph column's left edge. */
@@ -157,75 +219,276 @@ export function graphColumnWidth(maxLane: number): number {
   return Math.min(Math.max(wanted, MIN_GRAPH_WIDTH), MAX_GRAPH_WIDTH);
 }
 
+/** Half a row: from a row's edge to its centre height. */
+const HALF_ROW = ROW_HEIGHT / 2;
+
 /**
- * Turn one segment into the lines that are actually painted, writing
- * `x0, y0, x1, y1` quadruples into `into` and returning how many it wrote.
+ * The lane a segment's line is in at its row's centre height.
  *
- * It writes into a caller's array rather than returning one, because it is
- * called once per segment per visible row per frame and a fresh array each time
- * is garbage the 8 ms frame budget does not need to collect.
+ * A line arriving at the vertex is in the vertex's lane there, because that is
+ * where it ends; every other line is in the lane it entered the band in, which
+ * for a line born at the vertex is the vertex's lane too.
+ */
+function centreLane(rows: LayoutRows, segment: number, vertexLane: number): number {
+  const toLane = entryAt(rows.segmentToLane, segment);
+  return toLane === vertexLane ? vertexLane : entryAt(rows.segmentFromLane, segment);
+}
+
+/**
+ * The lane, at the centre height of `row`, of the line that crosses `row`'s
+ * bottom edge in `lane` (when `edge` is `segmentToLane`, asked of the row above)
+ * or its top edge in `lane` (when `edge` is `segmentFromLane`, asked of the row
+ * below).
  *
- * A segment spans the whole band unless the row says otherwise, so there are
- * four cases and the vertex decides three of them:
+ * At most one line crosses an edge in a lane other than the vertex's: the layout
+ * gives a line a lane of its own, a line born at the vertex starts at the centre
+ * and not at the top edge, and a line arriving at the vertex ends at the centre
+ * and not at the bottom edge. So the first segment of the row whose lane at that
+ * edge is `lane` is the line's. Outside the rows, or in the vertex's own lane,
+ * the answer is the lane itself: a line there meets the vertex in its own lane.
+ */
+function neighbourLane(rows: LayoutRows, row: number, lane: number, edge: Uint16Array): number {
+  if (row < 0 || row >= rows.rowCount || lane === entryAt(rows.laneIndex, row)) {
+    return lane;
+  }
+  const vertexLane = entryAt(rows.laneIndex, row);
+  const last = entryAt(rows.segmentOffsets, row + 1);
+  for (let segment = entryAt(rows.segmentOffsets, row); segment < last; segment += 1) {
+    if (entryAt(edge, segment) === lane) {
+      return centreLane(rows, segment, vertexLane);
+    }
+  }
+  return lane;
+}
+
+/** No area is open beside this row, or the row is not next to one. */
+export const GAP_NONE = 0;
+/** The row is the open one: its details are under it. */
+export const GAP_BELOW = 1;
+/** The row is the one after the open one: the details are over it. */
+export const GAP_ABOVE = 2;
+
+/** Which side of an open area, if any, `row` is on. */
+export function gapSide(row: number, open: number): number {
+  if (open < 0) {
+    return GAP_NONE;
+  }
+  return row === open ? GAP_BELOW : row === open + 1 ? GAP_ABOVE : GAP_NONE;
+}
+
+/** Whether the segment's line crosses the upper half of its row's band. */
+function reachesTop(rows: LayoutRows, row: number, segment: number): boolean {
+  const vertexLane = entryAt(rows.laneIndex, row);
+  return (
+    entryAt(rows.segmentFromLane, segment) !== vertexLane ||
+    (entryAt(rows.segmentToLane, segment) === vertexLane &&
+      (entryAt(rows.flags, row) & RowFlag.ClipAboveVertex) === 0)
+  );
+}
+
+/** Whether the segment's line crosses the lower half of its row's band. */
+function reachesBottom(rows: LayoutRows, row: number, segment: number): boolean {
+  const vertexLane = entryAt(rows.laneIndex, row);
+  return (
+    entryAt(rows.segmentToLane, segment) !== vertexLane ||
+    (entryAt(rows.segmentFromLane, segment) === vertexLane &&
+      (entryAt(rows.flags, row) & RowFlag.ClipBelowVertex) === 0)
+  );
+}
+
+/**
+ * The second half of an S-curve, from the boundary above `top` to the centre of
+ * the row at `top`: it starts half-way between `other` and `x` and ends vertical
+ * in `x`'s lane.
+ */
+function upperHalf(into: number[], x: number, other: number, top: number): void {
+  into[0] = (x + other) / 2;
+  into[1] = top;
+  piece(into, 2, (3 * x + other) / 4, top + HALF_ROW / 4, x, top + HALF_ROW / 2, x, top + HALF_ROW);
+}
+
+/** The first half of an S-curve, from the centre of the row at `top` to its foot. */
+function lowerHalf(into: number[], at: number, x: number, other: number, top: number): void {
+  const bottom = top + ROW_HEIGHT;
+  piece(
+    into,
+    at,
+    x,
+    top + HALF_ROW + HALF_ROW / 2,
+    (3 * x + other) / 4,
+    bottom - HALF_ROW / 4,
+    (x + other) / 2,
+    bottom,
+  );
+}
+
+/**
+ * Turn one segment of `row` into the path that is painted, and return how many
+ * halves it has: none, one or two.
  *
- * - **a straight segment in a lane that is not the vertex's** crosses the whole
- *   band, whatever the clip bits say. They are about the vertex's lane only;
- *   `src/contracts/layout.ts` is explicit that a painter which clips on the
- *   segments instead leaves a gap at the foot of every page;
- * - **a straight segment in the vertex's own lane** is the arriving line and the
- *   departing line as one segment, so it is painted as two halves and each half
- *   is painted only when its clip bit is clear. That is the difference between a
- *   branch tip and a line continuing off the page, and neither bit is advice;
- * - **a segment whose lower end is the vertex's lane** is a line dying at this
- *   commit. It leans from where it entered the band down to the vertex, and
- *   stops there — drawing it to the bottom edge would put a stub below a dot it
- *   has already reached;
- * - **a segment whose upper end is the vertex's lane** is a line born at this
- *   commit, a merge's further parent. It starts at the vertex and leans out to
- *   the lane it will descend in.
+ * **What is written.** A start point, `x, y`, and then per half the three points
+ * of one cubic Bézier piece, `c1x, c1y, c2x, c2y, x, y`, each piece starting
+ * where the one before it ends. The upper half runs from the top edge to the
+ * centre height and is written first; the lower half from the centre height to
+ * the bottom edge. A half whose two ends share an `x` is straight, and its
+ * control points lie on it. It writes into a caller's array, at most fourteen
+ * numbers, because it is called once per segment per visible row per frame.
  *
- * A leaning segment touching neither — which the pass in `src/core/layout/`
- * does not emit, its every lane change having one end at the vertex — is drawn
- * corner to corner, so that a future layout cannot make this function silently
- * paint nothing.
+ * **Which halves exist.** The segment's line crosses the top edge unless it is
+ * born at the vertex, and the bottom edge unless it dies there; in the vertex's
+ * own lane a straight segment is the arriving and the departing line in one, so
+ * there the clip bits decide, exactly as `src/contracts/layout.ts` requires.
+ * Every other lane's line crosses the whole band, whatever the clip bits say.
+ *
+ * **The shape (E04-M01-S15).** The reference extension draws every change of
+ * lane as one S-curve from the centre height of one row to the centre height of
+ * the next, vertical at both ends, with its middle on the boundary between the
+ * two rows. That is a cubic from `(xa, ya)` to `(xb, yb)` whose control points are
+ * `(xa, m)` and `(xb, m)`, `m` the boundary's height. A row paints the half of it
+ * that lies in its band, which is the curve cut at its middle: the lower half of
+ * the row above's band holds its first half, the upper half of this band its
+ * second. Each half is written here exactly as that cut gives it, so the two
+ * halves, painted by two rows, are one curve. The lane at the other end comes
+ * from the neighbouring row's segments ({@link neighbourLane}); the layout says
+ * nothing new, and a line whose two centres share a lane is straight.
+ *
+ * **Beside an open area (E04-M01-S09).** `side` says whether the details of the
+ * row above or of this row are open. A change of lane then stays one row tall and
+ * fixed to one dot, so the half of the curve that would have lain in the
+ * neighbouring band is drawn by {@link gapLines}, and the half this row paints is
+ * straight wherever the curve is not its own. The curve is the lower row's (the
+ * line *joins* a dot below the area) when the lane the layout gives the line at
+ * the boundary is the lane it has at the upper row's centre, and the upper row's
+ * (the line *leaves* a dot above the area) in every other case. This is the
+ * second of the two places the guarantee of that slice hangs on. Without an open
+ * area `side` is {@link GAP_NONE} and nothing here differs from S15.
  */
 export function segmentLines(
   into: number[],
-  fromLane: number,
-  toLane: number,
-  vertexLane: number,
-  flags: number,
+  rows: LayoutRows,
+  row: number,
+  segment: number,
   rowTop: number,
+  side = GAP_NONE,
 ): number {
-  const middle = rowTop + ROW_HEIGHT / 2;
-  const bottom = rowTop + ROW_HEIGHT;
-  const xFrom = laneCentreX(fromLane);
-  const xTo = laneCentreX(toLane);
-  if (fromLane !== toLane) {
-    const arriving = toLane === vertexLane;
-    const departing = fromLane === vertexLane;
-    write(into, 0, xFrom, departing ? middle : rowTop, xTo, arriving ? middle : bottom);
-    return 1;
+  const x = laneCentreX(centreLane(rows, segment, entryAt(rows.laneIndex, row)));
+  into[0] = x;
+  into[1] = rowTop + HALF_ROW;
+  let halves = 0;
+  if (reachesTop(rows, row, segment)) {
+    const fromLane = entryAt(rows.segmentFromLane, segment);
+    let other = laneCentreX(neighbourLane(rows, row - 1, fromLane, rows.segmentToLane));
+    if (side === GAP_ABOVE && laneCentreX(fromLane) !== other) {
+      other = x;
+    }
+    upperHalf(into, x, other, rowTop);
+    halves = 1;
   }
-  if (fromLane !== vertexLane) {
-    write(into, 0, xFrom, rowTop, xFrom, bottom);
-    return 1;
+  if (reachesBottom(rows, row, segment)) {
+    const toLane = entryAt(rows.segmentToLane, segment);
+    let other = laneCentreX(neighbourLane(rows, row + 1, toLane, rows.segmentFromLane));
+    if (side === GAP_BELOW && laneCentreX(toLane) === x) {
+      other = x;
+    }
+    lowerHalf(into, 2 + 6 * halves, x, other, rowTop);
+    halves += 1;
   }
-  let written = 0;
-  if ((flags & RowFlag.ClipAboveVertex) === 0) {
-    write(into, written++, xFrom, rowTop, xFrom, middle);
-  }
-  if ((flags & RowFlag.ClipBelowVertex) === 0) {
-    write(into, written++, xFrom, middle, xFrom, bottom);
-  }
-  return written;
+  return halves;
 }
 
-function write(into: number[], line: number, x0: number, y0: number, x1: number, y1: number): void {
-  into[line * 4] = x0;
-  into[line * 4 + 1] = y0;
-  into[line * 4 + 2] = x1;
-  into[line * 4 + 3] = y1;
+/**
+ * The part of one line that lies in the open area under `row`, written like
+ * {@link segmentLines} writes a segment, and the number of its halves: none when
+ * the segment's line does not cross the foot of `row`, otherwise two.
+ *
+ * `gapTop` is the area's top edge, which is `row`'s foot, in the same
+ * coordinates as the row tops, and `gap` its height. The line runs the whole of the area's height
+ * between `row`'s centre and the next row's, and a change of lane in it is one
+ * row tall, **fixed to one dot** as the reference extension was seen to draw it
+ * (E04-M01-S09, item 5):
+ *
+ * - *Leaving* `row`'s dot (a merge's further parent): the second half of the
+ *   S-curve first, from the area's top edge to one half row inside it, then
+ *   straight down the lane of the dot below.
+ * - *Joining* the dot below (a branch or a stash into its parent): straight down
+ *   the lane it is in, then the first half of the S-curve over the last half row
+ *   of the area.
+ *
+ * Which of the two is {@link segmentLines}'s rule, so the halves the two rows
+ * paint and the ones written here meet at the area's edges. A line in one lane
+ * throughout is written as two straight halves.
+ */
+export function gapLines(
+  into: number[],
+  rows: LayoutRows,
+  row: number,
+  segment: number,
+  gapTop: number,
+  gap = DETAILS_HEIGHT,
+): number {
+  if (!reachesBottom(rows, row, segment)) {
+    return 0;
+  }
+  const toLane = entryAt(rows.segmentToLane, segment);
+  const x = laneCentreX(centreLane(rows, segment, entryAt(rows.laneIndex, row)));
+  const other = laneCentreX(neighbourLane(rows, row + 1, toLane, rows.segmentFromLane));
+  const bottom = gapTop + gap;
+  if (laneCentreX(toLane) === x && x !== other) {
+    const meet = bottom - HALF_ROW;
+    into[0] = x;
+    into[1] = gapTop;
+    piece(into, 2, x, meet, x, meet, x, meet);
+    lowerHalf(into, 8, x, other, bottom - ROW_HEIGHT);
+  } else {
+    upperHalf(into, other, x, gapTop);
+    piece(into, 8, other, bottom, other, bottom, other, bottom);
+  }
+  return 2;
+}
+
+/**
+ * The half of the uncommitted row's line that `row` paints, when it is the row
+ * the line ends at: from the top edge straight down the vertex's lane to the
+ * centre, written into `into` as the `x, y` of its start and of its end.
+ *
+ * That row carries `RowFlag.UncommittedAbove`, and is HEAD's (E04-M01-S14); the
+ * answer is whether `row` is it, and a row that is not paints nothing here.
+ * Every row above it down to the uncommitted row carries the line as an
+ * ordinary straight segment, so this is the one half the segments do not hold.
+ */
+export function uncommittedArrival(
+  into: number[],
+  rows: LayoutRows,
+  row: number,
+  rowTop: number,
+): boolean {
+  if ((entryAt(rows.flags, row) & RowFlag.UncommittedAbove) === 0) {
+    return false;
+  }
+  const x = laneCentreX(entryAt(rows.laneIndex, row));
+  into[0] = x;
+  into[1] = rowTop;
+  into[2] = x;
+  into[3] = rowTop + HALF_ROW;
+  return true;
+}
+
+function piece(
+  into: number[],
+  at: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x: number,
+  y: number,
+): void {
+  into[at] = x1;
+  into[at + 1] = y1;
+  into[at + 2] = x2;
+  into[at + 3] = y2;
+  into[at + 4] = x;
+  into[at + 5] = y;
 }
 
 /**
@@ -237,17 +500,27 @@ function write(into: number[], line: number, x0: number, y0: number, x1: number,
  * (`docs/ADR-0002-architecture-and-performance.md` decision 5). Both coordinates
  * are in the canvas's own frame, which is the viewport's.
  *
- * Nothing in this slice calls it — selection is E03 and tooltips are E01-M02 —
- * and it is here because it is the arithmetic the recycling scheme is judged
- * against from the other direction: a vertex is drawn where this says it is, or
- * one of the two is wrong.
+ * Nothing calls it yet — selection is E03 and tooltips are E01-M02 — and it is
+ * here because it is the arithmetic the recycling scheme is judged against from
+ * the other direction: a vertex is drawn where this says it is, or one of the two
+ * is wrong. With the details of row `open` showing (E04-M01-S09) the point is
+ * placed among the rows as `rowAtOffset` does, so a point inside the area is
+ * the open row's and is far from its vertex, and a point under the area is on
+ * the row it is drawn on.
  */
-export function vertexRowAt(x: number, y: number, scrollTop: number, rows: LayoutRows): number {
-  const row = Math.floor((y + scrollTop) / ROW_HEIGHT);
+export function vertexRowAt(
+  x: number,
+  y: number,
+  scrollTop: number,
+  rows: LayoutRows,
+  open = NO_ROW,
+  gap = DETAILS_HEIGHT,
+): number {
+  const row = rowAtOffset(y + scrollTop, open, gap);
   if (row < 0 || row >= rows.rowCount) {
     return -1;
   }
   const dx = x - laneCentreX(entryAt(rows.laneIndex, row));
-  const dy = y - (rowTopY(row, scrollTop) + ROW_HEIGHT / 2);
+  const dy = y - (rowTopY(row, scrollTop, open, gap) + ROW_HEIGHT / 2);
   return dx * dx + dy * dy <= VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS ? row : -1;
 }

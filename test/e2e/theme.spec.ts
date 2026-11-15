@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,8 +8,12 @@ import { inflateSync } from 'node:zlib';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
-import { readCanvas, scrollListTo } from './support/budgets-page';
-import { fixture } from './support/fixtures';
+import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
+import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
+import { removeDirectory } from '../fixtures/shared-store';
+import { initScriptFirst } from './support/budgets';
+import type { InitScriptRun } from './support/budgets';
+import { ended, fixture } from './support/fixtures';
 
 /**
  * The colour-scheme control in the bar, driven through the built application.
@@ -44,14 +49,9 @@ type Scheme = 'light' | 'dark';
 type Choice = Scheme | 'system';
 
 /** What `surface` is for a scheme. */
-function surfaceOf(scheme: Scheme): string {
-  return scheme === 'dark' ? DARK_SURFACE : LIGHT_SURFACE;
-}
+const surfaceOf = (scheme: Scheme): string => (scheme === 'dark' ? DARK_SURFACE : LIGHT_SURFACE);
 
-interface Launched {
-  readonly application: ElectronApplication;
-  readonly page: Page;
-}
+type Launched = { readonly application: ElectronApplication; readonly page: Page };
 
 interface LaunchOptions {
   /** The emulated preference, or `null` for the operating system's own. Light when absent. */
@@ -88,6 +88,8 @@ interface PageScope {
 }
 
 const homes: string[] = [];
+/** Every application process a case launched, waited for before its profile goes. */
+const children: ChildProcess[] = [];
 
 /** A user-data directory nobody has used: the application's first start. */
 function freshHome(): string {
@@ -96,25 +98,41 @@ function freshHome(): string {
   return home;
 }
 
-test.afterEach(() => {
-  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+/**
+ * A profile is removed only once the main process, which writes the choices into
+ * it, has exited. A case that ran out leaves its application running while this
+ * hook runs (measured by E04-M01-S13 in every run of a case left to run out), and
+ * removing a profile under it met `EPERM` (E04-M01-S04, review round 01). The line
+ * the order hinges on is the wait on {@link ended}. What it does not hold: after a
+ * main process stopped by force, the application's other processes held the
+ * profile for over thirty seconds on a loaded machine in E04-M01-S13's runs, so the
+ * removal of such a case's profile can still fail.
+ */
+test.afterEach(async () => {
+  for (const child of children.splice(0)) await ended(child);
+  for (const home of homes.splice(0)) removeDirectory(home);
 });
 
 /** Launch the built application on `home`. */
 async function launch(home: string, options: LaunchOptions): Promise<Launched> {
+  const open = options.open === undefined ? [] : [options.open];
   const application = await electron.launch({
-    args: [
-      '.',
-      ...(options.open === undefined ? [] : [options.open]),
-      `--user-data-dir=${home}`,
-      ...(options.switches ?? []),
-    ],
+    args: ['.', ...open, `--user-data-dir=${home}`, ...(options.switches ?? [])],
     cwd: repositoryRoot,
     colorScheme: options.emulated === undefined ? 'light' : options.emulated,
   });
+  children.push(application.process());
   if (options.initScript !== undefined) {
-    // In place before the first document, because the launch holds the
-    // application's `ready` until Playwright has connected (`support/budgets.ts`).
+    // Not always in the first document, and not always in any: the launch
+    // releases the application's `ready` before it returns, so the window can
+    // already be attached or loading (E04-M01-S05 read where Playwright does it).
+    // A call that lands after the window was initialised is in its next document;
+    // one that lands while it is attached and not yet initialised is in none of
+    // them, reloads included (read and measured by E04-M01's review round 05, and
+    // measured for this suite by E04-M01-FIX-05: the first-paint case red at its
+    // Base with a wait of 60 to 150 ms planted before this call). The case that
+    // passes a script brings the window to a document it ran first in with
+    // `initScriptFirst` of `support/budgets.ts`, which says how.
     await application.context().addInitScript(options.initScript);
   }
   return { application, page: await application.firstWindow() };
@@ -137,9 +155,7 @@ async function withApplication<T>(
 }
 
 /** The control, found the way assistive technology finds it: by its role and its name. */
-function control(page: Page): Locator {
-  return page.getByRole('combobox', { name: 'Theme' });
-}
+const control = (page: Page): Locator => page.getByRole('combobox', { name: 'Theme' });
 
 /** Runs in the page: its background, the scheme its root resolves, and `data-theme`. */
 function readShown(): { surface: string; scheme: string; pinned: string } {
@@ -153,9 +169,7 @@ function readShown(): { surface: string; scheme: string; pinned: string } {
 }
 
 /** What the page shows. */
-async function shown(page: Page): Promise<{ surface: string; scheme: string; pinned: string }> {
-  return page.evaluate(readShown);
-}
+const shown = (page: Page): Promise<ReturnType<typeof readShown>> => page.evaluate(readShown);
 
 /** The main process's half of the scheme. */
 async function native({ application }: Launched): Promise<{ source: string; dark: boolean }> {
@@ -177,16 +191,10 @@ test('System is the first start, and follows the preference both ways', async ()
     const { page } = launched;
     await expect(control(page)).toBeEnabled();
     await expect(control(page)).toHaveValue('system');
-    expect(await control(page).locator('option').allTextContents()).toEqual([
-      'Light',
-      'Dark',
-      'System',
-    ]);
-    expect(await shown(page)).toEqual({
-      surface: LIGHT_SURFACE,
-      scheme: 'light dark',
-      pinned: 'system',
-    });
+    const labels = await control(page).locator('option').allTextContents();
+    expect(labels).toEqual(['Light', 'Dark', 'System']);
+    const first = { surface: LIGHT_SURFACE, scheme: 'light dark', pinned: 'system' };
+    expect(await shown(page)).toEqual(first);
     expect((await native(launched)).source).toBe('system');
 
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -197,13 +205,7 @@ test('System is the first start, and follows the preference both ways', async ()
 });
 
 /** Runs in the page: what a theme change must leave alone. */
-function readUntouched(): {
-  loads: number;
-  marker: unknown;
-  offset: number;
-  rows: number;
-  scroller: string;
-} {
+function readUntouched(): Record<string, unknown> {
   const scope = globalThis as unknown as PageScope;
   const scroller = scope.document.querySelector('.graph__scroll');
   return {
@@ -227,10 +229,19 @@ test('Dark and Light override the preference at once, keeping the scroll and the
     const { page } = launched;
     await expect(page.locator('.bar__path')).toHaveText(large);
     await expect(control(page)).toBeEnabled();
-    await page.evaluate(markDocument);
+    // The mark, then the budget probe's counters (`support/budgets-page.ts`), put
+    // into the running document rather than as init scripts: what the waits below
+    // wait for is asked for after this, through the globals they wrap.
+    for (const script of [markDocument, installProbe, installTimerCounters, installRedrawCounter])
+      await page.evaluate(script);
+    const unscrolled = await page.evaluate(wakeupsSettled, 30_000);
     expect(await page.evaluate(scrollListTo, 3600)).toBe(3600);
     const before = await page.evaluate(readUntouched);
     expect(before).toMatchObject({ loads: 1, marker: 1, offset: 3600, scroller: 'light dark' });
+    // The canvas keeps its old picture until the renderer repaints after the
+    // scroll (measured by E04-M01's review round 02): read once all the page asked
+    // for has run, and once the canvas has been redrawn since the scroll.
+    expect(await page.evaluate(wakeupsSettled, 30_000)).toBeGreaterThan(unscrolled);
     const canvas = (await page.evaluate(readCanvas)).rgba;
 
     await page.emulateMedia({ colorScheme: 'light' });
@@ -238,7 +249,10 @@ test('Dark and Light override the preference at once, keeping the scroll and the
     expect(await shown(page)).toEqual({ surface: DARK_SURFACE, scheme: 'dark', pinned: 'dark' });
     expect((await native(launched)).dark).toBe(true);
     expect(await page.evaluate(readUntouched)).toEqual({ ...before, scroller: 'dark' });
-    await page.waitForTimeout(300);
+    // What the switch left on the canvas, once everything it asked for has run.
+    // The switch asked for no redraw in E04-M01-FIX-03's three counted runs; a
+    // change that repaints the canvas differently in Dark is waited for and read.
+    await page.evaluate(wakeupsSettled, 30_000);
     expect((await page.evaluate(readCanvas)).rgba).toBe(canvas);
 
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -299,6 +313,25 @@ test('the choice survives a relaunch and is the scheme of the first paint', asyn
   const options = { emulated: null, initScript: recordFirstFrame };
   await withApplication(home, options, async (launched) => {
     const { page } = launched;
+    // The script can miss the first document, or every document of the window
+    // (`launch` says why). Once the renderer's view is in the window's document,
+    // one the script did not run in first is reloaded, and added to the page and
+    // reloaded again if it did not run in the reloaded one either.
+    // `beforeRenderer: true` below is what refuses a document it still did not
+    // run in first. A reloaded document starts in the scheme the main process
+    // holds at the reload, so a stored choice applied after the window was made,
+    // and before the reload, is seen only on a launch that does not reload.
+    await initScriptFirst(page, recordFirstFrame, 'the first-frame recorder', async () => {
+      await page.waitForFunction(() => 'gitGraphicalView' in globalThis);
+      const record = await page.evaluate(readFirstFrame);
+      const run: InitScriptRun =
+        record === undefined
+          ? 'did not run'
+          : record['beforeRenderer'] === true
+            ? 'ran first'
+            : 'ran late or in part';
+      return { run, seen: JSON.stringify(record ?? null) };
+    });
     await expect(control(page)).toHaveValue(against);
     // The control shows the choice from an IPC reply that does not wait for a
     // frame, so the first frame's callback may not have run yet: in 6 of 20
@@ -371,5 +404,24 @@ test('the light golden image of the graph canvas holds with the window in Dark',
     const drawn = Buffer.from((await page.evaluate(readCanvas)).rgba, 'base64');
     expect((await shown(page)).surface).toBe(DARK_SURFACE);
     expect(drawn.equals(golden)).toBe(true);
+  });
+});
+
+test("the window's own background follows Light, Dark and System", async () => {
+  // Whichever scheme the operating system prefers, Light or Dark moves the colour from it.
+  await withApplication(freshHome(), { emulated: null }, async (launched) => {
+    // The window's own colour, `backgroundColor` of `src/app/window.ts`, not the page's.
+    const background = (): Promise<string | undefined> =>
+      launched.application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.getBackgroundColor().toUpperCase(),
+      );
+    await expect(control(launched.page)).toHaveValue('system');
+    for (const choice of ['light', 'dark', 'system'] as const) {
+      await control(launched.page).selectOption(choice);
+      await expect.poll(async () => (await native(launched)).source).toBe(choice);
+      // System is whichever scheme the operating system prefers on this machine.
+      const dark = (await native(launched)).dark;
+      await expect.poll(background).toBe(dark ? '#1F1F1F' : '#FFFFFF');
+    }
   });
 });

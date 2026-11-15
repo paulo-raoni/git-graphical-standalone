@@ -24,15 +24,46 @@ export type { ReferenceList } from './reference-list';
 
 export {
   createReferenceParser,
-  createStashParser,
   finishReferences,
-  finishStashes,
   pushReferences,
-  pushStashes,
   REFERENCE_FORMAT,
-  STASH_FORMAT,
 } from './reference-records';
 export type { ReferenceParser } from './reference-records';
+
+export {
+  addStashReferences,
+  createStashListParser,
+  emptyStashList,
+  finishStashList,
+  interleaveStashes,
+  pushStashList,
+  STASH_FORMAT,
+  stashBaseNames,
+  isStashCommit,
+  thirdParentOf,
+  withUntrackedFiles,
+} from './stash-list';
+export type { StashEntry, StashList, StashListParser } from './stash-list';
+
+export { createChangedFilesParser, finishChangedFiles, pushChangedFiles } from './changed-files';
+export type { ChangedFilesParser } from './changed-files';
+
+export {
+  COMMIT_DETAILS_FORMAT,
+  createCommitDetailsParser,
+  finishCommitDetails,
+  pushCommitDetails,
+} from './commit-details';
+export type { CommitDetailsParser } from './commit-details';
+
+export {
+  createUncommittedStatusParser,
+  EMPTY_TREE,
+  finishUncommittedStatus,
+  pushUncommittedStatus,
+  uncommittedDetailsOf,
+} from './uncommitted-files';
+export type { UncommittedStatusParser } from './uncommitted-files';
 
 export {
   buildWorkingTree,
@@ -41,3 +72,5 @@ export {
   pushStatus,
 } from './working-tree-status';
 export type { StatusFacts, StatusParser } from './working-tree-status';
+
+export { currentPathOf } from './current-path';

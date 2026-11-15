@@ -80,6 +80,12 @@ export {
 export type { BranchEntry, BranchMenu } from './branch-menu';
 
 /**
+ * Which row a key goes to when the details of a row are open (E04-M01-S11).
+ */
+export { NO_MOVE, rowAfterMove } from './row-moves';
+export type { RowMove } from './row-moves';
+
+/**
  * The rules of the branch selection kept per repository: which stored value is a
  * selection, which one an open reads under, and which kept branches survive the
  * repository's references.
@@ -91,9 +97,75 @@ export type { BranchEntry, BranchMenu } from './branch-menu';
  */
 export { keptSelection, openingSelection, survivingSelection } from './kept-selection';
 
+/**
+ * The details of one commit or of the uncommitted changes, asked for on their
+ * own channel, and the check a request from the page passes before any of it
+ * reaches a command line.
+ */
+export { detailsTargetOf, isObjectName } from './commit-details';
+
+/**
+ * What a person can do with a changed file, the check a request for it passes
+ * before anything of it reaches git or the file system, and the rows of the
+ * pane that lists the files (E04-M01-S10).
+ */
+export { absolutePathIn, fileActionRequestOf, isRelativeFilePath, liesInside } from './file-action';
+export type {
+  FileAction,
+  FileActionDone,
+  FileActionRequest,
+  FileActionResponse,
+} from './file-action';
+export { actionsOf, CHAIN_SEPARATOR, fileRowsOf, letterOf, toneOf } from './file-tree';
+export type {
+  FileCounts,
+  FileRow,
+  FileTone,
+  FileTreeRow,
+  FileView,
+  FileViewOptions,
+  FolderRow,
+} from './file-tree';
+export type {
+  ChangedFile,
+  CommitDetails,
+  DetailsPerson,
+  DetailsRequest,
+  DetailsResponse,
+  DetailsTarget,
+  FileStatus,
+  UncommittedDetails,
+} from './commit-details';
+
+/**
+ * The check a choice the main process could not keep passes before the page is
+ * told of it: the preload calls it, and that bundle may import this ring alone.
+ */
+export { unkeptChoiceOf } from './unkept-choice';
+
 export type { GraphPage } from './graph-page';
 
 export { UNKNOWN_INDEX } from './indices';
+
+/**
+ * The rules of the Commit Details View's size, place and options kept across
+ * restarts: the defaults, the limits, the checks a record and a value from the
+ * page pass, and the clamps a drag goes through (E04-M01-S12).
+ */
+export {
+  DEFAULT_DETAILS_LAYOUT,
+  DEFAULT_DETAILS_OPTIONS,
+  draggedDivider,
+  draggedHeight,
+  heightRoom,
+  keptDetailsLayout,
+  keptDetailsOptions,
+  MAX_DIVIDER,
+  MAX_KEPT_HEIGHT,
+  MIN_DETAILS_HEIGHT,
+  MIN_DIVIDER,
+} from './details-layout';
+export type { DetailsLayout, DetailsOptions, DetailsPlace } from './details-layout';
 
 export { CHANNELS, ThemeChoice } from './ipc';
 export type {
@@ -105,6 +177,9 @@ export type {
   ChooseThemeRequest,
   ChooseThemeResponse,
   ChosenFolder,
+  DetailsOptionsResponse,
+  KeepDetailsLayoutRequest,
+  KeepDetailsLayoutResponse,
   LoadMoreCommitsRequest,
   LoadMoreCommitsResponse,
   OpenedPage,
@@ -116,9 +191,10 @@ export type {
   StartupRepositoryResponse,
   ThemeChoiceResponse,
   ThemeSetting,
+  UnkeptChoice,
 } from './ipc';
 
-export { RowFlag } from './layout';
+export { RowFlag, UNCOMMITTED_COLOUR } from './layout';
 export type { LayoutRows } from './layout';
 
 export type { PersonTable } from './people';

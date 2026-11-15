@@ -45,6 +45,15 @@
     "commitCount": 4,
     "commitDigest": "eeecb4059422e1015008af1876cb9b9801fb0437ef8e23e9da025f86c60b0f64"
   },
+  "stashes": {
+    "refs": [
+      "35ecd6cdfaedb94f56c86c114566286edec1a0c0 HEAD",
+      "35ecd6cdfaedb94f56c86c114566286edec1a0c0 refs/heads/main",
+      "2e6c3b87f2e7274a6a438e38780d705d54cd1dfb refs/stash"
+    ],
+    "commitCount": 8,
+    "commitDigest": "8d91b88eb8ed828584af32e62ca69aac0d268976160953effaec12bea86d8e1b"
+  },
   "detached-head": {
     "refs": [
       "1c6708775d3ad04e4dc3a11bc63c699bcb665381 HEAD",
@@ -86,5 +95,14 @@
     ],
     "commitCount": 5008,
     "commitDigest": "3122b2f3d9bb909d85139951c4615283bcdd1c7b9361ed516d4e29c03d005ec2"
+  },
+  "details": {
+    "refs": [
+      "0867b54499c3ea89cbcecde236e1a892169c38d2 HEAD",
+      "0867b54499c3ea89cbcecde236e1a892169c38d2 refs/heads/main",
+      "331e42f973fa1d46d968a7f1609a1b551574b3ff refs/heads/side"
+    ],
+    "commitCount": 6,
+    "commitDigest": "316d9c99e04a2906ed0e07e880c01652ef6c27bb777ab8f839e8fd58e6ed8e66"
   }
 }

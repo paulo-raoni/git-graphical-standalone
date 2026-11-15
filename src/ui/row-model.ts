@@ -2,6 +2,7 @@ import { entryAt } from '../contracts/column-read';
 import {
   authorOf,
   hexHashOf,
+  HASH_BYTE_LENGTH,
   refCommitOf,
   refCount,
   refKindOf,
@@ -9,7 +10,7 @@ import {
   RefKind,
   subjectOf,
 } from '../contracts/index';
-import type { GraphPage } from '../contracts/index';
+import type { DetailsTarget, GraphPage } from '../contracts/index';
 
 /**
  * What one row shows, computed for one row index on demand.
@@ -32,8 +33,17 @@ import type { GraphPage } from '../contracts/index';
 /** Characters of the object name the commit column shows. */
 const ABBREVIATED_HASH_LENGTH = 8;
 
-/** Kinds that get a label, in the order the description column shows them. */
-const LABELLED_KINDS: readonly RefKind[] = [RefKind.LocalHead, RefKind.RemoteBranch, RefKind.Tag];
+/**
+ * Kinds that get a label, in the order the description column shows them: a
+ * stash's first, where the reference extension was seen to start the column with
+ * it (E04-M01-S14).
+ */
+const LABELLED_KINDS: readonly RefKind[] = [
+  RefKind.Stash,
+  RefKind.LocalHead,
+  RefKind.RemoteBranch,
+  RefKind.Tag,
+];
 
 /** One reference label sitting on a row. */
 export interface RowLabel {
@@ -102,21 +112,23 @@ function pad(value: number): string {
 /**
  * The references sitting on `commitRow`, in the order the column shows them.
  *
- * It walks the whole block **once per labelled kind** — three times — for each
+ * It walks the whole block **once per labelled kind** — four times — for each
  * row that is about to be written, which is what puts the labels in kind order
- * without a sort. That is three times the repository's reference count and
- * nothing to do with its commit count, so a scroll of one row costs three walks
+ * without a sort. That is four times the repository's reference count and
+ * nothing to do with its commit count, so a scroll of one row costs four walks
  * however many commits are loaded. An index over the block, built once per page,
  * would turn that into a lookup and would be the obvious next step if a
  * repository with thousands of tags ever measured badly; it is not built now
  * because the measurement that would justify it does not exist yet
- * (`AGENTS.md` §7), and the constant is not what would decide it — three walks
+ * (`AGENTS.md` §7), and the constant is not what would decide it — four walks
  * and one walk are both linear in the reference count.
  *
- * Only the three kinds the reference behaviour names are shown. A remote's
- * symbolic HEAD and the stash's own reference point at commits too, and showing
- * them would put `origin/HEAD` beside `origin/main` on the same row and a
- * `stash` label on an ordinary commit.
+ * Only the kinds the reference behaviour names are shown. A remote's symbolic
+ * HEAD points at a commit too, and showing it would put `origin/HEAD` beside
+ * `origin/main` on the same row. A stash's reference was left out as well until
+ * E04-M01-S14, because it pointed at the commit the stash was made on and would
+ * have put a `stash` label on an ordinary commit; it now points at the stash's
+ * own row, which is where the reference extension shows it.
  */
 function labelsOn(page: GraphPage, commitRow: number): readonly RowLabel[] {
   const found: RowLabel[] = [];
@@ -159,4 +171,35 @@ export function rowViewAt(page: GraphPage, row: number): RowView {
     labels: labelsOn(page, commitRow),
     colourIndex,
   };
+}
+
+/** What to ask for to see the details of row `row`: the uncommitted changes or its commit. */
+export function detailsTargetAt(page: GraphPage, row: number): DetailsTarget {
+  const commitRow = commitRowOf(page, row);
+  return commitRow < 0
+    ? { kind: 'uncommitted' }
+    : { kind: 'commit', hash: hexHashOf(page.commits, commitRow) };
+}
+
+/**
+ * The row of `page` that shows `target`, or `-1` when the page has none.
+ *
+ * One pass over the loaded commits that spells an object name only for a commit
+ * whose first byte is the wanted one, about one in 256, so it builds almost no
+ * string. It is called once per reply and once per page that arrives with an area
+ * open, never per frame (E04-M01-S09).
+ */
+export function rowOfTarget(page: GraphPage, target: DetailsTarget): number {
+  const shift = page.workingTree.hasChanges ? 1 : 0;
+  if (target.kind === 'uncommitted') {
+    return shift - 1;
+  }
+  const first = Number.parseInt(target.hash.slice(0, 2), 16);
+  for (let commit = 0; commit < page.commits.count; commit += 1) {
+    const found = entryAt(page.commits.hashes, commit * HASH_BYTE_LENGTH) === first;
+    if (found && hexHashOf(page.commits, commit) === target.hash) {
+      return commit + shift;
+    }
+  }
+  return -1;
 }

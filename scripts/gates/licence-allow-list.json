@@ -1,5 +1,5 @@
 {
-  "comment": "This repository is public and MIT. Every installed dependency's licence must be on this list, and a licence the checker cannot determine is reported as UNKNOWN, which is not on it — so it fails, as an undetermined licence should.",
+  "comment": "This repository is public and MIT. Every installed dependency's licence must be on this list, and a licence the checker cannot determine is reported as UNKNOWN, which is not on it — so it fails, as an undetermined licence should. The one way past this list is an entry of exceptions: it names one package, by its name without a version, one licence that package may be under although the licence is not on this list, and why. It allows that licence for that package alone, and nothing else for it: the same package under another licence that is not on this list is refused, and so is another package under that licence. The gate's message says, for each refusal, whether no exception names the package or its exception is for another licence.",
   "allowed": [
     "0BSD",
     "Apache-2.0",

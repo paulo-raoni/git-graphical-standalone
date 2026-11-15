@@ -146,8 +146,9 @@ export function compareWithBaseline(
  *   the machine. A value there is a person's, typed by hand.
  * - What a person types decides which way a wrong reading goes, and the two
  *   ways are not alike. Read as the CI regime, a value meant as "not CI" holds
- *   the run to limits four times wider (the `ciTolerance` of all eight entries
- *   of `perf/baselines.json` that have one, read on 2026-10-24) and **stays
+ *   the run to limits four times wider (the `ciTolerance` of every entry of
+ *   `perf/baselines.json` that has one, 4 in each, read by E04-M01-S07 on
+ *   2026-11-07; an entry without one is not widened) and **stays
  *   green**, which nobody sees; until this slice `no` and `off` were read that
  *   way. Read as the strict regime, a value meant as "CI" goes red on a
  *   runner, which is seen but blames the product. Refusing is the one reading

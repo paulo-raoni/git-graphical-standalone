@@ -29,9 +29,19 @@ interface BranchSelection {
     readonly showRemoteBranches: boolean
 }
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; }
+value CHAIN_SEPARATOR: " / "
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "application:info" | "theme:choice" | "theme:choose"
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly fileAction: "repository:file-action"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; readonly detailsOptions: "details:options"; readonly chooseDetailsOptions: "details:choose-options"; readonly keepDetailsLayout: "details:keep-layout"; readonly unkeptChoice: "application:unkept-choice"; }
+
+interface ChangedFile {
+    readonly additions: number | null
+    readonly deletions: number | null
+    readonly oldPath: string | null
+    readonly path: string
+    readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
+}
+
+type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "repository:file-action" | "application:info" | "theme:choice" | "theme:choose" | "details:options" | "details:choose-options" | "details:keep-layout" | "application:unkept-choice"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
 
@@ -61,6 +71,52 @@ interface CommitColumns {
     readonly subjects: string
 }
 
+interface CommitDetails {
+    readonly author: DetailsPerson
+    readonly committer: DetailsPerson
+    readonly files: readonly ChangedFile[]
+    readonly hash: string
+    readonly message: string
+    readonly parents: readonly string[]
+}
+
+value DEFAULT_DETAILS_LAYOUT: DetailsLayout
+
+value DEFAULT_DETAILS_OPTIONS: DetailsOptions
+
+interface DetailsLayout {
+    readonly divider: number
+    readonly fileView: FileView | null
+    readonly height: number
+}
+
+interface DetailsOptions {
+    readonly autoCenter: boolean
+    readonly compactFolders: boolean
+    readonly defaultFileView: "tree" | "list"
+    readonly place: "inline" | "docked"
+    readonly statusLetters: boolean
+}
+
+type DetailsOptionsResponse = import("./result").Failure | import("./result").Success<import("./details-layout").DetailsOptions>
+
+interface DetailsPerson {
+    readonly email: string
+    readonly name: string
+    readonly offsetMinutes: number
+    readonly time: number
+}
+
+type DetailsPlace = "inline" | "docked"
+
+interface DetailsRequest {
+    readonly target: { readonly kind: "commit"; readonly hash: string; } | { readonly kind: "uncommitted"; }
+}
+
+type DetailsResponse = import("./result").Failure | import("./result").Success<import("./commit-details").CommitDetails | import("./commit-details").UncommittedDetails>
+
+type DetailsTarget = { readonly kind: "commit"; readonly hash: string; } | { readonly kind: "uncommitted"; }
+
 interface Failure {
     readonly exitCode?: number
     readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
@@ -71,15 +127,78 @@ interface Failure {
 type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
 value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly Cancelled: "cancelled"; }
 
+type FileAction = "open-file" | "copy-absolute-path" | "copy-relative-path"
+
+interface FileActionDone {
+    readonly path: string
+}
+
+interface FileActionRequest {
+    readonly action: "open-file" | "copy-absolute-path" | "copy-relative-path"
+    readonly path: string
+    readonly target: { readonly kind: "commit"; readonly hash: string; } | { readonly kind: "uncommitted"; }
+}
+
+type FileActionResponse = import("./result").Failure | import("./result").Success<import("./file-action").FileActionDone>
+
+interface FileCounts {
+    readonly minus: string
+    readonly plus: string
+}
+
+interface FileRow {
+    readonly actions: readonly FileAction[]
+    readonly counts: FileCounts | null
+    readonly depth: number
+    readonly index: number
+    readonly kind: "file"
+    readonly label: string
+    readonly letter: string | null
+    readonly oldPath: string | null
+    readonly path: string
+    readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
+    readonly tone: "added" | "deleted" | "plain"
+    readonly tooltip: string
+}
+
+type FileStatus = "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
+
+type FileTone = "added" | "deleted" | "plain"
+
+type FileTreeRow = import("./file-tree").FileRow | import("./file-tree").FolderRow
+
+type FileView = "tree" | "list"
+
+interface FileViewOptions {
+    readonly collapsed: ReadonlySet<string>
+    readonly compact: boolean
+    readonly letters: boolean
+    readonly view: "tree" | "list"
+}
+
+interface FolderRow {
+    readonly collapsed: boolean
+    readonly depth: number
+    readonly key: string
+    readonly kind: "folder"
+    readonly label: string
+}
+
 interface GitGraphicalBridge {
     readonly applicationInfo: () => Promise<ApplicationInfoResponse>
+    readonly chooseDetailsOptions: (request: DetailsOptions) => Promise<DetailsOptionsResponse>
     readonly chooseFolder: () => Promise<ChooseFolderResponse>
     readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>
+    readonly commitDetails: (request: DetailsRequest) => Promise<DetailsResponse>
+    readonly detailsOptions: () => Promise<DetailsOptionsResponse>
+    readonly fileAction: (request: FileActionRequest) => Promise<FileActionResponse>
+    readonly keepDetailsLayout: (request: KeepDetailsLayoutRequest) => Promise<KeepDetailsLayoutResponse>
     readonly loadMoreCommits: (request: LoadMoreCommitsRequest) => Promise<LoadMoreCommitsResponse>
     readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>
     readonly refresh: (request: RefreshRequest) => Promise<RefreshResponse>
     readonly startupRepository: () => Promise<StartupRepositoryResponse>
     readonly themeChoice: () => Promise<ThemeChoiceResponse>
+    readonly unkeptChoice: (listener: (unkept: UnkeptChoice) => void) => void
 }
 
 interface GraphPage {
@@ -91,6 +210,13 @@ interface GraphPage {
 }
 
 value HASH_BYTE_LENGTH: 20
+
+interface KeepDetailsLayoutRequest {
+    readonly layout: DetailsLayout
+    readonly path: string
+}
+
+type KeepDetailsLayoutResponse = import("./result").Failure | import("./result").Success<import("./details-layout").DetailsLayout>
 
 interface LayoutRows {
     readonly colourIndex: Uint8Array<ArrayBufferLike>
@@ -110,6 +236,16 @@ interface LoadMoreCommitsRequest {
 
 type LoadMoreCommitsResponse = import("./result").Failure | import("./result").Success<import("./graph-page").GraphPage>
 
+value MAX_DIVIDER: 0.8
+
+value MAX_KEPT_HEIGHT: 4096
+
+value MIN_DETAILS_HEIGHT: 120
+
+value MIN_DIVIDER: 0.2
+
+value NO_MOVE: -1
+
 interface OpenRepositoryRequest {
     readonly path: string
     readonly showRemoteBranches?: boolean
@@ -119,6 +255,7 @@ type OpenRepositoryResponse = import("./result").Failure | import("./result").Su
 
 interface OpenedPage {
     readonly commits: CommitColumns
+    readonly detailsLayout: DetailsLayout
     readonly hasMore: boolean
     readonly layout: LayoutRows
     readonly refs: Refs
@@ -159,8 +296,10 @@ interface Refs {
 
 type Result<TValue> = import("./result").Failure | import("./result").Success<TValue>
 
-type RowFlag = 1 | 2 | 4 | 8 | 16 | 32
-value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; }
+type RowFlag = 1 | 2 | 4 | 8 | 16 | 32 | 64
+value RowFlag: { readonly Merge: 1; readonly Stash: 2; readonly Head: 4; readonly Uncommitted: 8; readonly ClipAboveVertex: 16; readonly ClipBelowVertex: 32; readonly UncommittedAbove: 64; }
+
+type RowMove = "up" | "down" | "child" | "parent" | "other-child" | "other-parent"
 
 value SHOW_ALL: BranchMenu
 
@@ -186,7 +325,18 @@ interface ThemeSetting {
     readonly choice: "light" | "dark" | "system"
 }
 
+value UNCOMMITTED_COLOUR: 255
+
 value UNKNOWN_INDEX: 4294967295
+
+interface UncommittedDetails {
+    readonly files: readonly ChangedFile[]
+}
+
+interface UnkeptChoice {
+    readonly file: string
+    readonly what: string
+}
 
 interface WorkingTree {
     readonly changedFileCount: number
@@ -196,6 +346,10 @@ interface WorkingTree {
     readonly isDetached: boolean
     readonly untrackedFileCount: number
 }
+
+value absolutePathIn: (top: string, relative: string, separator: "/" | "\\") => string | null
+
+value actionsOf: (status: FileStatus) => readonly FileAction[]
 
 value authorOf: (columns: CommitColumns, row: number) => Person
 
@@ -207,11 +361,35 @@ value commitCount: (columns: CommitColumns) => number
 
 value committerOf: (columns: CommitColumns, row: number) => Person
 
+value detailsTargetOf: (value: unknown) => DetailsTarget | null
+
+value draggedDivider: (pointer: number, left: number, width: number) => number
+
+value draggedHeight: (wanted: number, room: number) => number
+
+value fileActionRequestOf: (value: unknown) => FileActionRequest | null
+
+value fileRowsOf: (files: readonly ChangedFile[], options: FileViewOptions) => readonly FileTreeRow[]
+
+value heightRoom: (place: DetailsPlace, available: number, row: number) => number
+
 value hexHashOf: (columns: CommitColumns, row: number) => string
 
 value isChecked: (menu: BranchMenu, name: string) => boolean
 
+value isObjectName: (text: unknown) => boolean
+
+value isRelativeFilePath: (path: unknown) => path is string
+
+value keptDetailsLayout: (value: unknown) => DetailsLayout | null
+
+value keptDetailsOptions: (value: unknown) => DetailsOptions | null
+
 value keptSelection: (value: unknown) => BranchSelection | null
+
+value letterOf: (status: FileStatus) => string
+
+value liesInside: (top: string, candidate: string) => boolean
 
 value matchingEntries: (entries: readonly BranchEntry[], text: string) => BranchEntry[]
 
@@ -233,6 +411,8 @@ value refKindOf: (refs: Refs, ref: number) => RefKind
 
 value refNameOf: (refs: Refs, ref: number) => string
 
+value rowAfterMove: (page: GraphPage, row: number, move: RowMove) => number
+
 value sameEntries: (a: readonly BranchEntry[], b: readonly BranchEntry[]) => boolean
 
 value sameSelection: (a: BranchSelection, b: BranchSelection) => boolean
@@ -246,3 +426,7 @@ value subjectOf: (columns: CommitColumns, row: number) => string
 value survivingSelection: (selection: BranchSelection, refs: Refs) => BranchSelection
 
 value toggleBranch: (menu: BranchMenu, name: string) => BranchMenu
+
+value toneOf: (status: FileStatus) => FileTone
+
+value unkeptChoiceOf: (value: unknown) => UnkeptChoice | null

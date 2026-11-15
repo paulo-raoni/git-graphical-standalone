@@ -1,5 +1,5 @@
 import { ThemeChoice } from '../contracts/index';
-import type { Failure } from '../contracts/index';
+import type { Failure, UnkeptChoice } from '../contracts/index';
 
 import { mountBranchControl } from './branch-control';
 import type { BranchControl } from './branch-control';
@@ -15,10 +15,11 @@ import { failureHeadline, repositoryLabel } from './status-text';
  * element with it.
  *
  * Nothing here decides anything. It holds no bridge and no state beyond which of
- * its two panes is showing and which colour scheme it was told to show, which is
- * why the whole of the wiring is in `./renderer.ts` and the wording of
- * everything but the controls is in `./status-text.ts`. The Branches dropdown
- * is built by `./branch-control.ts` and only placed in the bar here.
+ * its two panes is showing, which colour scheme it was told to show and which
+ * notices are open, which is why the whole of the wiring is in `./renderer.ts`
+ * and the wording of everything but the controls and the notice of a choice not
+ * kept is in `./status-text.ts`. The Branches dropdown is built by
+ * `./branch-control.ts` and only placed in the bar here.
  *
  * Everything is built from elements and `textContent`, never from a markup
  * string, so a repository path and a message from git cannot be interpreted as
@@ -47,6 +48,9 @@ const THEME_CHOICES: readonly (readonly [ThemeChoice, string])[] = [
 /** The `id` the theme control's visible label names it by. */
 const THEME_ID = 'bar-theme';
 
+/** What the control that closes a notice says. */
+const CLOSE_LABEL = 'Close';
+
 /** What the shell hands `./renderer.ts` to drive it with. */
 export interface Shell {
   /** The element `mountGraphTable` owns. */
@@ -74,6 +78,11 @@ export interface Shell {
   readonly showFailure: (failure: Failure) => void;
   /** Put the table back. */
   readonly clearFailure: () => void;
+  /**
+   * Say that a choice could not be kept for the next start, in a notice under the
+   * bar that stays until its Close control is used.
+   */
+  readonly showUnkept: (unkept: UnkeptChoice) => void;
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -114,6 +123,26 @@ function themeControl(): { label: HTMLLabelElement; select: HTMLSelectElement } 
 }
 
 /**
+ * One notice of a choice not kept: the three things a person needs, in plain
+ * words (what was not kept, that it still applies until the application closes,
+ * and the file that could not be written), and a Close control, a button, so the
+ * keyboard reaches it as it reaches the bar's.
+ */
+function unkeptNotice({ what, file }: UnkeptChoice): HTMLElement {
+  const notice = element('div', 'notice');
+  const text = element('p', 'notice__text');
+  text.textContent =
+    `The ${what} could not be kept. It still applies until the application closes, ` +
+    `but the next start will not have it. This file could not be written: ${file}`;
+  const close = control('bar__button', CLOSE_LABEL);
+  close.addEventListener('click', () => {
+    notice.remove();
+  });
+  notice.append(text, close);
+  return notice;
+}
+
+/**
  * Build the shell into `root` and answer the handles the wiring needs.
  *
  * The failure view is built now rather than when a failure arrives, for the
@@ -125,6 +154,14 @@ function themeControl(): { label: HTMLLabelElement; select: HTMLSelectElement } 
  * git's message goes into a `pre`, because git writes more than one line —
  * `discoverGit`'s refusal lists every place it looked — and a message folded
  * onto one line is a message nobody reads to the end.
+ *
+ * The notices sit in a strip between the bar and the stage, in the flow of the
+ * column, so a notice shortens the stage rather than covering any of it. The
+ * strip is a `status` live region built now and kept, empty when no notice is
+ * open, because live regions announce what is added to a region already in the
+ * page, politely and without moving the focus; a region added with its text
+ * already in it is not reliably announced (WAI-ARIA's guidance on live regions,
+ * not measured here with a screen reader).
  */
 export function mountShell(root: HTMLElement): Shell {
   const bar = element('header', 'bar');
@@ -136,6 +173,9 @@ export function mountShell(root: HTMLElement): Shell {
   const theme = themeControl();
   bar.append(path, open, refresh, ...branches.parts, theme.label, theme.select);
 
+  const notices = element('div', 'notices');
+  notices.setAttribute('role', 'status');
+
   const stage = element('div', 'stage');
 
   const failure = element('section', 'failure');
@@ -144,7 +184,7 @@ export function mountShell(root: HTMLElement): Shell {
   failure.append(headline, message);
   failure.hidden = true;
 
-  root.replaceChildren(bar, stage, failure);
+  root.replaceChildren(bar, notices, stage, failure);
   path.textContent = repositoryLabel(null);
 
   return {
@@ -170,6 +210,9 @@ export function mountShell(root: HTMLElement): Shell {
     clearFailure: (): void => {
       failure.hidden = true;
       stage.hidden = false;
+    },
+    showUnkept: (unkept: UnkeptChoice): void => {
+      notices.append(unkeptNotice(unkept));
     },
   };
 }

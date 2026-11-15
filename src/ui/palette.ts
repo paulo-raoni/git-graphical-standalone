@@ -38,6 +38,8 @@
  * reader has to talk themselves out of.
  */
 
+import { UNCOMMITTED_COLOUR } from '../contracts/index';
+
 /** Seven characters per colour, concatenated. */
 const LANE_COLOURS = '#3d7fd6#d9534f#3fa34d#a86fd0#e08b2f#2aa9a0#c2569a#8a8f3a';
 
@@ -48,12 +50,24 @@ const COLOUR_LENGTH = 7;
 export const LANE_COLOUR_COUNT = LANE_COLOURS.length / COLOUR_LENGTH;
 
 /**
- * The colour of a lane, for any palette index the contract can hold.
+ * The grey of the uncommitted row's ring and of its line down to HEAD's dot,
+ * which the reference extension draws grey (E04-M01-S14). A mid grey, chosen as
+ * the lane colours are, to read on both backgrounds.
+ */
+export const UNCOMMITTED_GREY = '#808080';
+
+/**
+ * The colour of a lane, for any palette index the contract can hold:
+ * {@link UNCOMMITTED_GREY} for `UNCOMMITTED_COLOUR`, and a lane colour for every
+ * other.
  *
  * `colourIndex` is a `Uint8Array` entry, so it is a whole number from 0 to 255
  * and the modulo below is total over its whole range.
  */
 export function laneColour(colourIndex: number): string {
+  if (colourIndex === UNCOMMITTED_COLOUR) {
+    return UNCOMMITTED_GREY;
+  }
   const at = (colourIndex % LANE_COLOUR_COUNT) * COLOUR_LENGTH;
   return LANE_COLOURS.slice(at, at + COLOUR_LENGTH);
 }

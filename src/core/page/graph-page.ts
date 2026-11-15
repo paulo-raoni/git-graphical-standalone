@@ -1,9 +1,12 @@
 import { entryAt } from '../../contracts/column-read';
-import { RowFlag } from '../../contracts/index';
+import { RowFlag, UNCOMMITTED_COLOUR, UNKNOWN_INDEX } from '../../contracts/index';
 import type { GraphPage, LayoutRows } from '../../contracts/index';
 import type { RepositoryPage } from '../../ports/index';
+import { layoutPage, openUncommittedLine } from '../layout/index';
+import type { LayoutState } from '../layout/index';
 
-import { appendRows, markHeadRow } from './row-block';
+import { continuesBlock } from './continues-block';
+import { appendRows, markHeadRow, markStashRows, NO_UNCOMMITTED_LINE } from './row-block';
 import type { RowBlock } from './row-block';
 
 /**
@@ -44,11 +47,16 @@ import type { RowBlock } from './row-block';
  * The block as one `LayoutRows`, with the uncommitted row on the front when the
  * working tree is dirty.
  *
- * The prepended row is exactly what `src/contracts/layout.ts` describes and what
- * `test/e2e/graph-table.spec.ts` builds by hand: row 0, lane 0, colour 0, one
- * segment from lane 0 to lane 0, and the flags `Uncommitted | ClipAboveVertex`.
- * Lane 0, colour 0 and the segment's two lanes are all zero, so they are what the
- * freshly allocated columns already hold and only the flags are written.
+ * The prepended row is what `src/contracts/layout.ts` describes: row 0, lane 0,
+ * one segment from lane 0 to lane 0, its vertex and its segment in
+ * `UNCOMMITTED_COLOUR`, and the flags `Uncommitted | ClipAboveVertex`, with
+ * `ClipBelowVertex` as well when the block was laid out with no line from it
+ * (`layoutReading`). Lane 0 and the segment's two lanes are zero, which the
+ * freshly allocated columns already hold, so only the colours and the flags are
+ * written. Until E04-M01-S14 the colour was 0 and the line stopped at the row's
+ * bottom edge whatever was below it, which is `test/e2e/graph-table.spec.ts`'s
+ * hand-built row still; since then the rows below continue it in lane 0 down to
+ * HEAD's dot.
  *
  * Nothing is laid out again: every other entry is a copy of an entry the layout
  * pass produced, moved along by one row and by one segment.
@@ -74,7 +82,10 @@ export function layoutRowsOf(block: RowBlock, withUncommittedRow: boolean): Layo
     segmentOffsets[row + shift] = entryAt(block.segmentOffsets, row) + shift;
   }
   if (withUncommittedRow) {
-    flags[0] = RowFlag.Uncommitted | RowFlag.ClipAboveVertex;
+    const lineless = block.uncommittedHead === NO_UNCOMMITTED_LINE ? RowFlag.ClipBelowVertex : 0;
+    flags[0] = RowFlag.Uncommitted | RowFlag.ClipAboveVertex | lineless;
+    colourIndex[0] = UNCOMMITTED_COLOUR;
+    segmentColour[0] = UNCOMMITTED_COLOUR;
   }
   return {
     rowCount,
@@ -107,15 +118,81 @@ export function graphPageOf(block: RowBlock, read: RepositoryPage): GraphPage {
 }
 
 /**
- * One page, start to finish: append its rows, mark HEAD, and produce it.
+ * One page, start to finish: append its rows, mark HEAD and the stashes, and
+ * produce it.
  *
- * The order matters and is not arbitrary. HEAD is marked **after** the append
- * because the row it names may be one of the rows just added, and **before** the
- * page is produced because the page is a copy of the block and a bit written
- * afterwards would be written into the wrong one of the two.
+ * The order matters and is not arbitrary. HEAD and the stash rows are marked
+ * **after** the append because the rows they name may be among the rows just
+ * added, and **before** the page is produced because the page is a copy of the
+ * block and a bit written afterwards would be written into the wrong one of the
+ * two.
  */
 export function addPage(block: RowBlock, rows: LayoutRows, read: RepositoryPage): GraphPage {
   appendRows(block, rows);
   markHeadRow(block, read.workingTree.headCommitIndex);
+  markStashRows(block, read.refs);
   return graphPageOf(block, read);
+}
+
+/**
+ * The row the uncommitted row's line runs down to in `read`, which is HEAD's
+ * commit's, or {@link NO_UNCOMMITTED_LINE} when it has none.
+ *
+ * It has none when the page shows no uncommitted row, and when HEAD's commit is
+ * not a row of the page. The second is not an inference about where the line
+ * would go: `WorkingTree.headCommitIndex` is `UNKNOWN_INDEX` both for a HEAD
+ * whose commit is past the page and for an unborn branch, which has no commit at
+ * all, and a line laid out towards the first would run down every page of the
+ * second. So the uncommitted row is drawn as a ring alone until a Load More
+ * reaches HEAD's commit, and that reading lays the rows out again, because it
+ * does not continue the block ({@link continuesReading}).
+ */
+export function uncommittedLineEnd(read: RepositoryPage): number {
+  const { hasChanges, headCommitIndex } = read.workingTree;
+  return hasChanges && headCommitIndex !== UNKNOWN_INDEX ? headCommitIndex : NO_UNCOMMITTED_LINE;
+}
+
+/**
+ * Lay out the new rows of `read`, which is the layout pass's work, telling it of
+ * the uncommitted row's line when the block is empty and `read` has one.
+ *
+ * This is the one mechanism E04-M01-S14 gives a row the page adds and joins to a
+ * row it shows: the stash rows are commits of the page joined to the commit each
+ * was made on by its first parent, and the uncommitted row's line is opened as a
+ * line to HEAD's row before the first commit, so the layout keeps its lane and
+ * HEAD's row knows it arrives (`openUncommittedLine` of `src/core/layout/`).
+ * `block.uncommittedHead` remembers which, so a later reading that would draw it
+ * differently is laid out again rather than appended ({@link continuesReading}).
+ */
+export function layoutReading(
+  state: LayoutState,
+  block: RowBlock,
+  read: RepositoryPage,
+): LayoutRows {
+  if (block.rowCount === 0) {
+    block.uncommittedHead = uncommittedLineEnd(read);
+    if (block.uncommittedHead !== NO_UNCOMMITTED_LINE) {
+      openUncommittedLine(state, block.uncommittedHead);
+    }
+  }
+  return layoutPage(state, read.commits, block.rowCount);
+}
+
+/**
+ * Whether `read` may be appended to the block laid out from the object names
+ * `laidOutFrom`: it begins with the same commits (`continuesBlock`), and it
+ * draws the uncommitted row's line to the same row, or draws none as the block
+ * did. A working tree made clean or dirty, a HEAD moved, or HEAD's commit
+ * reached for the first time by this reading all mean the rows above HEAD were
+ * laid out for another line, and the reading is laid out whole.
+ */
+export function continuesReading(
+  block: RowBlock,
+  laidOutFrom: Uint8Array,
+  read: RepositoryPage,
+): boolean {
+  return (
+    continuesBlock(block, laidOutFrom, read.commits) &&
+    block.uncommittedHead === uncommittedLineEnd(read)
+  );
 }

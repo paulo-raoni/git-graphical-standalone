@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
-import { fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
+import { removeDirectory } from '../fixtures/shared-store';
+import { initScriptFirst } from './support/budgets';
+import type { InitScriptRun } from './support/budgets';
+import { ended, fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
 
 /**
  * The branch selection and Show Remote Branches are kept per repository by the
@@ -50,6 +54,8 @@ const REMOTES = ['origin/HEAD', 'origin/feature', 'origin/main', 'origin/only-re
 
 let remotesRepository = '';
 const temporary: string[] = [];
+/** Every application process a case launched, waited for before the directories go. */
+const children: ChildProcess[] = [];
 
 /** One launched instance, and what its renderer drew. */
 interface Instance {
@@ -64,19 +70,23 @@ const text = (page: Page): Locator => page.locator('.branches__text');
 const list = (page: Page): Locator => page.getByRole('listbox', { name: 'Branches' });
 const remotes = (page: Page): Locator =>
   page.getByRole('checkbox', { name: 'Show Remote Branches' });
+/** A row of the open list, found by its exact accessible name, which its check mark is not part of. */
 const entry = (page: Page, label: string): Locator =>
-  list(page)
-    .getByRole('option')
-    .filter({ hasText: new RegExp(`^${label}$`) });
+  list(page).getByRole('option', { name: label, exact: true });
+
+/**
+ * The checkbox after a first page, as assistive technology reads it: checked or not,
+ * where an indeterminate box reads `mixed` and matches neither. `toBeChecked` reads
+ * the `checked` property alone, which a box left indeterminate also carries.
+ */
+const [SHOWN, HIDDEN] = ['- checkbox [checked=true]', '- checkbox [checked=false]'];
 
 /** What {@link recordDrawn} touches in the page. `tsconfig.node.json` has no DOM library. */
 interface PageScope {
   readonly document: {
     readonly querySelectorAll: (selector: string) => ArrayLike<{ textContent: string | null }>;
   };
-  readonly MutationObserver: new (callback: () => void) => {
-    observe: (target: unknown, options: Record<string, boolean>) => void;
-  };
+  readonly MutationObserver: new (callback: () => void) => { observe: (...of: unknown[]) => void };
   drawnRows?: string[][];
   viewBeforeScript?: boolean;
 }
@@ -89,13 +99,10 @@ interface PageScope {
 function recordDrawn(): void {
   const scope = globalThis as unknown as PageScope;
   scope.viewBeforeScript = 'gitGraphicalView' in globalThis;
-  const drawn: string[][] = [];
-  scope.drawnRows = drawn;
+  const drawn: string[][] = (scope.drawnRows = []);
   new scope.MutationObserver(() => {
-    const rows = Array.from(
-      scope.document.querySelectorAll('.row:not([hidden]) .row__hash'),
-      (row) => row.textContent ?? '',
-    );
+    const hashes = scope.document.querySelectorAll('.row:not([hidden]) .row__hash');
+    const rows = Array.from(hashes, (row) => row.textContent ?? '');
     if (rows.length > 0) drawn.push(rows.slice(0, 8));
   }).observe(scope.document, { subtree: true, childList: true, characterData: true });
 }
@@ -106,13 +113,40 @@ function readDrawn(): { rows: string[][]; first: boolean } {
   return { rows: scope.drawnRows ?? [], first: scope.viewBeforeScript === false };
 }
 
-/** Launch on `repository` with `home` as its user-data directory, its first page drawn. */
+/**
+ * Runs in the page: whether the renderer's view was there when
+ * {@link recordDrawn} ran, or `null` when it did not run in this document.
+ */
+function viewBeforeScript(): boolean | null {
+  return (globalThis as unknown as PageScope).viewBeforeScript ?? null;
+}
+
+/**
+ * Launch on `repository` with `home` as its user-data directory, its first page
+ * drawn, in a document {@link recordDrawn} ran first in.
+ *
+ * The script is added to the context after the launch, which has already let the
+ * application open its window, so it can reach the window's first document late,
+ * or none of its documents (`initScriptFirst` in `support/budgets.ts` says why,
+ * and how the window is brought to a document it ran first in). Measured by
+ * E04-M01-FIX-05 at its Base, where the window was never reloaded: with a wait of
+ * 60 to 600 ms planted before the `addInitScript` call, the restart case failed
+ * `drawn.first` in 12 of 12 runs. `firstPageMs` counts any reload made here.
+ */
 async function launch(repository: string, home: string): Promise<Instance> {
   const started = Date.now();
   const args = ['.', repository, `--user-data-dir=${home}`];
   const application = await electron.launch({ args, cwd: repositoryRoot });
+  children.push(application.process());
   await application.context().addInitScript(recordDrawn);
   const page = await application.firstWindow();
+  await initScriptFirst(page, recordDrawn, 'the drawn-rows recorder', async () => {
+    await page.waitForFunction(() => 'gitGraphicalView' in globalThis);
+    const before = await page.evaluate(viewBeforeScript);
+    const run: InitScriptRun =
+      before === null ? 'did not run' : before ? 'ran late or in part' : 'ran first';
+    return { run, seen: JSON.stringify(before) };
+  });
   await expect(box(page)).toBeEnabled();
   return { application, page, firstPageMs: Date.now() - started };
 }
@@ -124,14 +158,11 @@ async function close(instance: Instance): Promise<void> {
 }
 
 /** Launch, run `body`, and close whatever `body` did. */
-async function withWindow(
-  repository: string,
-  home: string,
-  body: (page: Page) => Promise<unknown>,
-): Promise<void> {
+type Body = (page: Page, application: ElectronApplication) => Promise<unknown>;
+async function withWindow(repository: string, home: string, body: Body): Promise<void> {
   const instance = await launch(repository, home);
   try {
-    await body(instance.page);
+    await body(instance.page, instance.application);
   } finally {
     await close(instance);
   }
@@ -194,7 +225,7 @@ interface Shown {
 
 async function expectShown(page: Page, repository: string, shown: Shown): Promise<void> {
   await expect(text(page)).toHaveText(shown.box);
-  await expect(remotes(page)).toBeChecked({ checked: shown.remotes });
+  await expect(remotes(page)).toMatchAriaSnapshot(shown.remotes ? SHOWN : HIDDEN);
   await expectGraph(page, repository, { labels: shown.remotes, ...shown });
   await box(page).click();
   await expect.poll(() => list(page).getByRole('option').allTextContents()).toEqual(shown.listed);
@@ -235,14 +266,21 @@ const FEATURE_AND_TOPIC_LOCAL: Shown = {
 };
 
 test.beforeAll(() => {
-  expect(existsSync(join(repositoryRoot, 'dist', 'main.cjs')), 'run `npm run build` first').toBe(
-    true,
-  );
+  const built = existsSync(join(repositoryRoot, 'dist', 'main.cjs'));
+  expect(built, 'run `npm run build` first').toBe(true);
   remotesRepository = fixture('remotes', 'remotes', 5000);
 });
 
-test.afterAll(() => {
-  for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true });
+/**
+ * The directories are removed only once the main processes, which write the
+ * selections into them, have exited: a case that ran out can leave its
+ * applications running, and removing a profile under one met `EPERM` (E04-M01-S04,
+ * review round 01). The line the order hinges on is the wait on {@link ended};
+ * what it does not hold is said beside the same wait in `theme.spec.ts`.
+ */
+test.afterAll(async () => {
+  for (const child of children.splice(0)) await ended(child);
+  for (const directory of temporary.splice(0)) removeDirectory(directory);
   removeOwnFixtures();
 });
 
@@ -277,7 +315,7 @@ test('each repository keeps its own selection', async () => {
   });
   await withWindow(other, home, async (page) => {
     await expect(text(page)).toHaveText('Show All');
-    await expect(remotes(page)).toBeChecked();
+    await expect(remotes(page)).toMatchAriaSnapshot(SHOWN);
     await expectGraph(page, other, { revisions: EVERY });
     await apply(page, 'uncheck');
     // This repository has no remote branch, so its graph does not change: what is
@@ -290,16 +328,11 @@ test('each repository keeps its own selection', async () => {
         .some((name) => readFileSync(join(home, RECORDS, name), 'utf8').includes(':false'));
     await expect.poll(hidden).toBe(true);
   });
+  const feature = { box: 'feature', checked: ['feature'], revisions: [FEATURE] };
   await withWindow(remotesRepository, home, (page) =>
-    expectShown(page, remotesRepository, {
-      ...SHOW_ALL,
-      box: 'feature',
-      checked: ['feature'],
-      revisions: [FEATURE],
-      uncommitted: false,
-    }),
+    expectShown(page, remotesRepository, { ...SHOW_ALL, ...feature, uncommitted: false }),
   );
-  await withWindow(other, home, (page) => expect(remotes(page)).not.toBeChecked());
+  await withWindow(other, home, (page) => expect(remotes(page)).toMatchAriaSnapshot(HIDDEN));
 });
 
 test('a second instance open at once opens on what the first applied, without a stall', async () => {
@@ -316,8 +349,7 @@ test('a second instance open at once opens on what the first applied, without a 
       // folder chooser answered in its main process.
       await second.application.evaluate(({ dialog }, path) => {
         const answer = { canceled: false, filePaths: [path] };
-        (dialog as unknown as { showOpenDialog: unknown }).showOpenDialog = () =>
-          Promise.resolve(answer);
+        Object.assign(dialog, { showOpenDialog: () => Promise.resolve(answer) });
       }, remotesRepository);
       await second.page.getByRole('button', { name: 'Open Repository' }).click();
       await expectShown(second.page, remotesRepository, { ...topic, revisions: [TOPIC] });

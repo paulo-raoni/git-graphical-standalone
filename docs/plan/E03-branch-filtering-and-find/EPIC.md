@@ -24,7 +24,7 @@ box, the remote-branches toggle, persistence per repository, very many branches 
 
 | ID | title | state |
 | --- | --- | --- |
-| E03-M01 | Branches dropdown | in flight |
+| E03-M01 | Branches dropdown | delivered, v0.2.0 |
 | E03-M02 | Find widget | planned |
 
 Outcomes are in `docs/PLAN.md` §2. Approved with the plan on 2026-09-11 (`AGENTS.md` §2). E03-M01 is the second

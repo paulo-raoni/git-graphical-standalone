@@ -3,8 +3,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { _electron as electron, expect, test } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import type {
   ApplicationInfoResponse,
@@ -13,7 +13,13 @@ import type {
 } from '../../src/contracts/index';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
-import { fixture, fixtureRoot, ownFixture, removeOwnFixtures } from './support/fixtures';
+import {
+  fixture,
+  fixtureRoot,
+  ownFixture,
+  removeOwnFixtures,
+  withOwnProfile,
+} from './support/fixtures';
 
 /**
  * The whole application, against real repositories.
@@ -191,26 +197,16 @@ function askApplicationInfo(): Promise<ApplicationInfoResponse> {
 type Launch = { open?: string; env?: Record<string, string> };
 
 /**
- * Launch the built application, run `body` against its window, and stop it.
+ * Launch the built application on a user-data directory of its own, run `body`
+ * against its window, and stop it.
  *
- * The exit status is read back afterwards, as the other end-to-end suites do:
- * a leaked Electron process is a failure of the gate whatever the assertions
- * said, and the utility process this slice adds is a child of that one.
+ * `withOwnProfile` (`./support/fixtures.ts`) reads the exit status back
+ * afterwards, as the other end-to-end suites do: a leaked Electron process is a
+ * failure of the gate whatever the assertions said, and the utility process is a
+ * child of that one.
  */
 async function withWindow(launch: Launch, body: (page: Page) => Promise<void>): Promise<void> {
-  const args = launch.open === undefined ? ['.'] : ['.', launch.open];
-  const application: ElectronApplication = await electron.launch({
-    args,
-    cwd: repositoryRoot,
-    ...(launch.env === undefined ? {} : { env: launch.env }),
-  });
-  try {
-    await body(await application.firstWindow());
-  } finally {
-    const child = application.process();
-    await application.close();
-    expect(child.exitCode === null && !child.killed).toBe(false);
-  }
+  await withOwnProfile(launch, async (application) => body(await application.firstWindow()));
 }
 
 /** An environment in which none of the places discovery looks holds a git. */

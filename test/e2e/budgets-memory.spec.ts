@@ -41,7 +41,8 @@ import { fixture } from './support/fixtures';
  *   the network service, the renderer and the utility process of
  *   `src/app/repository-client.ts`; the case requires at least the four this
  *   project's code starts or draws in. It is read once the load's memory has
- *   been given back (`SETTLE`), and the idle window opens after that reading.
+ *   been given back (`SETTLE`), or at the cap if it is still being given back
+ *   then, and the idle window opens after that reading.
  * - **The budget is held against the sum of the private bytes** of every
  *   process, by the owner's ruling recorded in decision 6 as amended on
  *   2026-10-03: that sum counts nothing twice. The sum of the working sets is
@@ -72,7 +73,10 @@ const IDLE_MS = 5 * 60 * 1000;
  * the budgets to judge; a fall after a rise does. The tree is read every
  * `pauseMs` plus the time a reading takes. The rule is tested on each reading
  * before the cap is, so a reading past `capMs` after the paint that meets the
- * rule is taken, and the first reading past it that does not fails the case.
+ * rule is taken. Past the cap, the first reading whose processes every reading
+ * of the `steadyMs` before it also held is taken **whether or not the rule is
+ * met**, and the case prints that the memory had not settled. Only when no
+ * reading has done that by `capMs + windowMs` does the case fail.
  *
  * Why: the load's memory is not given back at once but in steps. Measured by
  * E01-M01-FIX-28 on 2026-10-03, 15:50 to 16:03, in five launches whose tree was
@@ -95,8 +99,45 @@ const IDLE_MS = 5 * 60 * 1000;
  * free), the rule was met 68.7 to 124.4 s after the paint; in 20 the sum then
  * moved by -1.0 to +0.5 MiB over the five idle minutes, and in two, both at a
  * load of 52 to 100 %, the GPU process gave back 3.1 and 4.3 MiB during them.
+ *
+ * **Steps can keep coming past the cap, and that alone no longer fails the
+ * case** (E04-M01-FIX-06). E04-M01-FIX-05 read this case red on 2026-11-08 at
+ * an unchanged product: its sum fell in steps to 151.3 MiB by 97.4 s, then by
+ * 4.0 MiB at 118.6 s and 2.3 MiB at 150.8 s, to 144.5 MiB, under the limit of
+ * `privateBytesAt50000` from 30.5 s on, and the 150.8 s step left the rule
+ * unmet at the cap. FIX-06 read the tree every 2 s for 490 s after the paint in
+ * eight launches on 2026-11-09, 06:10 to 08:59, processor load of everything
+ * else 15.7 to 37.1 % on average: three with nothing made to press for memory
+ * (1.7 to 3.3 GB free in two, 0.45 GB at the lowest in the third, when
+ * something else took memory at 70 s), and five under a process of its own that
+ * held memory down to about 0.7 GB free from 0, 0, 100, 130 or 150 s after the
+ * paint. Where free memory first fell under 0.8 GB after the paint's own steps,
+ * at 70, 102, 134 and 150 s, the GPU process gave back 1.0 MiB 6 to 10 s later,
+ * at 80, 110, 140 and 156 s; it gave nothing more at a later fall in the same
+ * run, and no process moved by 0.5 MiB or more between readings after 98 s. The
+ * rule was met 98.0 to 132.0 s after the paint in all eight, so FIX-06 did not
+ * reproduce the red itself; it reproduced a step after 120 s only by pressing
+ * for memory, and the timing of those steps followed the pressure. From 180 s
+ * to 490 s the sum moved by 0.39 to 0.61 MiB in each of the eight.
+ *
+ * Why a reading past the cap is safe to hold: a sum still falling is over the
+ * sum it settles to, so the private-bytes verdict can only err toward red,
+ * where the case used to fail outright. A window opened there, at 180 to 182 s
+ * in those eight curves, read a working-set ratio of 0.976 to 1.003 and 0.010
+ * to 0.089 % of a core over the next 300 s, against limits of 1.02 and 0.5 %
+ * (0.252 % under continuous integration): memory given back during the window
+ * lowers the ratio and was not seen to cost processor time. What it can hide is
+ * a growth while idle no larger than what is given back in the same window.
+ * `steadyMs` keeps out the second GPU process described at `settle`, which
+ * lived 1.0 to 5.0 s.
  */
-const SETTLE = { windowMs: 40_000, fallBytes: 1_000_000, pauseMs: 2_000, capMs: 180_000 };
+const SETTLE = {
+  windowMs: 40_000,
+  fallBytes: 1_000_000,
+  pauseMs: 2_000,
+  capMs: 180_000,
+  steadyMs: 10_000,
+};
 
 const COMMITS = 50_000;
 
@@ -208,10 +249,25 @@ function stoppedFalling(readings: readonly Timed[]): boolean {
 }
 
 /**
+ * Whether every reading of `readings`, oldest first, from the newest back to
+ * the last one at least `SETTLE.steadyMs` older, holds the newest's processes.
+ */
+function steady(readings: readonly Timed[]): boolean {
+  const newest = readings.at(-1);
+  const from = readings.findLastIndex((each) => each.at <= (newest?.at ?? 0) - SETTLE.steadyMs);
+  return from >= 0 && readings.slice(from).every((each) => each.processes === newest?.processes);
+}
+
+/**
  * Read the application's processes every few seconds from `painted` until the
  * sum of their private bytes has stopped falling, and return the reading that
- * met the rule. Throws at the first reading past the cap that does not meet it:
- * a reading taken early is the defect this replaces.
+ * met the rule, or, past the cap, the first reading whose processes held for
+ * `SETTLE.steadyMs`, printing that the memory had not settled (E04-M01-FIX-06:
+ * until then the case failed there, and failed once on an unchanged product,
+ * as `SETTLE` records). Throws when no reading has done either by the cap and
+ * `SETTLE.windowMs` more. A reading taken before the load has given its memory
+ * back is the defect the rule replaced; the reading past the cap is over the
+ * settled sum, never under it, while the sum is falling.
  *
  * Why the same processes: 120 s after its GPU process starts, the main process
  * starts a second one (`--type=gpu-process --disable-gpu-sandbox
@@ -243,8 +299,18 @@ async function settle(
       );
       return tree;
     }
-    if (at > SETTLE.capMs) {
-      throw new Error(`the memory had not settled at the cap: ${shown.join(', ')}`);
+    if (at > SETTLE.capMs && steady(readings)) {
+      process.stdout.write(
+        `  the memory had not settled at the cap: read ${(at / 1000).toFixed(1)} s after the paint, ` +
+          `before it had stopped falling: ${shown.join(', ')}\n`,
+      );
+      return tree;
+    }
+    if (at > SETTLE.capMs + SETTLE.windowMs) {
+      throw new Error(
+        `no reading past the cap held the same processes as every reading of the ` +
+          `${String(SETTLE.steadyMs / 1000)} s before it: ${shown.join(', ')}`,
+      );
     }
     await budgeted.page.waitForTimeout(SETTLE.pauseMs);
   }
@@ -278,9 +344,10 @@ function firedDelta(before: ProbeReading, after: ProbeReading): number {
  * Five minutes with nothing touched: the processes before and after, and the
  * wakeups in the page and the main process between.
  *
- * `before` is the reading that met the rule of {@link SETTLE}, so the window
- * opens on a tree known to be at rest: a second reading taken here could hold
- * the short-lived process described at `settle`, as one did on 2026-10-03.
+ * `before` is the reading `settle` returned, so the window opens on a tree
+ * that met the rule of {@link SETTLE} or whose processes held past the cap: a
+ * second reading taken here could hold the short-lived process described at
+ * `settle`, as one did on 2026-10-03.
  *
  * Reading the main process's count is itself a callback there, so it is read
  * twice at the end and the second read's own cost is subtracted.
@@ -390,7 +457,7 @@ function closedVerdicts(loaded: readonly ProcessReading[]): boolean[] {
 }
 
 test('fifty thousand commits: memory, five idle minutes, and what closing gives back @budgets', async () => {
-  test.setTimeout(IDLE_MS + SETTLE.capMs + 180_000);
+  test.setTimeout(IDLE_MS + SETTLE.capMs + SETTLE.windowMs + 180_000);
   const repository = fixture('huge', 'large', COMMITS);
   const budgeted = await launchBudgeted({ open: repository });
   const held: { loaded: readonly ProcessReading[]; verdicts: boolean[] } = {

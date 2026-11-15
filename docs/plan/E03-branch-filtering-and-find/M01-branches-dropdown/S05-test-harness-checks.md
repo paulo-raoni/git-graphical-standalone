@@ -139,6 +139,15 @@ removed by the next process that reads the directory. Copy numbers are never use
 copy that exists, lowest first, and builds one past the highest, so a removed copy leaves a gap nothing builds
 into again.
 
+> **Corrected by E04-M01-S07, 2026-11-07.** "Never used twice" claims more than the code holds. The copy built is
+> one past the highest that exists when a process lists the copies, so a number below a copy that exists then is
+> never built again, and a removed copy below the highest leaves a gap nothing builds into;
+> `test/fixtures/shared-store-copies.test.ts` holds both, and its numbering case goes red with the number
+> counted rather than taken from the highest. A number is built again when a process lists the copies at a
+> moment when no copy at or above it exists. Review round 02 of E03-M01 read one such moment in the code, and
+> S07 did not measure it: a process lists the copies after another has removed the only copy and before that
+> one has published the next, so it builds copy 1 again.
+
 Why not by age: no bound is known on how long a run holds a path. Why not at once: E01-M01-FIX-33 measured, and
 this slice did not repeat, that on Windows a recursive removal is refused while another process has its working
 directory in the directory, but succeeds while that process merely holds a file open in it, and succeeds
