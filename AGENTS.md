@@ -84,7 +84,10 @@ audit files; merge, push or tag; touch any remote or the hosted repository's set
 **ORCHESTRATOR**
 - Commit to `dev`, **only**: `EPIC.md` and `MILESTONE.md` files, the other documents under `docs/` that are
   not slice documents, `AGENTS.md`, `README.md`, the two templates, the workflow block of `.gitignore`, and
-  lane merge commits.
+  lane merge commits. Also the community files under `.github/`, which are its Markdown files and the issue
+  and pull-request templates. The workflow files are not among them. (Owner's ruling, 2026-11-16: the public
+  presentation needs a contributing guide, a code of conduct, a security policy and issue templates. None of
+  them is read by a gate or ships in the application.)
 - Commit to `main`, **only** promotion merge commits (§8).
 - Create and remove worktrees and branches; merge; tag; copy sequence files between the primary checkout and
   worktrees.
