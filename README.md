@@ -1,99 +1,170 @@
-# git graphical standalone
+<div align="center">
 
-A standalone desktop application that reproduces the behaviour of the
-[Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph) extension for Visual
-Studio Code, without needing an editor. It starts with the part everything else hangs off — drawing the
-commit graph — and adds the extension's other features one at a time.
+<img src="docs/images/logo.svg" alt="Trunks Graph logo" width="96" height="96">
 
-## Status
+# Trunks Graph
 
-**Pre-alpha, version 0.1.0.** The first milestone, E01-M01 "First graph", is delivered: the application opens
-a git repository, named on the command line or chosen with **Open Repository**, and draws its commit graph — one
-row per commit with the graph, the description, the date, the author and the abbreviated hash; branch,
-remote-branch and tag labels on their commits; the uncommitted changes as the top row when the working tree
-is dirty; **Load More Commits** for the next page; and **Refresh**. It reads and never writes. Choosing which
-branches to show and a commit's details come next ([`docs/PLAN.md`](docs/PLAN.md) §4).
+**The commit graph for Git, as a desktop app.**
 
-Review round 22 compared the drawn rows with `git log` on every row of this repository and on the first 1 200
-rows of a 50 000-commit test repository, loaded page by page with Load More, and found no difference
-(2026-10-17).
+Open any repository and travel through its history: every branch and tag on one graph, the branches you choose,
+and any commit's details and changed files, without opening an editor.
 
-The stack is decided and is **Electron with TypeScript**, reading git through its command-line interface.
-The reasoning, including why a lighter shell was weighed and not taken, is in
-[`docs/ADR-0001-stack.md`](docs/ADR-0001-stack.md).
+[![CI](https://img.shields.io/github/actions/workflow/status/paulo-raoni/trunks-graph/ci.yml?branch=dev&style=flat-square&label=gates)](https://github.com/paulo-raoni/trunks-graph/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/tag/paulo-raoni/trunks-graph?style=flat-square&label=version&color=111)](https://github.com/paulo-raoni/trunks-graph/tags)
+[![License: MIT](https://img.shields.io/badge/license-MIT-111?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-111?style=flat-square)](#install)
+[![Read-only](https://img.shields.io/badge/writes%20to%20your%20repo-never-2dd4bf?style=flat-square)](#safe-by-design)
 
-**Requirements to build:** git, Node and npm. Nothing else. See [`docs/SETUP.md`](docs/SETUP.md).
+[Install](#install) · [Features](#features) · [Why](#why-trunks-graph) · [Roadmap](#roadmap) ·
+[Contributing](#contributing) · [FAQ](#faq)
 
-```
+</div>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/screenshot-light.png">
+  <img src="docs/images/screenshot-dark.png" alt="Trunks Graph showing the history of the Express repository: a coloured graph of branches on the left, then each commit's labels, message, date, author and hash">
+</picture>
+<p align="center"><sub>The history of <a href="https://github.com/expressjs/express">expressjs/express</a>, with every remote branch shown.</sub></p>
+
+> **Status: early preview (v0.3.0).** It works today on Windows, reading repositories without ever changing them.
+> There is no installer yet: you run it from source with Node. An installer is the next milestone.
+
+## Why Trunks Graph?
+
+Command-line `git log --graph` is hard to read past a handful of branches, and the good graph views live inside
+editors. Trunks Graph is a small, focused app that does one thing: shows you how your history actually fits
+together.
+
+- **For anyone reviewing history:** see where a branch left, what it carried and where it came back.
+- **For teams:** follow the branches you care about and hide the rest.
+- **For people who don't use an editor's Git view:** a standalone window you open on any repository.
+
+## Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**🌳 One graph for every branch**<br>
+Each commit on its own row, with the graph, message, date, author and hash. Branch, remote-branch and tag
+labels sit on their commits, and uncommitted changes show as the top row.
+
+</td>
+<td width="50%" valign="top">
+
+**🎯 The branches you choose**<br>
+A Branches dropdown with Show All, multiple selection and a filter box, plus Show Remote Branches. Both are
+remembered for each repository.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🔍 Commit details**<br>
+Click a commit, a stash or the uncommitted changes to read its details under the row: parents, author and
+committer, the whole message, and the changed files as a tree or a list.
+
+</td>
+<td valign="top">
+
+**⌨️ Keyboard and layout**<br>
+Move between commits with the keyboard. Resize the details area, dock it at the bottom, and it stays that way
+after a restart.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🌗 Light, dark or system**<br>
+A theme switch that applies at once and can follow the operating system.
+
+</td>
+<td valign="top">
+
+**📚 Large repositories**<br>
+Commits load page by page with Load More. Review round 22 compared the drawn rows with `git log` across the
+first 1 200 rows of a 50 000-commit test repository and found no difference.
+
+</td>
+</tr>
+</table>
+
+### Safe by design
+
+This version **only reads** your repository. It runs read-only git commands and never writes, so you can open
+it on any work in progress without risk. Write actions (checkout, merge, rebase and the rest) come in later
+milestones, behind menus and confirmation dialogs.
+
+## Install
+
+Until the installer ships, run it from source. You need [git](https://git-scm.com/) and
+[Node.js](https://nodejs.org/) 24.18.0.
+
+```bash
+git clone https://github.com/paulo-raoni/trunks-graph.git
+cd trunks-graph
 npm ci
-npm start                            # open the application
-npm start -- C:\path\to\a\repository  # open it on a repository
-npm run gates:quick                  # every gate but mutation, in minutes
-npm run gates                        # those plus mutation testing
-npm run gates:budgets                # the wall-clock budgets, on an otherwise idle machine
+npm start -- /path/to/a/repository
 ```
 
-Windows is the platform the application is built and verified on for now. The code is written
-cross-platform, and macOS and Linux builds are a later milestone.
+Without a path, choose a folder with **Open Repository**. Builds and checks are described in
+[`docs/SETUP.md`](docs/SETUP.md).
 
-## Not affiliated
+It is built and verified on Windows. The code is written to be cross-platform, and help verifying it on macOS
+and Linux is welcome ([#22](https://github.com/paulo-raoni/trunks-graph/issues/22)).
 
-This project is independent. It is **not affiliated with, endorsed by or sponsored by** Git Graph, its author
-(mhutchie), or Microsoft. Product names are used only to describe the behaviour this application aims to
-reproduce.
+## Roadmap
 
-## Clean-room reimplementation
+The MVP (graph, branch filter, commit details) is done. Next, in order:
 
-Git Graph's licence is not an open-source licence. Since version 1.5.0 its `LICENSE` grants permission to use,
-copy, modify and merge the software but states that permission is **not granted** to publish, distribute,
-sublicense or sell derivative works of it. This project is published, so it cannot be a derivative work.
+- [ ] Windows installer and portable build ([#18](https://github.com/paulo-raoni/trunks-graph/issues/18))
+- [ ] Web component and live demo for websites ([#20](https://github.com/paulo-raoni/trunks-graph/issues/20))
+- [ ] Graph fidelity: styles, columns, ordering ([#1](https://github.com/paulo-raoni/trunks-graph/issues/1))
+- [ ] Context menus and read-only actions ([#2](https://github.com/paulo-raoni/trunks-graph/issues/2))
+- [ ] Diff and file viewer ([#3](https://github.com/paulo-raoni/trunks-graph/issues/3))
+- [ ] Branch, commit, tag and stash actions ([#6](https://github.com/paulo-raoni/trunks-graph/issues/6),
+      [#10](https://github.com/paulo-raoni/trunks-graph/issues/10))
+- [ ] macOS and Linux builds ([#19](https://github.com/paulo-raoni/trunks-graph/issues/19))
 
-It is therefore a **clean-room reimplementation of observable behaviour**:
-
-- Behaviour is learned by **using** the extension and by reading its public user-facing description, and is
-  written down here in our own words.
-- **Nothing is taken from its repository** — no source code, styles, icons, images, strings or other assets —
-  and contributors do not read its source while working on this project. This applies to every version of
-  Git Graph, including the early MIT-licensed ones, and to every fork of it.
-- Code is never reproduced from memory of that source either.
-
-The full rule, and how it is checked in review, is in [`AGENTS.md`](AGENTS.md).
+Every planned milestone is an [issue labelled `roadmap`](https://github.com/paulo-raoni/trunks-graph/issues?q=is%3Aopen+label%3Aroadmap),
+and the full plan is in [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Contributing
 
-Read [`AGENTS.md`](AGENTS.md) before planning, writing or reviewing anything. It is the workflow contract
-and it is authoritative: how work is planned (epic, milestone, slice), how it moves through worktrees and
-branches, how it is reviewed, and what counts as a complete delivery.
+Contributions are welcome. Start with [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md), then pick an issue
+labelled [`help wanted`](https://github.com/paulo-raoni/trunks-graph/labels/help%20wanted) or
+[`good first issue`](https://github.com/paulo-raoni/trunks-graph/labels/good%20first%20issue).
 
-Setup notes for building locally are in [`docs/SETUP.md`](docs/SETUP.md): what has to be installed, what was
-verified on the development machine, and the traps met while building.
+The project runs on a strict workflow contract, [`AGENTS.md`](AGENTS.md): every change is planned as a slice,
+built in its own branch, checked by a set of gates (types, unit and mutation tests, end-to-end tests,
+performance and size budgets) and reviewed by someone who did not write it.
 
-## Layout
+## FAQ
 
-```
-AGENTS.md            the workflow contract (authoritative)
-TASK_TEMPLATE.md     the shape of every task file
-AUDIT_TEMPLATE.md    the shape of every audit file
-src/contracts/       the shared data types and the IPC contract; depends on nothing
-src/app/             the composition root: the Electron main process
-src/preload/         the typed bridge between the main process and the renderer
-src/ui/              the renderer
-docs/PLAN.md         every behaviour to reproduce, as epics, milestones and slices
-docs/ADR-*.md        the decisions: the stack, the architecture and budgets, the quality gates
-docs/plan/           the epic and milestone in flight
-docs/SETUP.md        what has to be installed, and what was verified on the development machine
-docs/INPUTS.md       what this project inherited, what it changed, and what is still open
-docs/KICKOFF.md      the opening brief for the first working session
-LICENSE              MIT
-```
+**Is it related to the Git Graph extension for VS Code?**
+It reproduces that extension's behaviour as a standalone app, but it is an independent project. It is **not
+affiliated with, endorsed by or sponsored by** Git Graph, its author (mhutchie) or Microsoft. Git Graph's
+licence does not allow derivative works to be published, so this is a **clean-room reimplementation**: behaviour
+is learned only by using the extension and reading its public Marketplace page, and nothing is taken from its
+repository, of any version or fork. The full rule is in [`AGENTS.md`](AGENTS.md) §1.
 
-Those are the directories that exist today. The architecture has three more rings, and each one is created
-by the slice that puts a real file in it rather than standing empty: `src/core/` for pure domain and use
-cases, `src/ports/` for the interfaces it needs from the world, and `src/adapters/` for their
-implementations. **Dependencies point inward only, and a gate enforces it rather than a convention**, so the
-rules for all seven exist already even where the directory does not.
-[`docs/ADR-0002-architecture-and-performance.md`](docs/ADR-0002-architecture-and-performance.md) explains the
-rings and carries the CPU and memory budgets every change is measured against.
+**Is it related to Git?**
+Trunks Graph is a viewer for Git repositories. It is not part of the Git project, which neither makes nor
+endorses it. "Git" is a trademark of the Software Freedom Conservancy.
+
+**Why Electron?**
+The trade-offs, including the lighter shell that was weighed, are in
+[`docs/ADR-0001-stack.md`](docs/ADR-0001-stack.md).
+[`docs/ADR-0002-architecture-and-performance.md`](docs/ADR-0002-architecture-and-performance.md) carries the
+memory and CPU budgets every change is measured against.
+
+**Can I embed the graph in a website?**
+Not yet. A versioned snapshot format and a `<git-graph>` web component are planned:
+[`docs/INTEGRATION-WEB.md`](docs/INTEGRATION-WEB.md) and
+[#20](https://github.com/paulo-raoni/trunks-graph/issues/20). A hosted mode is an open question
+([#21](https://github.com/paulo-raoni/trunks-graph/issues/21)).
 
 ## Licence
 

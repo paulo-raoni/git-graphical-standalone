@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="title">
+  <title id="title">Trunks Graph</title>
+  <rect width="128" height="128" rx="28" fill="#0f172a"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 100 C64 112 52 112 44 114" stroke="#3b82f6" stroke-width="7"/>
+    <path d="M64 100 C64 112 76 112 84 114" stroke="#3b82f6" stroke-width="7"/>
+    <path d="M64 84 C64 70 34 72 34 52 V42" stroke="#2dd4bf" stroke-width="9"/>
+    <path d="M64 64 C64 52 92 54 92 40 V34" stroke="#fbbf24" stroke-width="9"/>
+    <path d="M64 104 V28" stroke="#3b82f6" stroke-width="13"/>
+  </g>
+  <circle cx="34" cy="40" r="10" fill="#2dd4bf"/>
+  <circle cx="92" cy="32" r="10" fill="#fbbf24"/>
+  <circle cx="64" cy="26" r="11" fill="#3b82f6"/>
+  <circle cx="64" cy="84" r="6" fill="#0f172a"/>
+</svg>
