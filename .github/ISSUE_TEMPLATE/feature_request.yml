@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest something Trunks Graph should do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Check the [roadmap issues](https://github.com/paulo-raoni/trunks-graph/issues?q=label%3Aroadmap) first:
+        your idea may already be planned. Describe behaviour in your own words; this project never takes code,
+        text or images from other applications.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to do
+      description: The task or problem, not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
